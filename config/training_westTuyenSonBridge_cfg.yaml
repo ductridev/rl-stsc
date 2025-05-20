@@ -24,10 +24,10 @@ agent:
 
 dir:
   models_path_name: "models/"
-  sumocfg_file_name: "intersections/westTuyenSonBridge/osm.sumocfg"
+  sumocfg_file_name: "simulations/westTuyenSonBridge/osm.sumocfg"
 
-intersections:
-  - intersection_1:
+traffic_lights:
+  - traffic_light_1:
     id: "cluster_3070397256_6164917307_6164917332_6164917334_#7more"
     detectors:
       - id: "e3_0"
@@ -58,7 +58,7 @@ intersections:
           - 12
           - 13
           - 14
-  - intersection_2:
+  - traffic_light_2:
     id: "cluster_1333258669_1333279736_6518778049_6518778050"
     detectors:
       - id: "e3_3"
@@ -89,7 +89,7 @@ intersections:
           - 17
           - 18
           - 19
-  - intersection_3:
+  - traffic_light_3:
     id: "cluster_1333246087_3070300095_3078041918_6518727272_#2more"
     detectors:
       - id: "e3_7"

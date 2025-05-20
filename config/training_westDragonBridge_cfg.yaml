@@ -24,10 +24,10 @@ agent:
 
 dir:
   models_path_name: "models/"
-  sumocfg_file_name: "intersections/westDragonBridge/osm.sumocfg"
+  sumocfg_file_name: "simulations/westDragonBridge/osm.sumocfg"
 
-intersections:
-  - intersection_1:
+traffic_lights:
+  - traffic_light_1:
     id: "clusterJ35_cluster2988146972_9662761813_J33_J34_#1more"
     detectors:
       - id: "e3_0"
@@ -52,7 +52,7 @@ intersections:
           - 13
           - 14
           - 15
-  - intersection_2:
+  - traffic_light_2:
     id: "cluster_2988146960_2988146981_3068684710_6528582411"
     detectors:
       - id: "e3_4"
@@ -82,7 +82,7 @@ intersections:
           - 4
           - 5
           - 6
-  - intersection_3:
+  - traffic_light_3:
     id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
     detectors:
       - id: "e3_6"
