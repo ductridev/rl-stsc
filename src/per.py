@@ -3,6 +3,9 @@ import numpy as np
 from sumtree import SumTree
 
 class PERMemory:
+    """
+    Prioritized Experience Replay (PER) memory buffer.
+    """
     def __init__(self, capacity, alpha):
         self.tree = SumTree(capacity)
         self.alpha = alpha  # controls how much prioritization is used
