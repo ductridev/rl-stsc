@@ -20,7 +20,7 @@ class NStepReplayMemory(ReplayMemory):
         self.gamma = gamma
         self.n_buffer = deque(maxlen=n_step)
 
-    def push(self, state, action, reward, next_state, done):
+    def push(self, state, action, reward, next_state, done = False):
         """
         Save a transition into the n-step replay buffer.
         This method accumulates rewards over n steps and stores the transition
