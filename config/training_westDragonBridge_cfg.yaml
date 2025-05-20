@@ -55,14 +55,53 @@ intersections:
   - intersection_2:
     id: "cluster_2988146960_2988146981_3068684710_6528582411"
     detectors:
-      - id: "e3_0"
-      - id: "e3_1"
-      - id: "e3_3"
       - id: "e3_4"
+        lane_idx:
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          - 13
+      - id: "e3_5"
+        lane_idx:
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
+          - 20
+      - id: "e3_2"
+        lane_idx:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
   - intersection_3:
     id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
     detectors:
-      - id: "e3_0"
-      - id: "e3_1"
-      - id: "e3_3"
-      - id: "e3_4"
+      - id: "e3_6"
+        lane_idx:
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+      - id: "e3_7"
+        lane_idx:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+      - id: "e3_8"
+        lane_idx:
+          - 10
+          - 11
+          - 12
+          - 13
