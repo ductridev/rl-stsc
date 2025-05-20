@@ -102,25 +102,41 @@ def import_train_configuration(file_path):
         config = {}
 
         # Convert the configuration to a dictionary
+
+        # Simulation configuration
         config['gui'] = content['simulation']['gui']
         config['total_episodes'] = content['simulation']['total_episodes']
         config['max_steps'] = content['simulation']['max_steps']
-        config['n_cars_generated'] = content['simulation']['n_cars_generated']
-        config['green_duration'] = content['simulation']['green_duration']
-        config['yellow_duration'] = content['simulation']['yellow_duration']
-        config['num_layers'] = content['model']['num_layers']
-        config['width_layers'] = content['model']['width_layers']
-        config['batch_size'] = content['model']['batch_size']
-        config['learning_rate'] = content['model']['learning_rate']
-        config['training_epochs'] = content['model']['training_epochs']
+        config['interphase_duration'] = content['simulation']['interphase_duration']
+
+        # Memory configuration
         config['memory_size_min'] = content['memory']['memory_size_min']
         config['memory_size_max'] = content['memory']['memory_size_max']
-        config['num_states'] = content['agent']['num_states']
-        config['num_actions'] = content['agent']['num_actions']
-        config['gamma'] = content['agent']['gamma']
+
+        # Green duration agent
+        config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
+        config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
+        config['green_duration_agent']['gamma'] = content['green_duration_agent']['gamma']
+        config['green_duration_agent']['num_layers'] = content['green_duration_agent']['model']['num_layers']
+        config['green_duration_agent']['batch_size'] = content['green_duration_agent']['model']['batch_size']
+        config['green_duration_agent']['learning_rate'] = content['green_duration_agent']['model']['learning_rate']
+        config['green_duration_agent']['actions_space'] = content['green_duration_agent']['model']['actions_space']
+        
+        # Selector phase agent
+        config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
+        config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
+        config['selector_phase_agent']['gamma'] = content['selector_phase_agent']['gamma']
+        config['selector_phase_agent']['num_layers'] = content['selector_phase_agent']['model']['num_layers']
+        config['selector_phase_agent']['batch_size'] = content['selector_phase_agent']['model']['batch_size']
+        config['selector_phase_agent']['learning_rate'] = content['selector_phase_agent']['model']['learning_rate']
+
+        # Training configuration
+        config['training_epochs'] = content['model']['training_epochs']
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumocfg_file_name'] = content['dir']['sumocfg_file_name']
-        config['intersections'] = content['intersections']
+
+        # Intersection configuration
+        config['traffic_lights'] = content['traffic_lights']
 
         return config
     
@@ -148,16 +164,26 @@ def import_test_configuration(file_path):
         config = {}
 
         # Convert the configuration to a dictionary
+        # Simulation configuration
         config['gui'] = content['simulation']['gui']
         config['max_steps'] = content['simulation']['max_steps']
-        config['n_cars_generated'] = content['simulation']['n_cars_generated']
         config['episode_seed'] = content['simulation']['episode_seed']
-        config['yellow_duration'] = content['simulation']['yellow_duration']
-        config['num_states'] = content['agent']['num_states']
-        config['num_actions'] = content['agent']['num_actions']
+        config['interphase_duration'] = content['simulation']['interphase_duration']
+
+        # Green duration agent configuration
+        config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
+        config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
+
+        # Selector phase agent
+        config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
+        config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
+
+        # Testing configuration
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumocfg_file_name'] = content['dir']['sumocfg_file_name']
         config['model_to_test'] = content['dir']['model_to_test']
-        config['intersections'] = content['intersections']
+
+        # Intersection configuration
+        config['traffic_lights'] = content['traffic_lights']
 
         return config

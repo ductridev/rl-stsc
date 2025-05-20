@@ -7,7 +7,7 @@ class NStepReplayMemory(ReplayMemory):
     This is useful for implementing n-step Q-learning, where the agent learns from
     multiple steps of experience at once.
     """
-    def __init__(self, capacity, n_step, gamma):
+    def __init__(self, max_size, min_size, n_step, gamma):
         """
         Initialize the n-step replay memory with a fixed capacity.
         Args:
@@ -15,7 +15,7 @@ class NStepReplayMemory(ReplayMemory):
             n_step (int): number of steps to consider for n-step Q-learning
             gamma (float): discount factor for future rewards
         """
-        super().__init__(capacity)
+        super().__init__(max_size, min_size)
         self.n_step = n_step
         self.gamma = gamma
         self.n_buffer = deque(maxlen=n_step)

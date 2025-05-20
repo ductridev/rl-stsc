@@ -1,12 +1,15 @@
 simulation:
   gui: true
   max_steps: 500
-  n_cars_generated: 100
   yellow_duration: 5
 
-agent:
-  num_states: 10
-  num_actions: 4
+green_duration_agent:
+  num_states: 1
+  num_actions: 6
+
+selector_phase_agent:
+  num_states: 5
+  num_actions: 1
 
 dir:
   models_path_name: "models/"

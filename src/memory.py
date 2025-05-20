@@ -11,10 +11,11 @@ class ReplayMemory:
         transition (namedtuple): structure to hold (state, action, reward, next_state, done)
     """
 
-    def __init__(self, capacity):
+    def __init__(self, max_size, min_size):
         """Initialize the replay memory with a fixed capacity."""
-        self.capacity = capacity
-        self.memory = deque(maxlen=capacity)
+        self.max_size = max_size
+        self.min_size = min_size
+        self.memory = deque(maxlen=max_size)
         self.transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
 
     def push(self, state, action, reward, next_state, done):
@@ -41,6 +42,32 @@ class ReplayMemory:
             A list of transitions sampled randomly
         """
         return random.sample(self.memory, batch_size)
+    
+    def get_sample(self, n):
+        """
+        Get a sample of size n from the replay buffer.
+
+        Args:
+            n (int): number of transitions to sample
+
+        Returns:
+            A list of transitions sampled randomly
+        """
+        if self.get_size() < self.min_size:
+            return []
+        
+        if n > self.get_size():
+            return random.sample(self.memory, self.get_size()) # get all samples if n is larger than the buffer size
+        return random.sample(self.memory, n)
+
+    def get_size(self):
+        """
+        Get the current size of the replay buffer.
+
+        Returns:
+            int: current size of the replay buffer
+        """
+        return len(self.memory)
 
     def __len__(self):
         """Return the current size of the replay buffer."""
