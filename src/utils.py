@@ -22,11 +22,13 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
     # Add SUMO tools to Python path
     sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 
+    print("Starting SUMO...")
+
     # Start SUMO with GUI or without GUI
     if gui:
-        traci.start(["sumo-gui", "-c", os.path.join('intersection', sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", max_steps])
+        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps)])
     else:
-        traci.start(["sumo", "-c", os.path.join('intersection', sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", max_steps])
+        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps)])
 
 def set_train_path(model_name):
     """
@@ -114,6 +116,7 @@ def import_train_configuration(file_path):
         config['memory_size_max'] = content['memory']['memory_size_max']
 
         # Green duration agent
+        config['green_duration_agent'] = {}
         config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
         config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
         config['green_duration_agent']['gamma'] = content['green_duration_agent']['gamma']
@@ -123,6 +126,7 @@ def import_train_configuration(file_path):
         config['green_duration_agent']['actions_space'] = content['green_duration_agent']['model']['actions_space']
         
         # Selector phase agent
+        config['selector_phase_agent'] = {}
         config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
         config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
         config['selector_phase_agent']['gamma'] = content['selector_phase_agent']['gamma']
@@ -133,11 +137,12 @@ def import_train_configuration(file_path):
         # Training configuration
         config['training_epochs'] = content['model']['training_epochs']
         config['models_path_name'] = content['dir']['models_path_name']
-        config['sumocfg_file_name'] = content['dir']['sumocfg_file_name']
+        config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
 
         # Intersection configuration
         config['traffic_lights'] = content['traffic_lights']
 
+        print("Configuration loaded successfully.")
         return config
     
 def import_test_configuration(file_path):
@@ -180,7 +185,7 @@ def import_test_configuration(file_path):
 
         # Testing configuration
         config['models_path_name'] = content['dir']['models_path_name']
-        config['sumocfg_file_name'] = content['dir']['sumocfg_file_name']
+        config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
         config['model_to_test'] = content['dir']['model_to_test']
 
         # Intersection configuration
