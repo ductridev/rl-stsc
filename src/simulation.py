@@ -67,58 +67,83 @@ class Simulation:
 
         while self.step < self.max_steps:
             for i in range(len(self.traffic_lights)):
-                traffic_light = self.traffic_lights[i]
+                traffic_light = self.traffic_lights[0]
                 # Train the agents
                 self.train_green_duration_agent(traffic_light, epsilon)
                 # self.train_selector_phase_agent(traffic_light, epsilon)
 
                 # Get the action from the green duration agent and set the green phase
-                green_street = random.choice(list(self.green_duration_agent_action[traffic_light["id"]].keys()))
+                green_street = random.choice(
+                    list(self.green_duration_agent_action[traffic_light["id"]].keys())
+                )
                 self.green_time_old = self.green_time
-                self.green_time = self.green_duration_agent_action[traffic_light["id"]][green_street]
+                self.green_time = self.green_duration_agent_action[traffic_light["id"]][
+                    green_street
+                ]
+
+                print("Green street:", green_street, "Green time:", self.green_time)
 
                 # Get number of phases
-                num_phases = sum(len(detector['lane_idx']) for detector in traffic_light["detectors"])
+                num_phases = sum(
+                    len(detector["lane_idx"]) for detector in traffic_light["detectors"]
+                )
 
                 # Get all phase index with match street name from green_time
                 phase_index = [
-                    i for i, detector in enumerate(traffic_light["detectors"]) if detector["street"] == green_street
+                    detector["lane_idx"]
+                    for detector in traffic_light["detectors"]
+                    if detector["street"] == green_street
                 ]
+
+                # We flatten the list
+                phase_index = [i for sublist in phase_index for i in sublist]
+
+                print("Phase index:", phase_index)
 
                 steps_todo = 0
                 # Set the green phase for the traffic light
-                self.set_green_phase(traffic_light["id"], self.green_time, phase_index, num_phases)
+                self.set_green_phase(
+                    traffic_light["id"], self.green_time, phase_index, num_phases
+                )
 
                 if (self.step + self.green_time) >= self.max_steps:
                     steps_todo = self.max_steps - self.step
+                else:
+                    steps_todo = self.green_time
 
                 number_of_vehicles = 0
-                old_vehicle_ids = []
+
+                vehicle_ids = [
+                    traci.lanearea.getLastStepVehicleIDs(detector["id"])
+                    for detector in traffic_light["detectors"] if detector["street"] == green_street
+                ]
+
+                old_vehicle_ids = vehicle_ids
 
                 while steps_todo > 0:
-                    # Get the vehicle IDs from the detectors
-                    for detector in traffic_light['detectors']:
-                        old_vehicle_ids.append(traci.lanearea.getLastStepVehicleIDs(detector['id']))
-
-                    vehicle_ids = []
-
-                    for detector in traffic_light['detectors']:
-                        vehicle_ids = vehicle_ids.append(traci.lanearea.getLastStepVehicleIDs(detector['id']))
-
-                    # Calculate the number of vehicles exit the detector by comparing the old and new vehicle IDs
-                    for i in range(len(old_vehicle_ids)):
-                        for vehicle_id in old_vehicle_ids[i]:
-                            if vehicle_id not in vehicle_ids[i]:
-                                number_of_vehicles += 1
-
                     self.step += 1
                     steps_todo -= 1
                     traci.simulationStep()
 
+                    vehicle_ids = [
+                        traci.lanearea.getLastStepVehicleIDs(detector["id"])
+                        for detector in traffic_light["detectors"] if detector["street"] == green_street
+                    ]
+
+                    # Calculate the number of vehicles exit the detector by comparing the old and new vehicle IDs
+                    number_of_vehicles += sum(
+                        1 for vid in old_vehicle_ids if vid not in vehicle_ids
+                    )
+
+                    # Save current vehicles as old vehicles to compare in the next step
+                    old_vehicle_ids = vehicle_ids
+
                 print("Number of vehicles:", number_of_vehicles)
 
                 # Get outflow rate
-                self.outflow_rate = number_of_vehicles / self.green_time if self.green_time > 0 else 0
+                self.outflow_rate = (
+                    number_of_vehicles / self.green_time if self.green_time > 0 else 0
+                )
 
                 print("Outflow rate:", self.outflow_rate)
 
@@ -166,7 +191,9 @@ class Simulation:
                 if street not in self.green_duration_agent_action[traffic_light["id"]]:
                     self.green_duration_agent_action[traffic_light["id"]][street] = 0
 
-                self.green_duration_agent_action[traffic_light["id"]][street] = np.argmax(result.detach().numpy())
+                self.green_duration_agent_action[traffic_light["id"]][street] = (
+                    np.argmax(result.detach().numpy())
+                )
 
     def get_green_duration_reward(self):
         """
@@ -214,7 +241,7 @@ class Simulation:
             )
 
         # Set the green phase for the traffic light
-        self.set_green_phase(self.selector_phase_agent_action, traffic_light['id'])
+        self.set_green_phase(self.selector_phase_agent_action, traffic_light["id"])
 
         # Set the yellow phase for the traffic light
         # self.set_yellow_phase(traffic_light['id'])
@@ -248,7 +275,7 @@ class Simulation:
 
     def replace_chars(self, s, indexes, replacements):
         s_list = list(s)
-        
+
         if isinstance(replacements, str):
             # One replacement character for all indices
             for i in indexes:
@@ -259,8 +286,8 @@ class Simulation:
             for i, c in zip(indexes, replacements):
                 if 0 <= i < len(s_list):
                     s_list[i] = c
-        
-        return ''.join(s_list)
+
+        return "".join(s_list)
 
     def select_action(self, state, epsilon):
         """
