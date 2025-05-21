@@ -16,8 +16,8 @@ green_duration_agent:
   num_actions: 6
   gamma: 0.99
   model:
-    num_layers: 3
-    batch_size: 64
+    num_layers: 6
+    batch_size: 128
     learning_rate: 0.0001
     actions_space:
       - -3
@@ -98,7 +98,7 @@ traffic_lights:
           - 3
           - 4
   - traffic_light_2:
-    id: "cluster_2988146960_2988146981_3068684710_6528582411"
+    id: "joinedS_6528582408_6528582409_cluster_2988146960_2988146981_3068684710_6528582411"
     detectors:
       - id: "e2_0"
         street: "NVL-DB"
