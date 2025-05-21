@@ -15,10 +15,6 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
     import sys
     import traci
 
-    # Set environment variables
-    os.environ["SUMO_HOME"] = "/usr/local/share/sumo"
-    os.environ["SUMO_GUI"] = "1" if gui else "0"
-
     # Add SUMO tools to Python path
     sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 
