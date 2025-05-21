@@ -14,9 +14,9 @@ class Intersection:
         """
         # Get all intersections inside intersections folder
         intersections = []
-        for folder in os.listdir(os.path.join(os.getcwd(), 'intersection')):
-            if os.path.isdir(os.path.join(os.getcwd(), 'intersection', folder)):
-                if os.path.exists(os.path.join(os.getcwd(), 'intersection', folder, 'osm.sumocfg')):
+        for folder in os.listdir(os.path.join(os.getcwd(), 'simulations')):
+            if os.path.isdir(os.path.join(os.getcwd(), 'simulations', folder)):
+                if os.path.exists(os.path.join(os.getcwd(), 'simulations', folder, 'osm.sumocfg')):
                     intersections.append(folder)
         return intersections
     
@@ -30,7 +30,7 @@ class Intersection:
         Returns:
             bool: True if the intersection exists, False otherwise
         """
-        return os.path.exists(os.path.join(os.getcwd(), 'intersection', intersection, 'osm.sumocfg'))
+        return os.path.exists(os.path.join(os.getcwd(), 'simulations', intersection, 'osm.sumocfg'))
     
     @staticmethod
     def generate_routes(intersection, enable_bicycle=False, enable_pedestrian=False, enable_motorcycle=False, enable_passenger=False, enable_truck=False):
@@ -48,16 +48,23 @@ class Intersection:
         # Check if the intersection exists
         if not Intersection.check_intersection_exists(intersection):
             raise ValueError(f"Intersection {intersection} does not exist.")
-        if enable_bicycle:
-            Intersection.generate_bicycle_routes(intersection)
-        if enable_pedestrian:
-            Intersection.generate_pedestrian_routes(intersection)
-        if enable_motorcycle:
-            Intersection.generate_motorcycle_routes(intersection)
-        if enable_passenger:
-            Intersection.generate_passenger_routes(intersection)
-        if enable_truck:
-            Intersection.generate_truck_routes(intersection)
+        
+        original_path = os.getcwd()
+        try:
+            intersection_path = os.path.join(os.getcwd(), 'simulations', intersection)
+            os.chdir(intersection_path)
+            if enable_bicycle:
+                Intersection.generate_bicycle_routes(intersection)
+            if enable_pedestrian:
+                Intersection.generate_pedestrian_routes(intersection)
+            if enable_motorcycle:
+                Intersection.generate_motorcycle_routes(intersection)
+            if enable_passenger:
+                Intersection.generate_passenger_routes(intersection)
+            if enable_truck:
+                Intersection.generate_truck_routes(intersection)
+        finally:
+            os.chdir(original_path)
 
     @staticmethod
     def generate_bicycle_routes(intersection):
@@ -69,8 +76,9 @@ class Intersection:
         Returns:
             list: list of all bicycle routes found in the data
         """
-
-        os.system('python "%SUMO_HOME%\tools\randomTrips.py" -n osm.net.xml.gz --fringe-factor 2 --insertion-density 60 -o osm.bicycle.trips.xml -r osm.bicycle.rou.xml -b 0 -e 3600 --trip-attributes "departLane=\"best\"" --fringe-start-attributes "departSpeed=\"max\"" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class bicycle --vclass bicycle --prefix bike --max-distance 8000')
+        
+        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 2 --insertion-density 60 -o osm.bicycle.trips.xml -r osm.bicycle.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class bicycle --vclass bicycle --prefix bike --max-distance 8000')
+        print("Bicycle routes generated")
     
     @staticmethod
     def generate_pedestrian_routes(intersection):
@@ -82,7 +90,9 @@ class Intersection:
         Returns:
             list: list of all pedestrian routes found in the data
         """
-        os.system('python "%SUMO_HOME%\tools\randomTrips.py" -n osm.net.xml.gz --fringe-factor 1 --insertion-density 100 -o osm.pedestrian.trips.xml -r osm.pedestrian.rou.xml -b 0 -e 3600 --vehicle-class pedestrian --prefix ped --pedestrians --max-distance 2000')
+        
+        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 1 --insertion-density 100 -o osm.pedestrian.trips.xml -r osm.pedestrian.rou.xml -b 0 -e 3600 --vehicle-class pedestrian --prefix ped --pedestrians --max-distance 2000')
+        print("Pedestrian routes generated")
 
     @staticmethod
     def generate_motorcycle_routes(intersection):
@@ -94,7 +104,9 @@ class Intersection:
         Returns:
             list: list of all motorcycle routes found in the data
         """
-        os.system('python "%SUMO_HOME%\tools\randomTrips.py" -n osm.net.xml.gz --fringe-factor 2 --insertion-density 40 -o osm.motorcycle.trips.xml -r osm.motorcycle.rou.xml -b 0 -e 3600 --trip-attributes "departLane=\"best\"" --fringe-start-attributes "departSpeed=\"max\"" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class motorcycle --vclass motorcycle --prefix motorcycle --max-distance 1200')
+        
+        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 2 --insertion-density 40 -o osm.motorcycle.trips.xml -r osm.motorcycle.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class motorcycle --vclass motorcycle --prefix motorcycle --max-distance 1200')
+        print("Motorcycle routes generated")
 
     @staticmethod
     def generate_passenger_routes(intersection):
@@ -106,7 +118,9 @@ class Intersection:
         Returns:
             list: list of all passenger routes found in the data
         """
-        os.system('python "%SUMO_HOME%\tools\randomTrips.py" -n osm.net.xml.gz --fringe-factor 5 --insertion-density 120 -o osm.passenger.trips.xml -r osm.passenger.rou.xml -b 0 -e 3600 --trip-attributes "departLane=\"best\"" --fringe-start-attributes "departSpeed=\"max\"" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class passenger --vclass passenger --prefix veh --min-distance 300 --min-distance.fringe 100 --allow-fringe.min-length 10000 --lanes')
+        
+        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 5 --insertion-density 120 -o osm.passenger.trips.xml -r osm.passenger.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class passenger --vclass passenger --prefix veh --min-distance 300 --min-distance.fringe 100 --allow-fringe.min-length 10000 --lanes')
+        print("Passenger routes generated")
 
     @staticmethod
     def generate_truck_routes(intersection):
@@ -118,4 +132,6 @@ class Intersection:
         Returns:
             list: list of all truck routes found in the data
         """
-        os.system('python "%SUMO_HOME%\tools\randomTrips.py" -n osm.net.xml.gz --fringe-factor 5 --insertion-density 80 -o osm.truck.trips.xml -r osm.truck.rou.xml -b 0 -e 3600 --trip-attributes "departLane=\"best\"" --fringe-start-attributes "departSpeed=\"max\"" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class truck --vclass truck --prefix truck --min-distance 600 --min-distance.fringe 100 --allow-fringe.min-length 10000 --lanes')
+        
+        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 5 --insertion-density 80 -o osm.truck.trips.xml -r osm.truck.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class truck --vclass truck --prefix truck --min-distance 600 --min-distance.fringe 100 --allow-fringe.min-length 10000 --lanes')
+        print("Truck routes generated")
