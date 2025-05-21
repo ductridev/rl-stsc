@@ -18,7 +18,7 @@ class ReplayMemory:
         self.memory = deque(maxlen=max_size)
         self.transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
 
-    def push(self, state, action, reward, next_state, done):
+    def push(self, state, action, reward, next_state, done = False):
         """
         Save a transition into the replay buffer.
 
@@ -41,7 +41,7 @@ class ReplayMemory:
         Returns:
             A list of transitions sampled randomly
         """
-        return random.sample(self.memory, batch_size)
+        return random.sample(self.min_size, batch_size)
     
     def get_sample(self, n):
         """
