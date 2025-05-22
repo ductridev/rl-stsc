@@ -42,13 +42,17 @@ dir:
   sumocfg_file_name: "simulations/westDragonBridge/osm.sumocfg"
 
 phases:
- - rrrrGGGGrrrrr
- - GGGGrrrrrrrr
- - rrrrrrrrGGGG
+ 
+   - 
+
 
 traffic_lights:
   - traffic_light_1:
     id: "clusterJ35_cluster2988146972_9662761813_J33_J34_#1more"
+    phase: 
+      - GrrrrrrrrrrGGGGG
+      - rrrrrGGGGGGrrrrr
+      - GGGGGGrrrrrrrrrr
     detectors:
       - id: "e2_3"
         street: "NVL-DB"
@@ -140,6 +144,10 @@ traffic_lights:
           - 4
   - traffic_light_2:
     id: "joinedS_6528582408_6528582409_cluster_2988146960_2988146981_3068684710_6528582411"
+    phase: 
+      - GrrrrrrrrrrrrGGGGGGG
+      - GGGGGGGrrrrrrrrrrrrr
+      - rrrrrrrGGGGGGrrrrrrr
     detectors:
       - id: "e2_0"
         street: "NVL-DB"
@@ -200,6 +208,10 @@ traffic_lights:
           - 13
   - traffic_light_3:
     id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
+    phase: 
+      - rrrrrGGGrrGGGG
+      - GGGGGrrrrrrrrr
+      - rrrrrGGGGGrrrr
     detectors:
       - id: "e2_24"
         street: "NVL-DB"
