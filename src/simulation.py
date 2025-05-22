@@ -64,6 +64,8 @@ class Simulation:
         print("Simulation started")
         print("Simulating...")
         print("---------------------------------------")
+        green_street_old = ""
+        green_street = ""
 
         while self.step < self.max_steps:
             for i in range(len(self.traffic_lights)):
@@ -73,9 +75,14 @@ class Simulation:
                 # self.train_selector_phase_agent(traffic_light, epsilon)
 
                 # Get the action from the green duration agent and set the green phase
-                green_street = random.choice(
-                    list(self.green_duration_agent_action[traffic_light["id"]].keys())
-                )
+                while green_street == green_street_old:
+                    green_street = random.choice(
+                        list(
+                            self.green_duration_agent_action[traffic_light["id"]].keys()
+                        )
+                    )
+                green_street_old = green_street
+
                 self.green_time_old = self.green_time
                 self.green_time = self.green_duration_agent_action[traffic_light["id"]][
                     green_street
@@ -88,15 +95,16 @@ class Simulation:
                     len(detector["lane_idx"]) for detector in traffic_light["detectors"]
                 )
 
-                # Get all phase index with match street name from green_time
-                phase_index = [
-                    detector["lane_idx"]
-                    for detector in traffic_light["detectors"]
-                    if detector["street"] == green_street
-                ]
-
-                # We flatten the list
-                phase_index = [i for sublist in phase_index for i in sublist]
+                # Get all phase index with match street name from green_time, use set to remove duplicates and since it's array in array so we have to flatten it
+                phase_index = set(
+                    item
+                    for sublist in [
+                        detector["lane_idx"]
+                        for detector in traffic_light["detectors"]
+                        if detector["street"] == green_street
+                    ]
+                    for item in sublist
+                )
 
                 print("Phase index:", phase_index)
 
@@ -113,30 +121,42 @@ class Simulation:
 
                 number_of_vehicles = 0
 
-                vehicle_ids = [
-                    traci.lanearea.getLastStepVehicleIDs(detector["id"])
-                    for detector in traffic_light["detectors"] if detector["street"] == green_street
-                ]
+                vehicle_ids = set()
 
-                old_vehicle_ids = vehicle_ids
+                # We get the vehicle IDs from the last step, use set to remove duplicates and since api return tuple in array so we have to flatten it
+                old_vehicle_ids = set(
+                    item
+                    for tup in [
+                        traci.lanearea.getLastStepVehicleIDs(detector["id"])
+                        for detector in traffic_light["detectors"]
+                        if detector["street"] == green_street
+                    ]
+                    for item in tup
+                )
 
                 while steps_todo > 0:
                     self.step += 1
                     steps_todo -= 1
                     traci.simulationStep()
 
-                    vehicle_ids = [
-                        traci.lanearea.getLastStepVehicleIDs(detector["id"])
-                        for detector in traffic_light["detectors"] if detector["street"] == green_street
-                    ]
-
-                    # Calculate the number of vehicles exit the detector by comparing the old and new vehicle IDs
-                    number_of_vehicles += sum(
-                        1 for vid in old_vehicle_ids if vid not in vehicle_ids
+                    vehicle_ids = set(
+                        item
+                        for tup in [
+                            traci.lanearea.getLastStepVehicleIDs(detector["id"])
+                            for detector in traffic_light["detectors"]
+                            if detector["street"] == green_street
+                        ]
+                        for item in tup
                     )
 
                     # Save current vehicles as old vehicles to compare in the next step
-                    old_vehicle_ids = vehicle_ids
+                    old_vehicle_ids.update(vehicle_ids)
+
+                    if steps_todo == 0:
+                        # Calculate the number of vehicles exit the detector by comparing the old and new vehicle IDs
+                        number_of_vehicles += sum(
+                            1 for vid in old_vehicle_ids if vid not in vehicle_ids
+                        )
 
                 print("Number of vehicles:", number_of_vehicles)
 
@@ -160,6 +180,9 @@ class Simulation:
         self.green_duration_agent_old_action = self.green_duration_agent_action
         self.green_duration_agent_old_state = self.green_duration_agent_state
 
+        if traffic_light["id"] not in self.green_duration_agent_action:
+            self.green_duration_agent_action[traffic_light["id"]] = {}
+
         for detector in traffic_light["detectors"]:
             queue_length = self.get_queue_length(detector["id"])
             if detector["street"] not in state:
@@ -172,21 +195,18 @@ class Simulation:
 
         # Normalize the state
         for street in state:
+            if street not in self.green_duration_agent_action[traffic_light["id"]]:
+                self.green_duration_agent_action[traffic_light["id"]][street] = 0
+
             # Decide where to perform an exploration or exploitation action
             if random.random() < epsilon:
-                self.green_duration_agent_action[traffic_light["id"][detector]] = (
-                    queue_length / 5 * 3
+                self.green_duration_agent_action[traffic_light["id"]][street] = (
+                    state[street] / 5 * 3
                 )
             else:
                 result: torch.Tensor = self.green_duration_agent.predict(
                     torch.from_numpy(np.array([state[street]]))
                 )
-
-                if traffic_light["id"] not in self.green_duration_agent_action:
-                    self.green_duration_agent_action[traffic_light["id"]] = {}
-
-                if street not in self.green_duration_agent_action[traffic_light["id"]]:
-                    self.green_duration_agent_action[traffic_light["id"]][street] = 0
 
                 self.green_duration_agent_action[traffic_light["id"]][street] = (
                     np.argmax(result.detach().numpy())
