@@ -151,9 +151,6 @@ class Simulation:
 
                 print("Green duration agent reward:", self.green_duration_agent_reward)
 
-            self.step += 1
-            traci.simulationStep()
-
     def train_green_duration_agent(self, traffic_light, epsilon):
         """
         Train the green duration agent using the current state and action.
