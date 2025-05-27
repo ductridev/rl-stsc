@@ -111,24 +111,31 @@ def import_train_configuration(file_path):
         config['memory_size_min'] = content['memory']['memory_size_min']
         config['memory_size_max'] = content['memory']['memory_size_max']
 
-        # Green duration agent
-        config['green_duration_agent'] = {}
-        config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
-        config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
-        config['green_duration_agent']['gamma'] = content['green_duration_agent']['gamma']
-        config['green_duration_agent']['num_layers'] = content['green_duration_agent']['model']['num_layers']
-        config['green_duration_agent']['batch_size'] = content['green_duration_agent']['model']['batch_size']
-        config['green_duration_agent']['learning_rate'] = content['green_duration_agent']['model']['learning_rate']
-        config['green_duration_agent']['actions_space'] = content['green_duration_agent']['model']['actions_space']
+        config['agent'] = {}
+        config['agent']['num_states'] = content['agent']['num_states']
+        config['agent']['gamma'] = content['agent']['gamma']
+        config['agent']['green_duration_deltas'] = content['agent']['green_duration_deltas']
+        config['agent']['num_layers'] = content['agent']['model']['num_layers']
+        config['agent']['batch_size'] = content['agent']['model']['batch_size']
+        config['agent']['learning_rate'] = content['agent']['model']['learning_rate']
+        # # Green duration agent
+        # config['green_duration_agent'] = {}
+        # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
+        # config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
+        # config['green_duration_agent']['gamma'] = content['green_duration_agent']['gamma']
+        # config['green_duration_agent']['num_layers'] = content['green_duration_agent']['model']['num_layers']
+        # config['green_duration_agent']['batch_size'] = content['green_duration_agent']['model']['batch_size']
+        # config['green_duration_agent']['learning_rate'] = content['green_duration_agent']['model']['learning_rate']
+        # config['green_duration_agent']['actions_space'] = content['green_duration_agent']['model']['actions_space']
         
-        # Selector phase agent
-        config['selector_phase_agent'] = {}
-        config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
-        config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
-        config['selector_phase_agent']['gamma'] = content['selector_phase_agent']['gamma']
-        config['selector_phase_agent']['num_layers'] = content['selector_phase_agent']['model']['num_layers']
-        config['selector_phase_agent']['batch_size'] = content['selector_phase_agent']['model']['batch_size']
-        config['selector_phase_agent']['learning_rate'] = content['selector_phase_agent']['model']['learning_rate']
+        # # Selector phase agent
+        # config['selector_phase_agent'] = {}
+        # config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
+        # config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
+        # config['selector_phase_agent']['gamma'] = content['selector_phase_agent']['gamma']
+        # config['selector_phase_agent']['num_layers'] = content['selector_phase_agent']['model']['num_layers']
+        # config['selector_phase_agent']['batch_size'] = content['selector_phase_agent']['model']['batch_size']
+        # config['selector_phase_agent']['learning_rate'] = content['selector_phase_agent']['model']['learning_rate']
 
         # Training configuration
         config['training_epochs'] = content['model']['training_epochs']
@@ -171,13 +178,14 @@ def import_test_configuration(file_path):
         config['episode_seed'] = content['simulation']['episode_seed']
         config['interphase_duration'] = content['simulation']['interphase_duration']
 
-        # Green duration agent configuration
-        config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
-        config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
+        config['agent']['num_states'] = content['agent']['num_states']
+        # # Green duration agent configuration
+        # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
+        # config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
 
-        # Selector phase agent
-        config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
-        config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
+        # # Selector phase agent
+        # config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
+        # config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
 
         # Testing configuration
         config['models_path_name'] = content['dir']['models_path_name']

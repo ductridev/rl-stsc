@@ -9,262 +9,146 @@ import torch
 GREEN_ACTION = 0
 RED_ACTION = 1
 
+def index_to_action(index, green_duration_deltas):
+    phase_idx = index // len(green_duration_deltas)
+    delta_idx = index % len(green_duration_deltas)
+    return phase_idx, green_duration_deltas[delta_idx]
+
+def action_to_index(phase_idx, delta_idx, num_deltas):
+    return phase_idx * num_deltas + delta_idx
 
 class Simulation:
     def __init__(
         self,
-        selector_phase_agent: DQN,
-        green_duration_agent: DQN,
-        green_duration_agent_memory: ReplayMemory,
-        selector_phase_agent_memory: ReplayMemory,
-        green_duration_agent_cfg,
-        selector_phase_agent_cfg,
+        agent: DQN,
+        agent_memory: ReplayMemory,
+        agent_cfg,
         max_steps,
         traffic_lights,
         interphase_duration=3,
         epoch=1000,
     ):
-        self.selector_phase_agent = selector_phase_agent
-        self.green_duration_agent = green_duration_agent
-        self.green_duration_agent_memory = green_duration_agent_memory
-        self.selector_phase_agent_memory = selector_phase_agent_memory
-        self.green_duration_agent_cfg = green_duration_agent_cfg
-        self.selector_phase_agent_cfg = selector_phase_agent_cfg
+        self.agent = agent
+        self.agent_memory = agent_memory
+        self.agent_cfg = agent_cfg
         self.max_steps = max_steps
         self.traffic_lights = traffic_lights
         self.interphase_duration = interphase_duration
         self.epoch = epoch
 
-        self.green_duration_agent_action = {}
-        self.green_duration_agent_old_action = {}
-        self.green_duration_agent_reward = 0
-        self.green_duration_agent_state = {}
-        self.green_duration_agent_old_state = {}
-
-        self.selector_phase_agent_action = -1
-        self.selector_phase_agent_old_action = -1
-        self.selector_phase_agent_reward = 0
-        self.selector_phase_agent_state = {}
-        self.selector_phase_agent_old_state = {}
+        self.agent_action = {}
+        self.agent_old_action = {}
+        self.agent_reward = 0
+        self.agent_state = {}
+        self.agent_old_state = {}
 
         self.outflow_rate = 0
         self.old_outflow_rate = 0
+        self.travel_speed = 0
+        self.travel_time = 0
+        self.density = 0
+        self.old_travel_speed = 0
+        self.old_travel_time = 0
+        self.old_density = 0
         self.step = 0
         self.green_time = 0
         self.green_time_old = 0
 
     def run(self, epsilon, episode):
-        """
-        Run the simulation for a given number of episodes.
-        Args:
-            epsilon (float): exploration rate for epsilon-greedy policy
-            episode (int): current episode number
-        """
-
         print("Simulation started")
         print("Simulating...")
         print("---------------------------------------")
-        green_street_old = ""
-        green_street = ""
 
         while self.step < self.max_steps:
-            for i in range(len(self.traffic_lights)):
-                traffic_light = self.traffic_lights[0]
-                # Train the agents
-                self.train_green_duration_agent(traffic_light, epsilon)
-                # self.train_selector_phase_agent(traffic_light, epsilon)
+            for traffic_light in self.traffic_lights:
+                state = self.get_state(traffic_light)
+                action_idx = self.select_action(state, epsilon)
 
-                # Get the action from the green duration agent and set the green phase
-                while green_street == green_street_old:
-                    green_street = random.choice(
-                        list(
-                            self.green_duration_agent_action[traffic_light["id"]].keys()
-                        )
-                    )
-                green_street_old = green_street
+                num_deltas = len(self.agent_cfg["green_duration_deltas"])
+                phase_idx, green_delta = index_to_action(action_idx, num_deltas, self.get_num_phases(traffic_light))
+                green_time = max(1, 10 + green_delta)
 
                 self.green_time_old = self.green_time
-                self.green_time = self.green_duration_agent_action[traffic_light["id"]][
-                    green_street
-                ]
+                self.green_time = green_time
 
-                print("Green street:", green_street, "Green time:", self.green_time)
+                self.old_outflow_rate = self.outflow_rate
+                self.old_travel_speed = self.travel_speed
+                self.old_travel_time = self.travel_time
+                self.old_density = self.density
 
-                # Get number of phases
-                num_phases = sum(
-                    len(detector["lane_idx"]) for detector in traffic_light["detectors"]
-                )
+                old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase_idx)
 
-                # Get all phase index with match street name from green_time, use set to remove duplicates and since it's array in array so we have to flatten it
-                phase_index = set(
-                    item
-                    for sublist in [
-                        detector["lane_idx"]
-                        for detector in traffic_light["detectors"]
-                        if detector["street"] == green_street
-                    ]
-                    for item in sublist
-                )
-
-                print("Phase index:", phase_index)
-
-                steps_todo = 0
-                # Set the green phase for the traffic light
                 self.set_green_phase(
-                    traffic_light["id"], self.green_time, phase_index, num_phases
+                    traffic_light["id"],
+                    green_time,
+                    [phase_idx],
+                    self.get_num_phases(traffic_light),
+                    traffic_light
                 )
 
-                if (self.step + self.green_time) >= self.max_steps:
-                    steps_todo = self.max_steps - self.step
-                else:
-                    steps_todo = self.green_time
-
-                number_of_vehicles = 0
-
-                vehicle_ids = set()
-
-                # We get the vehicle IDs from the last step, use set to remove duplicates and since api return tuple in array so we have to flatten it
-                old_vehicle_ids = set(
-                    item
-                    for tup in [
-                        traci.lanearea.getLastStepVehicleIDs(detector["id"])
-                        for detector in traffic_light["detectors"]
-                        if detector["street"] == green_street
-                    ]
-                    for item in tup
-                )
-
-                while steps_todo > 0:
+                for _ in range(min(green_time, self.max_steps - self.step)):
                     self.step += 1
-                    steps_todo -= 1
                     traci.simulationStep()
 
-                    vehicle_ids = set(
-                        item
-                        for tup in [
-                            traci.lanearea.getLastStepVehicleIDs(detector["id"])
-                            for detector in traffic_light["detectors"]
-                            if detector["street"] == green_street
-                        ]
-                        for item in tup
-                    )
+                new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase_idx)
+                outflow = sum(1 for vid in old_vehicle_ids if vid not in new_vehicle_ids)
+                self.outflow_rate = outflow / green_time if green_time > 0 else 0
 
-                    # Save current vehicles as old vehicles to compare in the next step
-                    old_vehicle_ids.update(vehicle_ids)
+                # Get new traffic metrics
+                self.travel_speed = self.get_avg_speed(traffic_light)
+                self.travel_time = self.get_avg_travel_time(traffic_light)
+                self.density = self.get_avg_density(traffic_light)
 
-                    if steps_todo == 0:
-                        # Calculate the number of vehicles exit the detector by comparing the old and new vehicle IDs
-                        number_of_vehicles += sum(
-                            1 for vid in old_vehicle_ids if vid not in vehicle_ids
-                        )
+                reward = self.get_reward()
+                print(f"Phase: {phase_idx}, Green time: {green_time}, Reward: {reward}")
 
-                print("Number of vehicles:", number_of_vehicles)
+                next_state = self.get_state(traffic_light)
+                self.agent_memory.push(state, action_idx, reward, next_state)
 
-                # Get outflow rate
-                self.outflow_rate = (
-                    number_of_vehicles / self.green_time if self.green_time > 0 else 0
-                )
-
-                print("Outflow rate:", self.outflow_rate)
-
-                self.green_duration_agent_reward = self.get_green_duration_reward()
-
-                print("Green duration agent reward:", self.green_duration_agent_reward)
-
-    def train_green_duration_agent(self, traffic_light, epsilon):
-        """
-        Train the green duration agent using the current state and action.
-        We get the queue length of each street and get the action as green light duration from the green duration agent by loop through each detector on each street.
-        """
+                self.agent.train(self.agent_memory)
+    
+    def train_agent(self, traffic_light, epsilon):
         state = {}
-        self.green_duration_agent_old_action = self.green_duration_agent_action
-        self.green_duration_agent_old_state = self.green_duration_agent_state
-
-        if traffic_light["id"] not in self.green_duration_agent_action:
-            self.green_duration_agent_action[traffic_light["id"]] = {}
+        self.agent_old_action = self.agent_action
+        self.agent_old_state = self.agent_state
 
         for detector in traffic_light["detectors"]:
             queue_length = self.get_queue_length(detector["id"])
-            if detector["street"] not in state:
-                state[detector["street"]] = 0
+            if detector["phase"] not in state:
+                state[detector["phase"]] = 0
+            state[detector["phase"]] += queue_length
 
-            # Get the queue length from the detector
-            state[detector["street"]] += queue_length
+        self.agent_state = state
 
-        self.green_duration_agent_state = state
+        state_tensor = torch.from_numpy(np.array([list(state.values())])).float()
 
-        # Normalize the state
-        for street in state:
-            if street not in self.green_duration_agent_action[traffic_light["id"]]:
-                self.green_duration_agent_action[traffic_light["id"]][street] = 0
+        if random.random() < epsilon:
+            phase_idx = random.randint(0, len(traffic_light["phases"]) - 1)
+            delta = random.choice(self.agent_cfg["green_duration_deltas"])
+        else:
+            q_values: torch.Tensor = self.agent.predict(state_tensor)
+            action_idx = torch.argmax(q_values).item()
+            phase_idx, delta = index_to_action(
+                action_idx,
+                self.agent_cfg["green_duration_deltas"],
+                len(traffic_light["phases"]),
+            )
 
-            # Decide where to perform an exploration or exploitation action
-            if random.random() < epsilon:
-                self.green_duration_agent_action[traffic_light["id"]][street] = (
-                    state[street] / 5 * 3
-                )
-            else:
-                result: torch.Tensor = self.green_duration_agent.predict(
-                    torch.from_numpy(np.array([state[street]]))
-                )
+        self.agent_action[traffic_light["id"]] = {
+            "phase": phase_idx,
+            "duration": max(1, 10 + delta)
+        }
 
-                self.green_duration_agent_action[traffic_light["id"]][street] = (
-                    np.argmax(result.detach().numpy())
-                )
-
-    def get_green_duration_reward(self):
-        """
-        Get the reward for the green duration agent.
-        """
-        # Calculate the reward based on the outflow rate and the difference between the current and previous actions
+    def get_reward(self):
         return (
-            self.green_duration_agent_reward
+            self.agent_reward
             + (self.green_time_old - self.green_time)
             + (self.outflow_rate - self.old_outflow_rate)
+            + (self.travel_speed - self.old_travel_speed)
+            + (self.travel_time - self.old_travel_time)
+            + (self.density - self.old_density)
         )
 
-    def train_selector_phase_agent(self, traffic_light, epsilon):
-        """
-        Train the selector phase agent using the current state and action.
-        We get the current state of all detectors and merge with the action as green light duration from the selector phase agent by loop through each detector on each street.
-        Then select which street to set green light depend on the action with epsilon-greedy.
-        """
-        state = {}
-        self.selector_phase_agent_old_action = self.selector_phase_agent_action
-        self.selector_phase_agent_old_state = self.selector_phase_agent_state
-
-        # Get the current state from the simulation
-        for detector in traffic_light["detectors"]:
-            _state = self.get_state(detector["id"])
-
-            if detector["street"] not in state:
-                state[detector["street"]] = _state
-
-            state[detector["street"]] = np.append(state[detector["street"]], _state)
-
-        print("State: ", state)
-
-        self.selector_phase_agent_state = state
-
-        # Decide where to perform an exploration or exploitation action
-        if random.random() < epsilon:
-            self.selector_phase_agent_action = random.randint(
-                0, self.selector_phase_agent_cfg["num_actions"] - 1
-            )
-        else:
-            self.selector_phase_agent_old_action = self.selector_phase_agent_action
-            self.selector_phase_agent_action = np.argmax(
-                self.selector_phase_agent.predict(np.array(state))
-            )
-
-        # Set the green phase for the traffic light
-        self.set_green_phase(self.selector_phase_agent_action, traffic_light["id"])
-
-        # Set the yellow phase for the traffic light
-        # self.set_yellow_phase(traffic_light['id'])
-
-        # Get the reward for the selector phase agent
-        # self.selector_phase_agent_reward = self.get_selector_phase_reward()
 
     def set_yellow_phase(self, phase):
         """
@@ -275,13 +159,11 @@ class Simulation:
             self.traffic_light_id, self.interphase_duration
         )
 
-    def set_green_phase(self, tlsId, duration, phase, num_phases):
-        """
-        Activate the correct green light combination in sumo
-        """
-        new_phase = self.update_phase(phase, num_phases)
+    def set_green_phase(self, tlsId, duration, phase_idxs, traffic_light):
+        new_phase = traffic_light["phase"][phase_idxs[0]]  # Use custom-defined phase string
         traci.trafficlight.setPhaseDuration(tlsId, duration)
         traci.trafficlight.setRedYellowGreenState(tlsId, new_phase)
+
 
     def update_phase(self, phase_idxs, num_phases):
         """
@@ -316,11 +198,12 @@ class Simulation:
             int: selected action
         """
         if random.random() < epsilon:
-            return random.randint(0, self.num_actions - 1)
+            return random.randint(0, self.agent_cfg['num_actions'] - 1)
         else:
+            state = torch.from_numpy(np.array([state])).float()
             with torch.no_grad():
-                q_values: torch.Tensor = self.selector_phase_agent.predict(state)
-                return q_values.argmax().tolist()[0]
+                q_values: torch.Tensor = self.agent.predict(state)
+                return q_values.argmax().item()
 
     def get_state(self, detector_id):
         """
@@ -329,16 +212,18 @@ class Simulation:
             np.array: current state of the simulation
         """
         # Get the current state from the simulation
-        state = np.zeros((self.selector_phase_agent_cfg["num_states"],))
+        state = np.zeros((self.agent_cfg["num_states"],))
         min_free_capacity = self.get_min_free_capacity(detector_id)
         density = self.get_density(detector_id)
         waiting_time = self.get_waiting_time(detector_id)
+        queue_length = self.get_queue_length(detector_id)
         if state == np.zeros((self.num_states,)):
             state = np.array(
                 [
                     density,
                     min_free_capacity,
                     waiting_time,
+                    queue_length
                 ]
             )
         else:
@@ -349,6 +234,7 @@ class Simulation:
                         density,
                         min_free_capacity,
                         waiting_time,
+                        queue_length,
                     ]
                 ),
                 axis=0,
@@ -378,9 +264,14 @@ class Simulation:
 
     def get_waiting_time(self, detector_id):
         """
-        Get the waiting time of vehicles on a lane.
+        Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
-        return None
+        vehicle_ids = traci.lane.getLastStepVehicleIDs(detector_id)
+
+        total_waiting_time = 0.0
+        for vid in vehicle_ids:
+            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        return total_waiting_time
 
     def get_travel_speed(self, edge_id):
         """
@@ -393,3 +284,55 @@ class Simulation:
         Get the travel time of vehicles on a lane.
         """
         return traci.edge.getTraveltime(edge_id)
+    def get_avg_speed(self, traffic_light):
+        speeds = []
+        for detector in traffic_light["detectors"]:
+            try:
+                speed = traci.lane.getLastStepMeanSpeed(detector["id"])
+                speeds.append(speed)
+            except:
+                pass
+        return np.mean(speeds) if speeds else 0.0
+    def get_avg_travel_time(self, traffic_light):
+        travel_times = []
+        for detector in traffic_light["detectors"]:
+            try:
+                travel_time = traci.lane.getTraveltime(detector["id"])
+                travel_times.append(travel_time)
+            except:
+                pass
+        return np.mean(travel_times) if travel_times else 0.0
+
+    def get_avg_density(self, traffic_light):
+        densities = []
+        for detector in traffic_light["detectors"]:
+            try:
+                densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
+            except:
+                pass
+        return np.mean(densities) if densities else 0.0
+    def get_num_phases(self, traffic_light):
+        """
+        Returns the number of custom-defined traffic light phases.
+        """
+        return len(traffic_light["phase"])
+    def get_vehicles_in_phase(self, traffic_light, phase_idx):
+        """
+        Returns the vehicle IDs on lanes with a green signal in the specified phase.
+        """
+        phase_str = traffic_light["phase"][phase_idx]
+
+        green_lanes = [
+            traffic_light["controlled_lanes"][i]
+            for i, light_state in enumerate(phase_str)
+            if light_state.upper() == "G"
+        ]
+
+        vehicle_ids = []
+        for lane in green_lanes:
+            try:
+                vehicle_ids.extend(traci.lane.getLastStepVehicleIDs(lane))
+            except:
+                pass  # Skip any invalid or unavailable lanes
+
+        return vehicle_ids
