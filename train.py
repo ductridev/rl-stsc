@@ -1,49 +1,49 @@
 from src.memory import ReplayMemory
-from src.utils import set_train_path, set_sumo
+from src.utils import set_train_path, set_sumo, import_train_configuration
 from src.model import DQN
-from src.utils import import_train_configuration
 from src.simulation import Simulation
 from src.visualization import Visualization
 from src.intersection import Intersection
 
 import traci
-
 import datetime
 
 if __name__ == "__main__":
+    # Load configuration
     config = import_train_configuration('config/training_westDragonBridge_cfg.yaml')
+    green_duration_deltas = config['agent']['green_duration_deltas']
 
-    green_duration_agent_memory = ReplayMemory(max_size=config['memory_size_max'], min_size=config['memory_size_min'])
-    selector_phase_agent_memory = ReplayMemory(max_size=config['memory_size_max'], min_size=config['memory_size_min'])
+    # Automatically compute number of phases from config
+    num_phases_total = sum([
+        len(tl["phase"]) for tl in config["traffic_lights"]
+    ])
+    num_actions = num_phases_total * len(green_duration_deltas)
+    config['agent']['num_actions'] = num_actions
 
+    # Create replay memory for the agent
+    agent_memory = ReplayMemory(
+        max_size=config['memory_size_max'],
+        min_size=config['memory_size_min']
+    )
+
+    # Set model save path
     path = set_train_path(config['models_path_name'])
 
-    green_duration_agent = DQN(
-        num_layers=config['green_duration_agent']['num_layers'],
-        batch_size=config['green_duration_agent']['batch_size'],
-        learning_rate=config['green_duration_agent']['learning_rate'],
-        input_dim=config['green_duration_agent']['num_states'],
-        output_dim=config['green_duration_agent']['num_actions'],
-        gamma=config['green_duration_agent']['gamma'],
+    # Initialize the agent
+    agent = DQN(
+        num_layers=config['agent']['num_layers'],
+        batch_size=config['agent']['batch_size'],
+        learning_rate=config['agent']['learning_rate'],
+        input_dim=config['agent']['num_states'],
+        output_dim=config['agent']['num_actions'],
+        gamma=config['agent']['gamma'],
     )
 
-    selector_phase_agent = DQN(
-        num_layers=config['selector_phase_agent']['num_layers'],
-        batch_size=config['selector_phase_agent']['batch_size'],
-        learning_rate=config['selector_phase_agent']['learning_rate'],
-        input_dim=config['selector_phase_agent']['num_states'],
-        output_dim=config['selector_phase_agent']['num_actions'],
-        gamma=config['selector_phase_agent']['gamma'],
-    )
-
-    # Initialize the simulation
+    # Initialize simulation
     simulation = Simulation(
-        green_duration_agent=green_duration_agent,
-        selector_phase_agent=selector_phase_agent,
-        green_duration_agent_memory=green_duration_agent_memory,
-        selector_phase_agent_memory=selector_phase_agent_memory,
-        green_duration_agent_cfg=config['green_duration_agent'],
-        selector_phase_agent_cfg=config['selector_phase_agent'],
+        agent=agent,
+        agent_memory=agent_memory,
+        agent_cfg=config['agent'],
         max_steps=config['max_steps'],
         traffic_lights=config['traffic_lights'],
         interphase_duration=config['interphase_duration'],
@@ -74,5 +74,5 @@ if __name__ == "__main__":
     print("----- End time:", datetime.datetime.now())
     print("----- Session info saved at:", path)
 
-    green_duration_agent.save(path + '/green_duration_agent.pth')
-    selector_phase_agent.save(path + '/selector_phase_agent.pth')
+    # Save the trained model
+    agent.save(path + '/agent.pth')
