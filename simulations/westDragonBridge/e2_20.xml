@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-05-22 23:06:35 by Eclipse SUMO GUI Version 1.23.1
+<!-- generated on 2025-05-27 13:21:22 by Eclipse SUMO GUI Version 1.23.1
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
     <input>
-        <net-file value="D:\TrafficSimulator\RL\rl-stsc\simulations\westDragonBridge\osm.net.xml.gz"/>
-        <route-files value="D:\TrafficSimulator\RL\rl-stsc\simulations\westDragonBridge\osm.bicycle.trips.xml"/>
-        <additional-files value="D:\TrafficSimulator\RL\rl-stsc\simulations\westDragonBridge\osm.poly.xml.gz"/>
+        <net-file value="D:\TrafficSimulator\RL\rl-stsc\simulations/westDragonBridge/osm.net.xml.gz"/>
+        <route-files value="D:\TrafficSimulator\RL\rl-stsc\simulations/westDragonBridge/osm.bicycle.trips.xml"/>
+        <additional-files value="D:\TrafficSimulator\RL\rl-stsc\simulations/westDragonBridge/osm.poly.xml.gz"/>
     </input>
 
     <processing>
         <ignore-route-errors value="true"/>
+        <waiting-time-memory value="500"/>
         <tls.actuated.jam-threshold value="30"/>
     </processing>
 
@@ -25,15 +26,16 @@
         <no-step-log value="true"/>
     </report>
 
+    <traci_server>
+        <remote-port value="59601"/>
+    </traci_server>
+
     <gui_only>
-        <gui-settings-file value="D:\TrafficSimulator\RL\rl-stsc\simulations\westDragonBridge\osm.view.xml"/>
+        <gui-settings-file value="D:\TrafficSimulator\RL\rl-stsc\simulations/westDragonBridge/osm.view.xml"/>
     </gui_only>
 
 </sumoConfiguration>
 -->
 
 <detector xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/det_e2_file.xsd">
-   <interval begin="0.00" end="300.00" id="e2_20" sampledSeconds="21.17" nVehEntered="2" nVehLeft="2" nVehSeen="2" meanSpeed="3.20" meanTimeLoss="3.27" meanOccupancy="0.17" maxOccupancy="2.54" meanMaxJamLengthInVehicles="0.01" meanMaxJamLengthInMeters="0.02" maxJamLengthInVehicles="1" maxJamLengthInMeters="1.60" jamLengthInVehiclesSum="4" jamLengthInMetersSum="6.40" meanHaltingDuration="5.00" maxHaltingDuration="5.00" haltingDurationSum="5.00" meanIntervalHaltingDuration="5.00" maxIntervalHaltingDuration="5.00" intervalHaltingDurationSum="5.00" startedHalts="1.00" meanVehicleNumber="0.08" maxVehicleNumber="1" />
-   <interval begin="300.00" end="600.00" id="e2_20" sampledSeconds="0.00" nVehEntered="0" nVehLeft="0" nVehSeen="0" meanSpeed="-1.00" meanTimeLoss="-1.00" meanOccupancy="0.00" maxOccupancy="0.00" meanMaxJamLengthInVehicles="0.00" meanMaxJamLengthInMeters="0.00" maxJamLengthInVehicles="0" maxJamLengthInMeters="0.00" jamLengthInVehiclesSum="0" jamLengthInMetersSum="0.00" meanHaltingDuration="0.00" maxHaltingDuration="0.00" haltingDurationSum="0.00" meanIntervalHaltingDuration="0.00" maxIntervalHaltingDuration="0.00" intervalHaltingDurationSum="0.00" startedHalts="0.00" meanVehicleNumber="0.00" maxVehicleNumber="0" />
-   <interval begin="600.00" end="870.00" id="e2_20" sampledSeconds="66.16" nVehEntered="5" nVehLeft="5" nVehSeen="5" meanSpeed="3.09" meanTimeLoss="5.82" meanOccupancy="0.59" maxOccupancy="4.64" meanMaxJamLengthInVehicles="0.07" meanMaxJamLengthInMeters="0.12" maxJamLengthInVehicles="1" maxJamLengthInMeters="1.60" jamLengthInVehiclesSum="20" jamLengthInMetersSum="31.89" meanHaltingDuration="7.67" maxHaltingDuration="11.00" haltingDurationSum="23.00" meanIntervalHaltingDuration="7.67" maxIntervalHaltingDuration="11.00" intervalHaltingDurationSum="23.00" startedHalts="3.00" meanVehicleNumber="0.26" maxVehicleNumber="2" />
 </detector>
