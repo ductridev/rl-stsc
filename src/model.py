@@ -62,7 +62,7 @@ class DQN(nn.Module):
         x = self.model(x)
         return x
     
-    def predict(self, x):
+    def predict_one(self, x):
         """
         Predict the Q-values for the given input.
 
@@ -72,10 +72,26 @@ class DQN(nn.Module):
         Returns:
             torch.Tensor: Predicted Q-values.
         """
-        x = torch.tensor(x, dtype=torch.float32)
+        x = np.reshape(x, [1, self.input_dim])
+        if not isinstance(x, torch.Tensor):
+            x = torch.tensor(x, dtype=torch.float32)
         return self.forward(x)
-        
-    def update(self, state, action, reward, next_state, done):
+    
+    def predict_batch(self, x):
+        """
+        Predict the Q-values for the given batch of inputs.
+
+        Args:
+            x (torch.Tensor): Batch of input tensors.
+
+        Returns:
+            torch.Tensor: Predicted Q-values.
+        """
+        if not isinstance(x, torch.Tensor):
+            x = torch.tensor(x, dtype=torch.float32)
+        return self.forward(x)
+
+    def update(self, state, action, reward, next_state, done = False):
         """
         Update the model using the given transition.
 
@@ -95,7 +111,7 @@ class DQN(nn.Module):
 
         # Compute Q-values
         q_values = self.forward(state)
-        next_q_values = self.predict(next_state)
+        next_q_values = self.predict_one(next_state)
 
         # Compute target Q-value
         target_q_value = reward + (1 - done) * self.gamma * torch.max(next_q_values)

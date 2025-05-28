@@ -13,13 +13,6 @@ if __name__ == "__main__":
     config = import_train_configuration('config/training_westDragonBridge_cfg.yaml')
     green_duration_deltas = config['agent']['green_duration_deltas']
 
-    # Automatically compute number of phases from config
-    num_phases_total = sum([
-        len(tl["phase"]) for tl in config["traffic_lights"]
-    ])
-    num_actions = num_phases_total * len(green_duration_deltas)
-    config['agent']['num_actions'] = num_actions
-
     # Create replay memory for the agent
     agent_memory = ReplayMemory(
         max_size=config['memory_size_max'],
@@ -29,20 +22,9 @@ if __name__ == "__main__":
     # Set model save path
     path = set_train_path(config['models_path_name'])
 
-    # Initialize the agent
-    agent = DQN(
-        num_layers=config['agent']['num_layers'],
-        batch_size=config['agent']['batch_size'],
-        learning_rate=config['agent']['learning_rate'],
-        input_dim=config['agent']['num_states'],
-        output_dim=config['agent']['num_actions'],
-        gamma=config['agent']['gamma'],
-    )
-
     # Initialize simulation
     simulation = Simulation(
-        agent=agent,
-        agent_memory=agent_memory,
+        memory=agent_memory,
         agent_cfg=config['agent'],
         max_steps=config['max_steps'],
         traffic_lights=config['traffic_lights'],
@@ -61,18 +43,15 @@ if __name__ == "__main__":
         # Intersection.generate_routes(config['sumo_cfg_file'].split("/")[1], enable_bicycle=True, enable_pedestrian=True, enable_motorcycle=True, enable_passenger=True)
         print("Routes generated")
 
-        sumo_cmd = set_sumo(config['gui'], config['sumo_cfg_file'], config['max_steps'])
+        set_sumo(config['gui'], config['sumo_cfg_file'], config['max_steps'])
 
         epsilon = 1.0 - (episode / config['total_episodes'])  # set the epsilon for this episode according to epsilon-greedy policy
         simulation_time, training_time = simulation.run(episode, epsilon)
         print('Simulation time:', simulation_time, 's - Training time:', training_time, 's - Total:', round(simulation_time+training_time, 1), 's')
 
-        traci.close()
+        traci.close(False)
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
     print("----- End time:", datetime.datetime.now())
     print("----- Session info saved at:", path)
-
-    # Save the trained model
-    agent.save(path + '/agent.pth')

@@ -15,8 +15,7 @@ class ReplayMemory:
         """Initialize the replay memory with a fixed capacity."""
         self.max_size = max_size
         self.min_size = min_size
-        self.memory = deque(maxlen=max_size)
-        self.transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'done'))
+        self.memory = []
 
     def push(self, state, action, reward, next_state, done = False):
         """
@@ -29,11 +28,13 @@ class ReplayMemory:
             next_state: next state after the action
             done (bool): whether the episode has ended
         """
-        self.memory.append(self.transition(state, action, reward, next_state, done))
-
-    def sample(self, batch_size):
+        self.memory.append((state, action, reward, next_state, done))
+        if self.get_size() > self.max_size:
+            self.memory.pop(0)  # if the length is greater than the size of memory, remove the oldest element
+    
+    def get_samples(self, batch_size):
         """
-        Sample a random batch of transitions for training.
+        Get a sample of size n from the replay buffer.
 
         Args:
             batch_size (int): number of transitions to sample
@@ -41,24 +42,12 @@ class ReplayMemory:
         Returns:
             A list of transitions sampled randomly
         """
-        return random.sample(self.min_size, batch_size)
-    
-    def get_sample(self, n):
-        """
-        Get a sample of size n from the replay buffer.
-
-        Args:
-            n (int): number of transitions to sample
-
-        Returns:
-            A list of transitions sampled randomly
-        """
         if self.get_size() < self.min_size:
             return []
         
-        if n > self.get_size():
-            return random.sample(self.memory, self.get_size()) # get all samples if n is larger than the buffer size
-        return random.sample(self.memory, n)
+        if batch_size > self.get_size():
+            return random.sample(self.memory, self.get_size()) # get all samples if batch_size is larger than the buffer size
+        return random.sample(self.memory, batch_size)
 
     def get_size(self):
         """
