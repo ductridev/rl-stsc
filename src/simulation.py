@@ -191,14 +191,20 @@ class Simulation:
 
         simulation_time = time.time() - start
 
+        print("Simulation ended")
+        print("---------------------------------------")
+
         print("Training...")
         start_time = time.time()
         for _ in range(self.epoch):
             self.training()
         training_time = time.time() - start_time
 
-        print(f"Saving models at episode {episode} ...")
+        print("Training ended")
+        print("---------------------------------------")
+
         if episode % 100 == 0:
+            print(f"Saving models at episode {episode} ...")
             for traffic_light in self.traffic_lights:
                 model_path = self.path + f"{traffic_light['id']}-{episode}.pth"
                 self.agents[traffic_light["id"]].save(model_path)

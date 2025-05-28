@@ -52,7 +52,7 @@ if __name__ == "__main__":
         simulation_time, training_time = simulation.run(epsilon, episode)
         print('Simulation time:', simulation_time, 's - Training time:', training_time, 's - Total:', round(simulation_time+training_time, 1), 's')
 
-        traci.close(False)
+        traci.close()
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
