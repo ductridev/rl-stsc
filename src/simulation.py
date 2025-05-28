@@ -27,6 +27,7 @@ class Simulation:
         traffic_lights,
         interphase_duration=3,
         epoch=1000,
+        path=None
     ):
         self.memory = memory
         self.agent_cfg = agent_cfg
@@ -34,6 +35,7 @@ class Simulation:
         self.traffic_lights = traffic_lights
         self.interphase_duration = interphase_duration
         self.epoch = epoch
+        self.path = path
 
         self.step = 0
         self.num_actions = {}
@@ -182,7 +184,7 @@ class Simulation:
                 self.density[traffic_light["id"]] = self.get_avg_density(traffic_light)
 
                 reward = self.get_reward(traffic_light["id"])
-                print(f"Traffic light: {traffic_light['id']}, Phase: {phase}, Green time: {green_time}, Reward: {reward}")
+                # print(f"Traffic light: {traffic_light['id']}, Phase: {phase}, Green time: {green_time}, Reward: {reward}")
 
                 next_state = self.get_state(traffic_light)
                 self.agent_memory[traffic_light["id"]].push(state, action_idx, reward, next_state)
@@ -194,6 +196,12 @@ class Simulation:
         for _ in range(self.epoch):
             self.training()
         training_time = time.time() - start_time
+
+        print(f"Saving models at episode {episode} ...")
+        if episode % 100 == 0:
+            for traffic_light in self.traffic_lights:
+                model_path = self.path + f"{traffic_light['id']}-{episode}.pth"
+                self.agents[traffic_light["id"]].save(model_path)
 
         return simulation_time, training_time
 
@@ -264,7 +272,7 @@ class Simulation:
             int: selected action
         """
         if random.random() < epsilon:
-            return random.randint(0, self.num_actions[traffic_light_id])
+            return random.randint(0, self.num_actions[traffic_light_id] - 1)
         else:
             state = torch.from_numpy(state).float()
             with torch.no_grad():

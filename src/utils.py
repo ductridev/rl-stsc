@@ -22,9 +22,9 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
 
     # Start SUMO with GUI or without GUI
     if gui:
-        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps)])
+        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label="master")
     else:
-        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps)])
+        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label="master")
 
 def set_train_path(model_name):
     """

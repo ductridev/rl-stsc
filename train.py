@@ -22,6 +22,8 @@ if __name__ == "__main__":
     # Set model save path
     path = set_train_path(config['models_path_name'])
 
+    visualization = Visualization(path=path, dpi=100)
+
     # Initialize simulation
     simulation = Simulation(
         memory=agent_memory,
@@ -30,6 +32,7 @@ if __name__ == "__main__":
         traffic_lights=config['traffic_lights'],
         interphase_duration=config['interphase_duration'],
         epoch=config['training_epochs'],
+        path=path
     )
 
     episode = 0
@@ -46,7 +49,7 @@ if __name__ == "__main__":
         set_sumo(config['gui'], config['sumo_cfg_file'], config['max_steps'])
 
         epsilon = 1.0 - (episode / config['total_episodes'])  # set the epsilon for this episode according to epsilon-greedy policy
-        simulation_time, training_time = simulation.run(episode, epsilon)
+        simulation_time, training_time = simulation.run(epsilon, episode)
         print('Simulation time:', simulation_time, 's - Training time:', training_time, 's - Total:', round(simulation_time+training_time, 1), 's')
 
         traci.close(False)
@@ -55,3 +58,10 @@ if __name__ == "__main__":
     print("\n----- Start time:", timestamp_start)
     print("----- End time:", datetime.datetime.now())
     print("----- Session info saved at:", path)
+
+    visualization.save_data_and_plot(simulation.agent_reward, 'reward', 'Episode', 'Reward')
+    visualization.save_data_and_plot(simulation.travel_speed, 'travel_speed', 'Episode', 'Travel speed')
+    visualization.save_data_and_plot(simulation.travel_time, 'travel_time', 'Episode', 'Travel time')
+    visualization.save_data_and_plot(simulation.density, 'density', 'Episode', 'Density')
+    visualization.save_data_and_plot(simulation.outflow_rate, 'outflow_rate', 'Episode', 'Outflow rate')
+    visualization.save_data_and_plot(simulation.green_time, 'green_time', 'Episode', 'Green time')
