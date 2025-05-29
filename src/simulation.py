@@ -269,9 +269,11 @@ class Simulation:
 
         total_reward = 0
         for traffic_light in self.traffic_lights:
-            total_reward += self.agent_reward[traffic_light["id"]]
+            total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
 
         self.save_plot(episode=episode)
+
+        self.step = 0
 
         return simulation_time, training_time, total_reward
 
@@ -467,18 +469,6 @@ class Simulation:
             total_waiting_time += traci.vehicle.getWaitingTime(vid)
         return total_waiting_time
 
-    def get_travel_speed(self, edge_id):
-        """
-        Get the travel speed of vehicles on a lane.
-        """
-        return traci.edge.getLastStepMeanSpeed(edge_id)
-
-    def get_travel_time(self, edge_id):
-        """
-        Get the travel time of vehicles on a lane.
-        """
-        return traci.edge.getTraveltime(edge_id)
-
     def get_avg_speed(self, traffic_light):
         speeds = []
         for detector in traffic_light["detectors"]:
@@ -491,12 +481,8 @@ class Simulation:
 
     def get_avg_travel_time(self, traffic_light):
         travel_times = []
-        for detector in traffic_light["detectors"]:
-            try:
-                travel_time = traci.lanearea.getTraveltime(detector["id"])
-                travel_times.append(travel_time)
-            except:
-                pass
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            travel_times.append(traci.lane.getTraveltime(lane))
         return np.mean(travel_times) if travel_times else 0.0
 
     def get_avg_density(self, traffic_light):
