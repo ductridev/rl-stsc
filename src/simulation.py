@@ -1,17 +1,19 @@
 from src.model import DQN
 from src.memory import ReplayMemory
+from src.visualization import Visualization
 
 import traci
 import numpy as np
 import random
 import torch
 import time
+
 GREEN_ACTION = 0
 RED_ACTION = 1
 
 
 def index_to_action(index, actions_map):
-    return actions_map[index]['phase'], actions_map[index]['duration']
+    return actions_map[index]["phase"], actions_map[index]["duration"]
 
 
 def action_to_index(phase_idx, delta_idx, num_deltas):
@@ -22,14 +24,16 @@ class Simulation:
     def __init__(
         self,
         memory: ReplayMemory,
+        visualization: Visualization,
         agent_cfg,
         max_steps,
         traffic_lights,
         interphase_duration=3,
         epoch=1000,
-        path=None
+        path=None,
     ):
         self.memory = memory
+        self.visualization = visualization
         self.agent_cfg = agent_cfg
         self.max_steps = max_steps
         self.traffic_lights = traffic_lights
@@ -40,7 +44,6 @@ class Simulation:
         self.step = 0
         self.num_actions = {}
         self.actions_map = {}
-        self.agents : list[DQN] = {}
 
         self.agent_reward = {}
         self.agent_state = {}
@@ -57,82 +60,112 @@ class Simulation:
         self.old_density = {}
         self.green_time = {}
         self.green_time_old = {}
+
+        self.history = {
+            "agent_reward": {},
+            "travel_speed": {},
+            "travel_time": {},
+            "density": {},
+            "outflow_rate": {},
+            "green_time": {},
+            "q_value": {},
+            "max_next_q_value": {},
+            "target": {},
+            "loss": {},
+        }
+
         self.initState()
+
+        self.agent : DQN = DQN(
+            num_layers=self.agent_cfg['num_layers'],
+            batch_size=self.agent_cfg['batch_size'],
+            learning_rate=self.agent_cfg['learning_rate'],
+            input_dim=self.agent_cfg['num_states'],
+            output_dims=self.get_output_dims(),
+            gamma=self.agent_cfg['gamma'],
+        )
 
     def initState(self):
         for traffic_light in self.traffic_lights:
-            self.agent_memory[traffic_light["id"]] = self.memory
+            traffic_light_id = traffic_light["id"]
+            self.agent_memory[traffic_light_id] = self.memory
 
             # Initialize the green time
-            self.green_time[traffic_light["id"]] = 20
+            self.green_time[traffic_light_id] = 20
 
             # Initialize the old green time
-            self.green_time_old[traffic_light["id"]] = 20
+            self.green_time_old[traffic_light_id] = 20
 
             # Initialize the number of actions
-            self.num_actions[traffic_light["id"]] = len(self.agent_cfg["green_duration_deltas"]) * len(
-                traffic_light["phase"]
-            )
+            self.num_actions[traffic_light_id] = len(
+                self.agent_cfg["green_duration_deltas"]
+            ) * len(traffic_light["phase"])
 
             # Initialize the action map
-            self.actions_map[traffic_light["id"]] = {}
+            self.actions_map[traffic_light_id] = {}
 
             # We will convert from number of phases and green delta to phase index and green delta
             i = 0
 
             for phase in traffic_light["phase"]:
                 for green_delta in self.agent_cfg["green_duration_deltas"]:
-                    self.actions_map[traffic_light["id"]][i] = {
+                    self.actions_map[traffic_light_id][i] = {
                         "phase": phase,
                         "duration": green_delta,
                     }
 
                     i += 1
 
-            # Initialize the agent
-            self.agents[traffic_light["id"]] = DQN(
-                num_layers=self.agent_cfg["num_layers"],
-                batch_size=self.agent_cfg["batch_size"],
-                learning_rate=self.agent_cfg["learning_rate"],
-                input_dim=self.agent_cfg["num_states"],
-                output_dim=self.num_actions[traffic_light["id"]],
-                gamma=self.agent_cfg["gamma"],
-            )
-
-            # self.agents[traffic_light["id"]].train(True)
-
             # Initialize the agent reward
-            self.agent_reward[traffic_light["id"]] = 0
+            self.agent_reward[traffic_light_id] = 0
 
             # Initialize the agent state
-            self.agent_state[traffic_light["id"]] = 0
+            self.agent_state[traffic_light_id] = 0
 
             # Initialize the agent old state
-            self.agent_old_state[traffic_light["id"]] = 0
+            self.agent_old_state[traffic_light_id] = 0
 
             # Initialize the old outflow rate
-            self.old_outflow_rate[traffic_light["id"]] = 0
+            self.old_outflow_rate[traffic_light_id] = 0
 
             # Initialize the outflow rate
-            self.outflow_rate[traffic_light["id"]] = 0
+            self.outflow_rate[traffic_light_id] = 0
 
             # Initialize the old travel speed
-            self.old_travel_speed[traffic_light["id"]] = 0
+            self.old_travel_speed[traffic_light_id] = 0
 
             # Initialize the travel speed
-            self.travel_speed[traffic_light["id"]] = 0
+            self.travel_speed[traffic_light_id] = 0
 
             # Initialize the old travel time
-            self.old_travel_time[traffic_light["id"]] = 0
+            self.old_travel_time[traffic_light_id] = 0
 
             # Initialize the travel time
-            self.travel_time[traffic_light["id"]] = 0
+            self.travel_time[traffic_light_id] = 0
 
             # Initialize the old density
-            self.old_density[traffic_light["id"]] = 0
+            self.old_density[traffic_light_id] = 0
 
             # Initialize the density
-            self.density[traffic_light["id"]] = 0
+            self.density[traffic_light_id] = 0
+
+            # Initialize the history
+            for key in self.history:
+                self.history[key][traffic_light_id] = []
+
+    def get_output_dims(self):
+        """
+        Get multiple outputs of the agent for each traffic light
+
+        Returns:
+            output_dims (list[int]): The output dimension of the agent
+        """
+
+        output_dims = []
+        for traffic_light in self.traffic_lights:
+            output_dims.append(self.num_actions[traffic_light["id"]])
+
+        return output_dims
 
     def run(self, epsilon, episode):
         print("Simulation started")
@@ -143,27 +176,43 @@ class Simulation:
 
         while self.step < self.max_steps:
             for traffic_light in self.traffic_lights:
+                traffic_light_id = traffic_light["id"]
                 state = self.get_state(traffic_light)
-                action_idx = self.select_action(traffic_light["id"], self.agents[traffic_light["id"]], state, epsilon)
+                action_idx = self.select_action(
+                    traffic_light_id,
+                    self.agent,
+                    state,
+                    epsilon,
+                )
 
                 phase, green_delta = index_to_action(
                     action_idx,
-                    self.actions_map[traffic_light["id"]],
+                    self.actions_map[traffic_light_id],
                 )
-                green_time = max(1, self.green_time[traffic_light["id"]] + green_delta)
+                green_time = max(1, self.green_time[traffic_light_id] + green_delta)
 
-                self.green_time_old[traffic_light["id"]] = self.green_time[traffic_light["id"]]
-                self.green_time[traffic_light["id"]] = green_time
+                self.green_time_old[traffic_light_id] = self.green_time[
+                    traffic_light_id
+                ]
+                self.green_time[traffic_light_id] = green_time
 
-                self.old_outflow_rate[traffic_light["id"]] = self.outflow_rate[traffic_light["id"]]
-                self.old_travel_speed[traffic_light["id"]] = self.travel_speed[traffic_light["id"]]
-                self.old_travel_time[traffic_light["id"]] = self.travel_time[traffic_light["id"]]
-                self.old_density[traffic_light["id"]] = self.density[traffic_light["id"]]
+                self.old_outflow_rate[traffic_light_id] = self.outflow_rate[
+                    traffic_light_id
+                ]
+                self.old_travel_speed[traffic_light_id] = self.travel_speed[
+                    traffic_light_id
+                ]
+                self.old_travel_time[traffic_light_id] = self.travel_time[
+                    traffic_light_id
+                ]
+                self.old_density[traffic_light_id] = self.density[
+                    traffic_light_id
+                ]
 
                 old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
 
                 self.set_green_phase(
-                    traffic_light["id"],
+                    traffic_light_id,
                     green_time,
                     phase,
                 )
@@ -176,18 +225,33 @@ class Simulation:
                 outflow = sum(
                     1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
                 )
-                self.outflow_rate[traffic_light["id"]] = outflow / green_time if green_time > 0 else 0
+                self.outflow_rate[traffic_light_id] = (
+                    outflow / green_time if green_time > 0 else 0
+                )
 
                 # Get new traffic metrics
-                self.travel_speed[traffic_light["id"]] = self.get_avg_speed(traffic_light)
-                self.travel_time[traffic_light["id"]] = self.get_avg_travel_time(traffic_light)
-                self.density[traffic_light["id"]] = self.get_avg_density(traffic_light)
+                self.travel_speed[traffic_light_id] = self.get_avg_speed(
+                    traffic_light
+                )
+                self.travel_time[traffic_light_id] = self.get_avg_travel_time(
+                    traffic_light
+                )
+                self.density[traffic_light_id] = self.get_avg_density(traffic_light)
 
-                reward = self.get_reward(traffic_light["id"])
+                reward = self.get_reward(traffic_light_id)
                 # print(f"Traffic light: {traffic_light['id']}, Phase: {phase}, Green time: {green_time}, Reward: {reward}")
 
                 next_state = self.get_state(traffic_light)
-                self.agent_memory[traffic_light["id"]].push(state, action_idx, reward, next_state)
+                self.agent_memory[traffic_light_id].push(
+                    state, action_idx, reward, next_state
+                )
+
+                self.history["agent_reward"][traffic_light_id].append(reward)
+                self.history["travel_speed"][traffic_light_id].append(self.travel_speed[traffic_light_id])
+                self.history["travel_time"][traffic_light_id].append(self.travel_time[traffic_light_id])
+                self.history["density"][traffic_light_id].append(self.density[traffic_light_id])
+                self.history["outflow_rate"][traffic_light_id].append(self.outflow_rate[traffic_light_id])
+                self.history["green_time"][traffic_light_id].append(self.green_time[traffic_light_id])
 
         simulation_time = time.time() - start
 
@@ -203,34 +267,97 @@ class Simulation:
         print("Training ended")
         print("---------------------------------------")
 
-        if episode % 100 == 0:
-            print(f"Saving models at episode {episode} ...")
-            for traffic_light in self.traffic_lights:
-                model_path = self.path + f"{traffic_light['id']}-{episode}.pth"
-                self.agents[traffic_light["id"]].save(model_path)
+        total_reward = 0
+        for traffic_light in self.traffic_lights:
+            total_reward += self.agent_reward[traffic_light["id"]]
 
-        return simulation_time, training_time
+        self.save_plot(episode=episode)
+
+        return simulation_time, training_time, total_reward
 
     def training(self):
         """
         Retrieve a group of samples from the memory and for each of them update the learning equation, then train
         """
         for traffic_light in self.traffic_lights:
-            batch = self.agent_memory[traffic_light["id"]].get_samples(self.agents[traffic_light["id"]].batch_size)
+            traffic_light_id = traffic_light["id"]
+            batch = self.agent_memory[traffic_light_id].get_samples(
+                self.agent.batch_size
+            )
 
-            if len(batch) > 0: 
-                for (state, action, reward, next_state, done) in batch:
-                    self.agents[traffic_light["id"]].update(state, action, reward, next_state, done)
+            if len(batch) > 0:
+                for state, action, reward, next_state, done in batch:
+                    metrics = self.agent.update(
+                        state, action, reward, next_state, done, self.num_actions[traffic_light_id]
+                    )
+
+                    self.history["q_value"][traffic_light_id].append(metrics["q_value"])
+                    self.history["max_next_q_value"][traffic_light_id].append(metrics["max_next_q_value"])
+                    self.history["target"][traffic_light_id].append(metrics["target"])
+                    self.history["loss"][traffic_light_id].append(metrics["loss"])
 
     def get_reward(self, traffic_light_id):
         return (
             self.agent_reward[traffic_light_id]
-            + (self.green_time_old[traffic_light_id] - self.green_time[traffic_light_id])
-            + (self.outflow_rate[traffic_light_id] - self.old_outflow_rate[traffic_light_id])
-            + (self.travel_speed[traffic_light_id] - self.old_travel_speed[traffic_light_id])
-            + (self.travel_time[traffic_light_id] - self.old_travel_time[traffic_light_id])
+            + (
+                self.green_time_old[traffic_light_id]
+                - self.green_time[traffic_light_id]
+            )
+            + (
+                self.outflow_rate[traffic_light_id]
+                - self.old_outflow_rate[traffic_light_id]
+            )
+            + (
+                self.travel_speed[traffic_light_id]
+                - self.old_travel_speed[traffic_light_id]
+            )
+            + (
+                self.travel_time[traffic_light_id]
+                - self.old_travel_time[traffic_light_id]
+            )
             + (self.density[traffic_light_id] - self.old_density[traffic_light_id])
         )
+    
+    def save_plot(self, episode):
+        # We simple by averaging the history over all traffic lights
+        avg_history = {}
+
+        for metric, data_per_tls in self.history.items():
+            # Transpose the list of lists into per-timestep values
+            # Filter out missing/empty lists first
+            data_lists = [data for data in data_per_tls.values() if len(data) > 0]
+
+            if not data_lists:
+                continue  # Skip if no data
+
+            # Truncate to minimum length to avoid index errors
+            min_length = min(len(data) for data in data_lists)
+            data_lists = [data[:min_length] for data in data_lists]
+
+            # Average per timestep
+            avg_data = [sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)]
+
+            # Save to avg_history
+            avg_history[metric] = avg_data
+
+        if episode % 100 == 0:
+            print(f"Saving models at episode {episode} ...")
+            model_path = self.path + f"model_episode_{episode}.pth"
+            self.agent.save(model_path)
+            print("Models saved")
+            print("---------------------------------------")
+
+            print("Generating plots at episode", episode, "...")
+            for metric, data in avg_history.items():
+                self.visualization.save_data_and_plot(
+                    data=data,
+                    filename=f"{metric}_avg_episode_{episode}",
+                    xlabel="Step",
+                    ylabel=metric.replace("_", " ").title(),
+                )
+
+            print("Plots at episode", episode, "generated")
+            print("---------------------------------------")
 
     def set_yellow_phase(self, phase):
         """
@@ -282,7 +409,7 @@ class Simulation:
         else:
             state = torch.from_numpy(state).float()
             with torch.no_grad():
-                q_values: torch.Tensor = agent.predict_one(state)
+                q_values: torch.Tensor = agent.predict_one(state, self.num_actions[traffic_light_id])
                 return q_values.argmax().item()
 
     def get_state(self, traffic_light):
