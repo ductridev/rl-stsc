@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torchinfo import summary
+import torch
 
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99):
+    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
         """
         Initialize the DQN model.
 
@@ -23,6 +24,7 @@ class DQN(nn.Module):
         self._input_dim = input_dim
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
+        self.device = device
 
         # Build model parts: backbone + heads
         self.backbone, self.heads = self.__build_model()
@@ -96,9 +98,9 @@ class DQN(nn.Module):
 
         x = np.reshape(x, [1, self.input_dim])
         if not isinstance(x, torch.Tensor):
-            x = torch.tensor(x, dtype=torch.float32)
+            x = torch.tensor(x, dtype=torch.float32).to(self.device)
         return self.forward(x, output_dim)
-    
+
     def predict_batch(self, x, output_dim = 15):
         """
         Predict the Q-values for the given batch of inputs.
@@ -115,8 +117,56 @@ class DQN(nn.Module):
         assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
 
         if not isinstance(x, torch.Tensor):
-            x = torch.tensor(x, dtype=torch.float32)
+            x = torch.tensor(x, dtype=torch.float32).to(self.device)
         return self.forward(x, output_dim)
+    
+    def train_batch(self, states, actions, rewards, next_states, dones, output_dim=15):
+        """
+        Train the model on a batch of experiences.
+
+        Args:
+            states (ndarray): Batch of states.
+            actions (ndarray): Batch of actions.
+            rewards (ndarray): Batch of rewards.
+            next_states (ndarray): Batch of next states.
+            dones (ndarray): Batch of done flags.
+            output_dim (int): Output dimension (action space size).
+
+        Returns:
+            dict: Batch training metrics (avg loss, avg q_value, etc.)
+        """
+        # Convert to tensors
+        states = torch.tensor(states, dtype=torch.float32).to(self.device)
+        actions = torch.tensor(actions, dtype=torch.int64).to(self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
+        next_states = torch.tensor(next_states, dtype=torch.float32).to(self.device)
+        dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
+
+        # Forward pass
+        q_values = self.predict_batch(states, output_dim)             # [B, output_dim]
+        next_q_values = self.predict_batch(next_states, output_dim)   # [B, output_dim]
+
+        # Get Q-value for taken actions: Q(s,a)
+        q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+
+        # Compute target Q-value
+        max_next_q_values = torch.max(next_q_values, dim=1)[0]
+        target_q_value = rewards + (1 - dones) * self.gamma * max_next_q_values
+
+        # Compute loss
+        loss = F.mse_loss(q_value, target_q_value.detach())
+
+        # Backpropagation
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "avg_q_value": q_value.mean().item(),
+            "avg_max_next_q_value": max_next_q_values.mean().item(),
+            "avg_target": target_q_value.mean().item()
+        }
 
     def update(self, state, action, reward, next_state, done = False, output_dim = 15):
         """
@@ -136,14 +186,14 @@ class DQN(nn.Module):
         assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
 
         # Convert to tensors
-        state = torch.tensor(state, dtype=torch.float32)
-        next_state = torch.tensor(next_state, dtype=torch.float32)
-        action = torch.tensor([action], dtype=torch.long)
-        reward = torch.tensor([reward], dtype=torch.float32)
-        done = torch.tensor([done], dtype=torch.float32)
+        state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        action = torch.tensor([action], dtype=torch.long).to(self.device)
+        reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
+        done = torch.tensor([done], dtype=torch.float32).to(self.device)
 
         # Compute Q-values
-        q_values = self.forward(state, output_dim)
+        q_values = self.predict_one(state, output_dim)
         next_q_values = self.predict_one(next_state, output_dim)
 
         q_value = q_values[action]

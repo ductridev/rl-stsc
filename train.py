@@ -5,7 +5,6 @@ from src.simulation import Simulation
 from src.visualization import Visualization
 from src.intersection import Intersection
 
-import traci
 import datetime
 
 if __name__ == "__main__":
@@ -57,7 +56,7 @@ if __name__ == "__main__":
         epsilon = 1.0 - (
             episode / config["total_episodes"]
         )  # set the epsilon for this episode according to epsilon-greedy policy
-        simulation_time, training_time, total_reward = simulation.run(epsilon, episode)
+        simulation_time, training_time = simulation.run(epsilon, episode)
         print(
             "Simulation time:",
             simulation_time,
@@ -66,11 +65,8 @@ if __name__ == "__main__":
             "s - Total:",
             round(simulation_time + training_time, 1),
             "s",
-            "- Total reward:",
-            round(total_reward, 2),
         )
 
-        traci.close()
         episode += 1
 
     print("\n----- Start time:", timestamp_start)

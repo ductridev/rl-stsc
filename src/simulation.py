@@ -7,6 +7,7 @@ import numpy as np
 import random
 import torch
 import time
+import torch.nn as nn
 
 GREEN_ACTION = 0
 RED_ACTION = 1
@@ -76,6 +77,13 @@ class Simulation:
 
         self.initState()
 
+        if torch.cuda.is_available():
+            print(f"GPU: {torch.cuda.get_device_name(0)} is available.")
+        else:
+            print("No GPU available. Training will run on CPU.")
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.agent : DQN = DQN(
             num_layers=self.agent_cfg['num_layers'],
             batch_size=self.agent_cfg['batch_size'],
@@ -83,7 +91,14 @@ class Simulation:
             input_dim=self.agent_cfg['num_states'],
             output_dims=self.get_output_dims(),
             gamma=self.agent_cfg['gamma'],
+            device=self.device
         )
+
+        if torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs")
+            self.agent = nn.DataParallel(self.agent)
+
+        self.agent = self.agent.to(self.device)
 
     def initState(self):
         for traffic_light in self.traffic_lights:
@@ -255,6 +270,8 @@ class Simulation:
 
         simulation_time = time.time() - start
 
+        traci.close()
+
         print("Simulation ended")
         print("---------------------------------------")
 
@@ -267,36 +284,38 @@ class Simulation:
         print("Training ended")
         print("---------------------------------------")
 
-        total_reward = 0
-        for traffic_light in self.traffic_lights:
-            total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
-
         self.save_plot(episode=episode)
 
         self.step = 0
 
-        return simulation_time, training_time, total_reward
+        total_reward = 0
+        for traffic_light in self.traffic_lights:
+            total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
+
+        print("Total reward:", total_reward, "- Epsilon:", epsilon)
+
+        return simulation_time, training_time
 
     def training(self):
         """
-        Retrieve a group of samples from the memory and for each of them update the learning equation, then train
+        Retrieve a batch from each traffic light memory and train the agent.
         """
         for traffic_light in self.traffic_lights:
             traffic_light_id = traffic_light["id"]
-            batch = self.agent_memory[traffic_light_id].get_samples(
-                self.agent.batch_size
-            )
+            batch = self.agent_memory[traffic_light_id].get_samples(self.agent.batch_size)
 
             if len(batch) > 0:
-                for state, action, reward, next_state, done in batch:
-                    metrics = self.agent.update(
-                        state, action, reward, next_state, done, self.num_actions[traffic_light_id]
-                    )
+                states, actions, rewards, next_states, dones = zip(*batch)
 
-                    self.history["q_value"][traffic_light_id].append(metrics["q_value"])
-                    self.history["max_next_q_value"][traffic_light_id].append(metrics["max_next_q_value"])
-                    self.history["target"][traffic_light_id].append(metrics["target"])
-                    self.history["loss"][traffic_light_id].append(metrics["loss"])
+                metrics = self.agent.train_batch(
+                    states, actions, rewards, next_states, dones,
+                    output_dim=self.num_actions[traffic_light_id]
+                )
+
+                self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
+                self.history["max_next_q_value"][traffic_light_id].append(metrics["avg_max_next_q_value"])
+                self.history["target"][traffic_light_id].append(metrics["avg_target"])
+                self.history["loss"][traffic_light_id].append(metrics["loss"])
 
     def get_reward(self, traffic_light_id):
         return (
