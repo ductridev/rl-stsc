@@ -153,7 +153,7 @@ class DQN(nn.Module):
         target_q_value = reward + (1 - done) * self.gamma * torch.max(next_q_values)
 
         # Compute loss
-        loss = F.mse_loss(q_values[action], target_q_value)
+        loss = F.mse_loss(q_value, target_q_value)
 
         # Backpropagation
         self.optimizer.zero_grad()
