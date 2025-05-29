@@ -21,7 +21,7 @@ class DQN(nn.Module):
         self._batch_size = batch_size
         self.learning_rate = learning_rate
         self._input_dim = input_dim
-        self._output_dims = output_dims
+        self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
 
         # Build model parts: backbone + heads
