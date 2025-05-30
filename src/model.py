@@ -98,9 +98,11 @@ class DQN(nn.Module):
         assert isinstance(output_dim, int), "output_dim must be an integer"
         assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
 
-        x = np.reshape(x, [1, self.input_dim])
         if not isinstance(x, torch.Tensor):
+            x = np.reshape(x, [1, self.input_dim])
             x = torch.tensor(x, dtype=torch.float32).to(self.device)
+        else:
+            x = torch.reshape(x, [1, self.input_dim])
         return self.forward(x, output_dim)
 
     def predict_batch(self, x, output_dim = 15):
