@@ -40,14 +40,16 @@ class DQN(nn.Module):
         backbone = nn.Sequential()
         backbone.append(nn.Linear(self.input_dim, 128))
         backbone.append(nn.ReLU())
+        backbone.append(nn.Linear(128, 256))
+        backbone.append(nn.ReLU())
 
         for _ in range(self.num_layers):
-            backbone.append(nn.Linear(128, 128))
+            backbone.append(nn.Linear(256, 256))
             backbone.append(nn.ReLU())
 
         heads = nn.ModuleDict()
         for dim in self._output_dims:
-            heads[str(dim)] = nn.Linear(128, dim)
+            heads[str(dim)] = nn.Linear(256, dim)
 
         return backbone, heads
     
@@ -60,7 +62,7 @@ class DQN(nn.Module):
 
         for dim in self._output_dims:
             print(f"\nHead summary for output_dim={dim}:")
-            summary(self.heads[str(dim)], input_size=(dim, 128))
+            summary(self.heads[str(dim)], input_size=(dim, 256))
 
     def forward(self, x, output_dim = 15):
         """
@@ -120,7 +122,7 @@ class DQN(nn.Module):
             x = torch.tensor(x, dtype=torch.float32).to(self.device)
         return self.forward(x, output_dim)
     
-    def train_batch(self, states, actions, rewards, next_states, dones, output_dim=15):
+    def train_batch(self, states, actions, rewards, next_states, output_dim=15):
         """
         Train the model on a batch of experiences.
 
@@ -136,12 +138,10 @@ class DQN(nn.Module):
             dict: Batch training metrics (avg loss, avg q_value, etc.)
         """
         # Convert to tensors
-        states = torch.tensor(states, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(actions, dtype=torch.int64).to(self.device)
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
-        next_states = torch.tensor(next_states, dtype=torch.float32).to(self.device)
-        dones = torch.tensor(dones, dtype=torch.float32).to(self.device)
-
+        states = torch.tensor(np.array(states), dtype=torch.float32).to(self.device)
+        actions = torch.tensor(np.array(actions), dtype=torch.int64).to(self.device)
+        rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(self.device)
         # Forward pass
         q_values = self.predict_batch(states, output_dim)             # [B, output_dim]
         next_q_values = self.predict_batch(next_states, output_dim)   # [B, output_dim]
@@ -151,7 +151,7 @@ class DQN(nn.Module):
 
         # Compute target Q-value
         max_next_q_values = torch.max(next_q_values, dim=1)[0]
-        target_q_value = rewards + (1 - dones) * self.gamma * max_next_q_values
+        target_q_value = rewards + self.gamma * max_next_q_values
 
         # Compute loss
         loss = F.mse_loss(q_value, target_q_value.detach())

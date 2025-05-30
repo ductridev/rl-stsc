@@ -308,7 +308,7 @@ class Simulation:
                 states, actions, rewards, next_states, dones = zip(*batch)
 
                 metrics = self.agent.train_batch(
-                    states, actions, rewards, next_states, dones,
+                    states, actions, rewards, next_states,
                     output_dim=self.num_actions[traffic_light_id]
                 )
 
@@ -319,8 +319,7 @@ class Simulation:
 
     def get_reward(self, traffic_light_id):
         return (
-            self.agent_reward[traffic_light_id]
-            + (
+            (
                 self.green_time_old[traffic_light_id]
                 - self.green_time[traffic_light_id]
             )
@@ -340,26 +339,24 @@ class Simulation:
         )
     
     def save_plot(self, episode):
-        # We simple by averaging the history over all traffic lights
+        # We simplify by averaging the history over all traffic lights
         avg_history = {}
 
         for metric, data_per_tls in self.history.items():
-            # Transpose the list of lists into per-timestep values
-            # Filter out missing/empty lists first
+            # Collect valid histories
             data_lists = [data for data in data_per_tls.values() if len(data) > 0]
-
             if not data_lists:
-                continue  # Skip if no data
+                continue
 
-            # Truncate to minimum length to avoid index errors
+            # Truncate to minimum length across all lists
             min_length = min(len(data) for data in data_lists)
             data_lists = [data[:min_length] for data in data_lists]
 
             # Average per timestep
             avg_data = [sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)]
 
-            # Save to avg_history
-            avg_history[metric] = avg_data
+            # Take the last 100 entries (or all if less)
+            avg_history[metric] = avg_data[-100:]
 
         if episode % 100 == 0:
             print(f"Saving models at episode {episode} ...")
@@ -376,7 +373,6 @@ class Simulation:
                     xlabel="Step",
                     ylabel=metric.replace("_", " ").title(),
                 )
-
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
 
@@ -428,7 +424,7 @@ class Simulation:
         if random.random() < epsilon:
             return random.randint(0, self.num_actions[traffic_light_id] - 1)
         else:
-            state = torch.from_numpy(state).float()
+            state = torch.from_numpy(state).to(self.device, dtype=torch.float32)
             with torch.no_grad():
                 q_values: torch.Tensor = agent.predict_one(state, self.num_actions[traffic_light_id])
                 return q_values.argmax().item()

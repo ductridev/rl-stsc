@@ -16,7 +16,7 @@ agent:
   num_states: 4 # min free capacity, waiting time, density, queue length
   green_duration_deltas: [-2, -1, 0, 1, 2] 
   model:
-    num_layers: 4
+    num_layers: 8
     batch_size: 128
     learning_rate: 0.0001
 
