@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torchinfo import summary
-import torch
+from typing import Optional
 
 class DQN(nn.Module):
     def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
@@ -62,7 +62,7 @@ class DQN(nn.Module):
 
         for dim in self._output_dims:
             print(f"\nHead summary for output_dim={dim}:")
-            summary(self.heads[str(dim)], input_size=(dim, 256))
+            summary(self.heads[str(dim)], input_size=(self.batch_size, 256))
 
     def forward(self, x, output_dim = 15):
         """
@@ -124,7 +124,7 @@ class DQN(nn.Module):
             x = torch.tensor(x, dtype=torch.float32).to(self.device)
         return self.forward(x, output_dim)
     
-    def train_batch(self, states, actions, rewards, next_states, output_dim=15):
+    def train_batch(self, states, actions, rewards, next_states, output_dim=15, done=False, target_net:Optional["DQN"]=None):
         """
         Train the model on a batch of experiences.
 
@@ -144,16 +144,21 @@ class DQN(nn.Module):
         actions = torch.tensor(np.array(actions), dtype=torch.int64).to(self.device)
         rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
         next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(self.device)
+        done = torch.tensor(done, dtype=torch.float32).to(self.device)
         # Forward pass
         q_values = self.predict_batch(states, output_dim)             # [B, output_dim]
-        next_q_values = self.predict_batch(next_states, output_dim)   # [B, output_dim]
+        with torch.no_grad():
+            if target_net is not None:
+                next_q_values = target_net.predict_batch(next_states, output_dim)
+            else:
+                next_q_values = self.predict_batch(next_states, output_dim)  # fallback
 
         # Get Q-value for taken actions: Q(s,a)
         q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
 
         # Compute target Q-value
         max_next_q_values = torch.max(next_q_values, dim=1)[0]
-        target_q_value = rewards + self.gamma * max_next_q_values
+        target_q_value = rewards + (1 - done) * self.gamma * max_next_q_values
 
         # Compute loss
         loss = F.mse_loss(q_value, target_q_value.detach())
