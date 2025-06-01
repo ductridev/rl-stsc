@@ -1,6 +1,7 @@
 from src.model import DQN
 from src.memory import ReplayMemory
 from src.visualization import Visualization
+from src.normalizer import Normalizer
 
 import traci
 import numpy as np
@@ -8,6 +9,7 @@ import random
 import torch
 import time
 import torch.nn as nn
+import copy
 
 GREEN_ACTION = 0
 RED_ACTION = 1
@@ -19,7 +21,6 @@ def index_to_action(index, actions_map):
 
 def action_to_index(phase_idx, delta_idx, num_deltas):
     return phase_idx * num_deltas + delta_idx
-
 
 class Simulation:
     def __init__(
@@ -41,6 +42,12 @@ class Simulation:
         self.interphase_duration = interphase_duration
         self.epoch = epoch
         self.path = path
+        self.weight = agent_cfg["weight"]
+        self.green_time_normalizer = Normalizer()
+        self.outflow_rate_normalizer = Normalizer()
+        self.density_normalizer = Normalizer()
+        self.travel_time_normalizer = Normalizer()
+        self.travel_speed_normalizer = Normalizer()
 
         self.step = 0
         self.num_actions = {}
@@ -99,6 +106,8 @@ class Simulation:
             self.agent = nn.DataParallel(self.agent)
 
         self.agent = self.agent.to(self.device)
+        self.target_net = copy.deepcopy(self.agent)
+        self.target_net.eval()
 
     def initState(self):
         for traffic_light in self.traffic_lights:
@@ -232,33 +241,40 @@ class Simulation:
                     phase,
                 )
 
+                travel_speed = 0
+                travel_time = 0
+                density = 0
+
                 for _ in range(min(green_time, self.max_steps - self.step)):
                     self.step += 1
                     traci.simulationStep()
 
-                new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
-                outflow = sum(
-                    1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
-                )
+                    new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
+                    outflow = sum(
+                        1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
+                    )
+
+                    travel_speed += self.get_avg_speed(traffic_light)
+                    travel_time += self.get_avg_travel_time(traffic_light)
+                    density += self.get_avg_density(traffic_light)
+
                 self.outflow_rate[traffic_light_id] = (
                     outflow / green_time if green_time > 0 else 0
                 )
 
                 # Get new traffic metrics
-                self.travel_speed[traffic_light_id] = self.get_avg_speed(
-                    traffic_light
-                )
-                self.travel_time[traffic_light_id] = self.get_avg_travel_time(
-                    traffic_light
-                )
-                self.density[traffic_light_id] = self.get_avg_density(traffic_light)
+                self.travel_speed[traffic_light_id] = ( travel_speed / green_time if green_time > 0 else 0 )
+                self.travel_time[traffic_light_id] = ( travel_time / green_time if green_time > 0 else 0 )
+                self.density[traffic_light_id] = ( density / green_time if green_time > 0 else 0 )
 
                 reward = self.get_reward(traffic_light_id)
                 # print(f"Traffic light: {traffic_light['id']}, Phase: {phase}, Green time: {green_time}, Reward: {reward}")
 
+                done = self.step >= self.max_steps
+
                 next_state = self.get_state(traffic_light)
                 self.agent_memory[traffic_light_id].push(
-                    state, action_idx, reward, next_state
+                    state, action_idx, reward, next_state, done
                 )
 
                 self.history["agent_reward"][traffic_light_id].append(reward)
@@ -277,6 +293,10 @@ class Simulation:
 
         print("Training...")
         start_time = time.time()
+
+        if episode % 10 == 0:
+            self.target_net.load_state_dict(self.agent.state_dict())
+
         for _ in range(self.epoch):
             self.training()
         training_time = time.time() - start_time
@@ -305,11 +325,13 @@ class Simulation:
             batch = self.agent_memory[traffic_light_id].get_samples(self.agent.batch_size)
 
             if len(batch) > 0:
-                states, actions, rewards, next_states, dones = zip(*batch)
+                states, actions, rewards, next_states, done = zip(*batch)
 
                 metrics = self.agent.train_batch(
                     states, actions, rewards, next_states,
-                    output_dim=self.num_actions[traffic_light_id]
+                    output_dim=self.num_actions[traffic_light_id],
+                    done=done,
+                    target_net=self.target_net
                 )
 
                 self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
@@ -319,25 +341,25 @@ class Simulation:
 
     def get_reward(self, traffic_light_id):
         return (
-            (
+            self.weight['green_time'] * self.green_time_normalizer.normalize(
                 self.green_time_old[traffic_light_id]
                 - self.green_time[traffic_light_id]
             )
-            + (
+            + self.weight['outflow_rate'] * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
                 - self.old_outflow_rate[traffic_light_id]
             )
-            + (
+            + self.weight['travel_speed'] * self.travel_speed_normalizer.normalize(
                 self.travel_speed[traffic_light_id]
                 - self.old_travel_speed[traffic_light_id]
             )
-            + (
+            + self.weight['travel_time'] * self.travel_time_normalizer.normalize(
                 self.travel_time[traffic_light_id]
                 - self.old_travel_time[traffic_light_id]
             )
-            + (self.density[traffic_light_id] - self.old_density[traffic_light_id])
+            + self.weight['density'] * self.density_normalizer.normalize(self.density[traffic_light_id] - self.old_density[traffic_light_id])
         )
-    
+
     def save_plot(self, episode):
         # We simplify by averaging the history over all traffic lights
         avg_history = {}
