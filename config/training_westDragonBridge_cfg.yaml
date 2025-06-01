@@ -19,6 +19,14 @@ agent:
     num_layers: 8
     batch_size: 128
     learning_rate: 0.0001
+    decay_rate: 0.995
+    min_epsilon: 0.01
+  weight:
+    green_time: 0.1
+    outflow_rate: 0.3
+    travel_speed: 0.2
+    travel_time: 0.2
+    density: 0.2
 
 dir:
   models_path_name: "models/"
