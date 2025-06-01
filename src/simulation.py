@@ -245,7 +245,9 @@ class Simulation:
                 travel_time = 0
                 density = 0
 
-                for _ in range(min(green_time, self.max_steps - self.step)):
+                green_time = min(green_time, self.max_steps - self.step)
+
+                for _ in range(green_time):
                     self.step += 1
                     traci.simulationStep()
 
@@ -255,8 +257,9 @@ class Simulation:
                     )
 
                     travel_speed += self.get_avg_speed(traffic_light)
-                    travel_time += self.get_avg_travel_time(traffic_light)
                     density += self.get_avg_density(traffic_light)
+
+                    old_vehicle_ids = new_vehicle_ids
 
                 self.outflow_rate[traffic_light_id] = (
                     outflow / green_time if green_time > 0 else 0
@@ -264,7 +267,7 @@ class Simulation:
 
                 # Get new traffic metrics
                 self.travel_speed[traffic_light_id] = ( travel_speed / green_time if green_time > 0 else 0 )
-                self.travel_time[traffic_light_id] = ( travel_time / green_time if green_time > 0 else 0 )
+                self.travel_time[traffic_light_id] = ( self.get_avg_travel_time(traffic_light) / green_time if green_time > 0 else 0 )
                 self.density[traffic_light_id] = ( density / green_time if green_time > 0 else 0 )
 
                 reward = self.get_reward(traffic_light_id)
@@ -546,9 +549,8 @@ class Simulation:
 
         # Group all lane_idx in detectors
         lane_idxs = [
-            lane_id
+            detector["id"]
             for detector in traffic_light["detectors"]
-            for lane_id in detector["lane_idx"]
         ]
 
         green_lanes = [
