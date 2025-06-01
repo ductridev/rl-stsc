@@ -1,5 +1,5 @@
 class Normalizer:
-    def __init__(self, min_val=float('inf'), max_val=float('-inf')):
+    def __init__(self, min_val=-1e10, max_val=1e10):
         self.min_val = min_val
         self.max_val = max_val
 
