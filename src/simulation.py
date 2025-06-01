@@ -357,10 +357,10 @@ class Simulation:
                 - self.old_travel_speed[traffic_light_id]
             )
             + self.weight['travel_time'] * self.travel_time_normalizer.normalize(
-                self.travel_time[traffic_light_id]
-                - self.old_travel_time[traffic_light_id]
+                self.old_travel_time[traffic_light_id]
+                - self.travel_time[traffic_light_id]
             )
-            + self.weight['density'] * self.density_normalizer.normalize(self.density[traffic_light_id] - self.old_density[traffic_light_id])
+            + self.weight['density'] * self.density_normalizer.normalize(self.old_density[traffic_light_id] - self.density[traffic_light_id])
         )
 
     def save_plot(self, episode):
