@@ -242,7 +242,6 @@ class Simulation:
                 )
 
                 travel_speed = 0
-                travel_time = 0
                 density = 0
 
                 green_time = min(green_time, self.max_steps - self.step)
