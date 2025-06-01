@@ -11,6 +11,9 @@ if __name__ == "__main__":
     # Load configuration
     config = import_train_configuration("config/training_westDragonBridge_cfg.yaml")
     green_duration_deltas = config["agent"]["green_duration_deltas"]
+    min_epsilon = config["agent"]["min_epsilon"]
+    decay_rate = config["agent"]["decay_rate"]
+    epsilon = 1
 
     # Create replay memory for the agent
     agent_memory = ReplayMemory(
@@ -53,10 +56,8 @@ if __name__ == "__main__":
 
         set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
 
-        epsilon = 1.0 - (
-            episode / config["total_episodes"]
-        )  # set the epsilon for this episode according to epsilon-greedy policy
         simulation_time, training_time = simulation.run(epsilon, episode)
+        epsilon = max(min_epsilon, epsilon * decay_rate)
         print(
             "Simulation time:",
             simulation_time,
