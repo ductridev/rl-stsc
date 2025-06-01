@@ -111,6 +111,7 @@ def import_train_configuration(file_path):
         config['memory_size_min'] = content['memory']['memory_size_min']
         config['memory_size_max'] = content['memory']['memory_size_max']
 
+        # Agent configuration
         config['agent'] = {}
         config['agent']['num_states'] = content['agent']['num_states']
         config['agent']['gamma'] = content['agent']['gamma']
@@ -118,6 +119,9 @@ def import_train_configuration(file_path):
         config['agent']['num_layers'] = content['agent']['model']['num_layers']
         config['agent']['batch_size'] = content['agent']['model']['batch_size']
         config['agent']['learning_rate'] = content['agent']['model']['learning_rate']
+        config['agent']['decay_rate'] = content['agent']['model']['decay_rate']
+        config['agent']['min_epsilon'] = content['agent']['model']['min_epsilon']
+        config['agent']['weight'] = content['agent']['weight']
         # # Green duration agent
         # config['green_duration_agent'] = {}
         # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
