@@ -58,6 +58,9 @@ Each agent (intersection) will:
 - Multiple heads ensure flexibility for multiple action spaces.
 - Supports scalable learning as city-size grows (many intersections).
 
+### Training Logic
+Check [TRAINING.md](TRAINING.md)
+
 ## License
 
 This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/) license.
