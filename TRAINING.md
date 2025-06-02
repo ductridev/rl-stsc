@@ -90,6 +90,6 @@ This adjusts the DQN to better approximate the expected returns.
 ---
 
 #### 6. **Periodically Update the Target Network**
-Describe in [🎯 Why We Use a Target Network in DQN?](#why-we-use-a-target-network-in-dqn) Section
+Describe in [🎯 Why We Use a Target Network in DQN?](#-why-we-use-a-target-network-in-dqn) Section
 
 ---
