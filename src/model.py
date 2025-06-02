@@ -174,55 +174,6 @@ class DQN(nn.Module):
             "avg_max_next_q_value": max_next_q_values.mean().item(),
             "avg_target": target_q_value.mean().item()
         }
-
-    def update(self, state, action, reward, next_state, done = False, output_dim = 15):
-        """
-        Update the model using the given transition.
-
-        Args:
-            state (torch.Tensor): Current state.
-            action (int): Action taken.
-            reward (float): Reward received.
-            next_state (torch.Tensor): Next state after the action.
-            done (bool): Whether the episode has ended.
-        Returns:
-            dict: Contains loss, q_value, max_next_q_value, and target.
-        """
-        assert output_dim is not None, "output_dim must be specified"
-        assert isinstance(output_dim, int), "output_dim must be an integer"
-        assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
-
-        # Convert to tensors
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        next_state = torch.tensor(next_state, dtype=torch.float32).to(self.device)
-        action = torch.tensor([action], dtype=torch.long).to(self.device)
-        reward = torch.tensor([reward], dtype=torch.float32).to(self.device)
-        done = torch.tensor([done], dtype=torch.float32).to(self.device)
-
-        # Compute Q-values
-        q_values = self.predict_one(state, output_dim)
-        next_q_values = self.predict_one(next_state, output_dim)
-
-        q_value = q_values[action]
-        max_next_q_value = torch.max(next_q_values)
-
-        # Compute target Q-value
-        target_q_value = reward + (1 - done) * self.gamma * torch.max(next_q_values)
-
-        # Compute loss
-        loss = F.mse_loss(q_value, target_q_value)
-
-        # Backpropagation
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        return {
-            "loss": loss.item(),
-            "q_value": q_value.item(),
-            "max_next_q_value": max_next_q_value.item(),
-            "target": target_q_value.item(),
-        }
     
     def save(self, path):
         """
