@@ -1,0 +1,180 @@
+simulation:
+  gui: true
+  max_steps: 500
+  yellow_duration: 5
+
+green_duration_agent:
+  num_states: 1
+  num_actions: 6
+
+selector_phase_agent:
+  num_states: 5
+  num_actions: 1
+
+dir:
+  models_path_name: "models/"
+  sumocfg_file_name: "simulations/westTuyenSonBridge/osm.sumocfg"
+  model_to_test: "models/2025-05-20_12-00-00_model.h5"
+
+traffic_lights:
+  - traffic_light_1:
+    id: "joinedS_6164917328_6514299276_cluster_3070397256_6164917307_6164917332_6164917334_#7more"
+    detectors:
+      - id: "e2_0"
+        street: "TS-SVNT"
+        lane_idx:
+          - 0
+      - id: "e2_1"
+        street: "TS-SVNT"
+        lane_idx:
+          - 1
+      - id: "e2_2"
+        street: "TS-SVNT"
+        lane_idx:
+          - 2
+          - 3
+          - 4
+      - id: "e2_3"
+        street: "29-NB"
+        lane_idx:
+          - 7
+          - 8
+          - 9
+      - id: "e2_4"
+        street: "29-NB"
+        lane_idx:
+          - 6
+      - id: "e2_5"
+        street: "29-NB"
+        lane_idx:
+          - 5
+      - id: "e2_6"
+        street: "SVNT-TS"
+        lane_idx:
+          - 12
+          - 13
+          - 14
+      - id: "e2_7"
+        street: "SVNT-TS"
+        lane_idx:
+          - 11
+      - id: "e2_8"
+        street: "SVNT-TS"
+        lane_idx:
+          - 10
+      - id: "e2_9"
+        street: "29-BN"
+        lane_idx:
+          - 15
+      - id: "e2_10"
+        street: "29-BN"
+        lane_idx:
+          - 16
+      - id: "e2_11"
+        street: "29-BN"
+        lane_idx:
+          - 17
+          - 18
+          - 19
+  - traffic_light_2:
+    id: "joinedS_3070300101_cluster_1333258669_1333279736_6518778049_6518778050_cluster_6518778051_6530458895"
+    detectors:
+      - id: "e2_12"
+        street: "TS-SVNT"
+        lane_idx:
+          - 0
+          - 1
+      - id: "e2_13"
+        street: "TS-SVNT"
+        lane_idx:
+          - 2
+      - id: "e2_14"
+        street: "TS-SVNT"
+        lane_idx:
+          - 3
+          - 4
+          - 5
+      - id: "e2_15"
+        street: "NT-NB"
+        lane_idx:
+          - 6
+          - 7
+          - 8
+          - 9
+      - id: "e2_16"
+        street: "NT-BN"
+        lane_idx:
+          - 16
+          - 17
+          - 18
+          - 19
+      - id: "e2_17"
+        street: "SVNT-TS"
+        lane_idx:
+          - 13
+          - 14
+          - 15
+      - id: "e2_18"
+        street: "SVNT-TS"
+        lane_idx:
+          - 12
+      - id: "e2_19"
+        street: "SVNT-TS"
+        lane_idx:
+          - 10
+          - 11
+  - traffic_light_3:
+    id: "cluster_1333246087_3070300095_3078041918_6518727272_#2more"
+    detectors:
+      - id: "e2_20"
+        street: "TS-SVNT"
+        lane_idx:
+          - 0
+          - 1
+      - id: "e2_21"
+        street: "TS-SVNT"
+        lane_idx:
+          - 2
+      - id: "e2_22"
+        street: "TS-SVNT"
+        lane_idx:
+          - 3
+          - 4
+          - 5
+      - id: "e2_23"
+        street: "LTN-BN"
+        lane_idx:
+          - 17
+          - 18
+      - id: "e2_24"
+        street: "LTN-BN"
+        lane_idx:
+          - 19
+          - 20
+          - 21
+      - id: "e2_25"
+        street: "LTN-NB"
+        lane_idx:
+          - 8
+          - 9
+          - 10
+      - id: "e2_26"
+        street: "LTN-NB"
+        lane_idx:
+          - 6
+          - 7
+      - id: "e2_27"
+        street: "SVNT-TS"
+        lane_idx:
+          - 14
+          - 15
+          - 16
+      - id: "e2_28"
+        street: "SVNT-TS"
+        lane_idx:
+          - 13
+      - id: "e2_29"
+        street: "SVNT-TS"
+        lane_idx:
+          - 11
+          - 12

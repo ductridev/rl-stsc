@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-05-17 11:39:10 by Eclipse SUMO GUI Version 1.22.0
+<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="D:\Sumo\tools\westDragonBridge\osm.net.xml.gz"/>
+        <route-files value="D:\Sumo\tools\westDragonBridge\osm.bicycle.trips.xml,D:\Sumo\tools\westDragonBridge\osm.motorcycle.rou.xml,D:\Sumo\tools\westDragonBridge\osm.passenger.rou.xml,D:\Sumo\tools\westDragonBridge\osm.pedestrian.rou.xml"/>
+        <additional-files value="D:\Sumo\tools\westDragonBridge\osm.poly.xml.gz"/>
+    </input>
+
+    <processing>
+        <ignore-route-errors value="true"/>
+        <tls.actuated.jam-threshold value="30"/>
+    </processing>
+
+    <routing>
+        <device.rerouting.adaptation-steps value="18"/>
+        <device.rerouting.adaptation-interval value="10"/>
+    </routing>
+
+    <report>
+        <verbose value="true"/>
+        <duration-log.statistics value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+    <traci_server>
+        <remote-port value="59178"/>
+    </traci_server>
+
+    <gui_only>
+        <gui-settings-file value="D:\Sumo\tools\westDragonBridge\osm.view.xml"/>
+    </gui_only>
+
+</sumoConfiguration>
+-->
+
+<e3Detector xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/det_e3_file.xsd">
+   <interval begin="0.00" end="100.00" id="e3_5" meanTravelTime="-1.00" meanOverlapTravelTime="-1.00" meanSpeed="-1.00" meanHaltsPerVehicle="-1.00" meanTimeLoss="-1.00" vehicleSum="0" meanSpeedWithin="8.79" meanHaltsPerVehicleWithin="0.59" meanDurationWithin="34.57" vehicleSumWithin="39" meanIntervalSpeedWithin="8.79" meanIntervalHaltsPerVehicleWithin="0.59" meanIntervalDurationWithin="34.57" meanTimeLossWithin="15.37"/>
+</e3Detector>

@@ -1,0 +1,239 @@
+simulation:
+  gui: False
+  total_episodes: 1000
+  max_steps: 3600
+  interphase_duration: 5
+
+memory:
+  memory_size_min: 10
+  memory_size_max: 10000
+
+model:
+  training_epochs: 1000
+
+agent:
+  gamma: 0.99
+  num_states: 4 # min free capacity, waiting time, density, queue length
+  green_duration_deltas: [-2, -1, 0, 1, 2] 
+  model:
+    num_layers: 8
+    batch_size: 128
+    learning_rate: 0.0001
+    decay_rate: 0.995
+    min_epsilon: 0.01
+  weight:
+    green_time: 0.1
+    outflow_rate: 0.3
+    travel_speed: 0.2
+    travel_time: 0.2
+    density: 0.2
+
+dir:
+  models_path_name: "models/"
+  sumocfg_file_name: "simulations/westDragonBridge/osm.sumocfg"
+
+traffic_lights:
+  - traffic_light_1:
+    id: "clusterJ35_cluster2988146972_9662761813_J33_J34_#1more"
+    phase: 
+      - GrrrrrrrrrrGGGGG
+      - rrrrrGGGGGGrrrrr
+      - GGGGGGrrrrrrrrrr
+    detectors:
+      - id: "e2_3"
+        street: "NVL-DB"
+        lane_idx:
+          - 15
+      - id: "e2_4"
+        street: "NVL-DB"
+        lane_idx:
+          - 14
+      - id: "e2_5"
+        street: "NVL-DB"
+        lane_idx:
+          - 13
+      - id: "e2_6"
+        street: "NVL-DB"
+        lane_idx:
+          - 12
+      - id: "e2_7"
+        street: "NVL-DB"
+        lane_idx:
+          - 11
+      - id: "e2_8"
+        street: "2/9-DB"
+        lane_idx:
+          - 10
+      - id: "e2_9"
+        street: "2/9-DB"
+        lane_idx:
+          - 9
+          - 8
+      - id: "e2_10"
+        street: "2/9-DB"
+        lane_idx:
+          - 7
+      - id: "e2_11"
+        street: "2/9-DB"
+        lane_idx:
+          - 6
+          - 5
+      - id: "e2_32"
+        street: "2/9-DB"
+        lane_idx:
+          - 8
+          - 9
+      - id: "e2_39"
+        street: "2/9-DB"
+        lane_idx:
+          - 5
+          - 6
+      - id: "e2_33"
+        street: "2/9-DB"
+        lane_idx:
+          - 10
+      - id: "e2_35"
+        street: "2/9-DB"
+        lane_idx:
+          - 6
+          - 5
+      - id: "e2_36"
+        street: "2/9-DB"
+        lane_idx:
+          - 10
+      - id: "e2_34"
+        street: "2/9-DB"
+        lane_idx:
+          - 7
+      - id: "e2_38"
+        street: "2/9-DB"
+        lane_idx:
+          - 7
+      - id: "e2_37"
+        street: "2/9-DB"
+        lane_idx:
+          - 8
+          - 9
+      - id: "e2_12"
+        street: "DB-NVL"
+        lane_idx:
+          - 0
+          - 1
+      - id: "e2_13"
+        street: "DB-NVL"
+        lane_idx:
+          - 2
+      - id: "e2_14"
+        street: "DB-NVL"
+        lane_idx:
+          - 3
+          - 4
+  - traffic_light_2:
+    id: "joinedS_6528582408_6528582409_cluster_2988146960_2988146981_3068684710_6528582411"
+    phase: 
+      - GrrrrrrrrrrrrGGGGGGG
+      - GGGGGGGrrrrrrrrrrrrr
+      - rrrrrrrGGGGGGrrrrrrr
+    detectors:
+      - id: "e2_0"
+        street: "NVL-DB"
+        lane_idx:
+          - 20
+          - 19
+          - 18
+      - id: "e2_1"
+        street: "NVL-DB"
+        lane_idx:
+          - 17
+      - id: "e2_2"
+        street: "NVL-DB"
+        lane_idx:
+          - 14
+          - 15
+          - 16
+      - id: "e2_15"
+        street: "TP-TNV"
+        lane_idx:
+          - 0
+      - id: "e2_16"
+        street: "TP-TNV"
+        lane_idx:
+          - 1
+      - id: "e2_17"
+        street: "TP-TNV"
+        lane_idx:
+          - 2
+      - id: "e2_18"
+        street: "TP-TNV"
+        lane_idx:
+          - 3
+      - id: "e2_19"
+        street: "TP-TNV"
+        lane_idx:
+          - 4
+          - 5
+          - 6
+      - id: "e2_20"
+        street: "DB-NVL"
+        lane_idx:
+          - 7
+          - 8
+      - id: "e2_21"
+        street: "DB-NVL"
+        lane_idx:
+          - 9
+      - id: "e2_22"
+        street: "DB-NVL"
+        lane_idx:
+          - 10
+      - id: "e2_23"
+        street: "DB-NVL"
+        lane_idx:
+          - 11
+          - 12
+          - 13
+  - traffic_light_3:
+    id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
+    phase: 
+      - rrrrrGGGrrGGGG
+      - GGGGGrrrrrrrrr
+      - rrrrrGGGGGrrrr
+    detectors:
+      - id: "e2_24"
+        street: "NVL-DB"
+        lane_idx:
+          - 13
+      - id: "e2_25"
+        street: "NVL-DB"
+        lane_idx:
+          - 12
+      - id: "e2_26"
+        street: "NVL-DB"
+        lane_idx:
+          - 10
+          - 11
+      - id: "e2_27"
+        street: "PCT-PCT"
+        lane_idx:
+          - 0
+          - 1
+      - id: "e2_28"
+        street: "PCT-PCT"
+        lane_idx:
+          - 2
+          - 3
+          - 4
+      - id: "e2_29"
+        street: "DB-NVL"
+        lane_idx:
+          - 5
+      - id: "e2_30"
+        street: "DB-NVL"
+        lane_idx:
+          - 7
+          - 8
+          - 9
+      - id: "e2_31"
+        street: "DB-NVL"
+        lane_idx:
+          - 6
