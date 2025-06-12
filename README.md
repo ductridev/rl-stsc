@@ -52,10 +52,29 @@ Each agent (intersection) will:
 1. Encode its state via the shared backbone.
 2. Use its corresponding head (determined by its action space) to predict Q-values.
 
+### DESRA Integration
+
+We integrate **DESRA** (DEcentralized Spillback Resistant Acyclic) as a rule-based policy module that uses shockwave theory to compute optimal traffic phases and green times based on queue lengths and downstream congestion.
+
+#### DQN + DESRA
+- DESRA’s selected phase ID and green time are appended to the DQN agent’s state input.
+- The DQN model learns to interpret DESRA’s decision as guidance, and can either follow it or override it based on long-term rewards.
+- This hybrid architecture offers the stability of rule-based control and the adaptivity of deep reinforcement learning.
+
+#### State Format
+The input to the DQN model becomes:
+``` python
+[min_free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time]
+
+```
+
+- This maintains compatibility with the existing architecture while improving spillback awareness and decision robustness.
+
 ### Benefits
 
 - Parameter sharing improves generalization across intersections.
 - Multiple heads ensure flexibility for multiple action spaces.
+- The combination between DESRA-DQN enhances stability in congestion and accelerates learning.
 - Supports scalable learning as city-size grows (many intersections).
 
 ### Training Logic
