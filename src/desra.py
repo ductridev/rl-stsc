@@ -13,7 +13,7 @@ class DESRA(SUMO):
         self.critical_density = 0.03  # vehicles per meter
 
     def select_phase(self, traffic_light):
-        best_phase = None
+        best_phase = traffic_light["phase"][0]
         best_green_time = 0
         best_effective_outflow = -1
 

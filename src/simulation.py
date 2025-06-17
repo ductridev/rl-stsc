@@ -478,7 +478,12 @@ class Simulation(SUMO):
             state[2] += waiting_time
             state[3] += queue_length
 
-        return np.array(state, dtype=np.float32)
+        best_phase, best_green_time = self.desra.select_phase(traffic_light)
+
+        state.append(best_phase)
+        state.append(best_green_time)
+
+        return np.array(state)
 
     def get_queue_length(self, detector_id):
         """
