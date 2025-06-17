@@ -1,7 +1,9 @@
+from src.sumo import SUMO
+
 import traci
 import numpy as np
 
-class DESRA:
+class DESRA(SUMO):
     def __init__(self, interphase_duration=3):
         self.interphase_duration = interphase_duration
 
@@ -82,7 +84,7 @@ class DESRA:
         return traci.lanearea.getLastStepHaltingNumber(detector_id)
 
     def get_downstream_queue_length(self, detector_id):
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
+        return traci.lane.getLastStepHaltingNumber(traci.lane.getLinks(traci.lanearea.getLaneID(detector_id))[0][0])
 
     def get_arrival_flow(self, detector_id, T=5.0):
         vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)

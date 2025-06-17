@@ -2,6 +2,8 @@ from src.model import DQN
 from src.memory import ReplayMemory
 from src.visualization import Visualization
 from src.normalizer import Normalizer
+from src.desra import DESRA
+from src.sumo import SUMO
 
 import traci
 import numpy as np
@@ -22,7 +24,7 @@ def index_to_action(index, actions_map):
 def action_to_index(phase_idx, delta_idx, num_deltas):
     return phase_idx * num_deltas + delta_idx
 
-class Simulation:
+class Simulation(SUMO):
     def __init__(
         self,
         memory: ReplayMemory,
@@ -100,6 +102,8 @@ class Simulation:
             gamma=self.agent_cfg['gamma'],
             device=self.device
         )
+
+        self.desra = DESRA(interphase_duration=self.interphase_duration)
 
         if torch.cuda.device_count() > 1:
             print(f"Using {torch.cuda.device_count()} GPUs")
@@ -538,31 +542,3 @@ class Simulation:
         Returns the number of custom-defined traffic light phases.
         """
         return len(traffic_light["phase"])
-
-    def get_vehicles_in_phase(self, traffic_light, phase_str):
-        """
-        Returns the vehicle IDs on lanes with a green signal in the specified phase.
-        """
-
-        lane_idxs = []
-
-        # Group all lane_idx in detectors
-        lane_idxs = [
-            detector["id"]
-            for detector in traffic_light["detectors"]
-        ]
-
-        green_lanes = [
-            lane_idxs[i]
-            for i, light_state in enumerate(phase_str)
-            if light_state.upper() == "G" and i < len(lane_idxs)
-        ]
-
-        vehicle_ids = []
-        for lane in green_lanes:
-            try:
-                vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(lane))
-            except:
-                pass  # Skip any invalid or unavailable lanes
-
-        return vehicle_ids
