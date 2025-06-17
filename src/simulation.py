@@ -492,10 +492,9 @@ class Simulation(SUMO):
         phase_chars = np.array(list(best_phase)).reshape(-1, 1)
         onehot_phase = self.phase_encoder.transform(phase_chars).flatten()
 
-        state.append(onehot_phase)
-        state.append(best_green_time)
+        state = state + onehot_phase.tolist() + [best_green_time]
 
-        return np.array(state)
+        return np.array(state, dtype=np.float32)
 
     def get_queue_length(self, detector_id):
         """
