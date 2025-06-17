@@ -52,6 +52,12 @@ class Simulation(SUMO):
         self.travel_time_normalizer = Normalizer()
         self.travel_speed_normalizer = Normalizer()
 
+        # Define one-hot encoder
+        phase_chars = np.array(list("rygGsuoO")).reshape(-1, 1)
+
+        self.phase_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+        self.phase_encoder.fit(phase_chars)
+
         self.step = 0
         self.num_actions = {}
         self.actions_map = {}
@@ -484,8 +490,7 @@ class Simulation(SUMO):
 
         # Convert phase string to one-hot
         phase_chars = np.array(list(best_phase)).reshape(-1, 1)
-        encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-        onehot_phase = encoder.transform(phase_chars).flatten()
+        onehot_phase = self.phase_encoder.transform(phase_chars).flatten()
 
         state.append(onehot_phase)
         state.append(best_green_time)
