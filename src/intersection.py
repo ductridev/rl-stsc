@@ -33,6 +33,59 @@ class Intersection:
         return os.path.exists(os.path.join(os.getcwd(), 'simulations', intersection, 'osm.sumocfg'))
     
     @staticmethod
+    def generate_residential_low_demand_routes(
+        intersection,
+        enable_bicycle=False,
+        enable_pedestrian=False,
+        enable_motorcycle=False,
+        enable_passenger=False,
+        enable_truck=False
+    ):
+        """
+        Generate low-demand routes on highway.residential edges for enabled vehicle types.
+        Total target: ~8-10 vehicles per 10 minutes across all selected types.
+        """
+        print("Generating low-demand routes on residential edges...")
+
+        vehicle_configs = [
+            ("bike", "bicycle", "bicycle", enable_bicycle),
+            ("ped", "pedestrian", "pedestrian", enable_pedestrian),
+            ("motorcycle", "motorcycle", "motorcycle", enable_motorcycle),
+            ("veh", "passenger", "passenger", enable_passenger),
+            ("truck", "truck", "truck", enable_truck)
+        ]
+
+        # Total target = 10 vehicles / 600s → 0.01667 veh/s
+        # Divide this across the number of enabled types
+        enabled_types = [v for v in vehicle_configs if v[3]]
+        if not enabled_types:
+            print("No vehicle types enabled for residential low demand. Skipping...")
+            return
+
+        per_type_rate = 0.0167 / len(enabled_types)
+
+        for prefix, vclass, vehicle_class, _enabled in enabled_types:
+            cmd = (
+                f'python "%SUMO_HOME%/tools/randomTrips.py" '
+                f'-n osm.net.xml.gz '
+                f'--fringe-factor 2 '
+                f'--insertion-rate {per_type_rate:.5f} '
+                f'-o osm.res_{prefix}.trips.xml '
+                f'-r osm.res_{prefix}.rou.xml '
+                f'-b 0 -e 3600 '
+                f'--trip-attributes "departLane=\\"best\\"" '
+                f'--fringe-start-attributes "departSpeed=\\"max\\"" '
+                f'--validate --remove-loops '
+                f'--via-edge-types highway.residential '
+                f'--vehicle-class {vehicle_class} '
+                f'--vclass {vclass} '
+                f'--prefix res_{prefix} '
+                f'--min-distance 150'
+            )
+            os.system(cmd)
+            print(f"Residential {vehicle_class} routes generated")
+    
+    @staticmethod
     def generate_routes(intersection, enable_bicycle=False, enable_pedestrian=False, enable_motorcycle=False, enable_passenger=False, enable_truck=False):
         """
         Generate routes for a given intersection.
@@ -53,6 +106,7 @@ class Intersection:
         try:
             intersection_path = os.path.join(os.getcwd(), 'simulations', intersection)
             os.chdir(intersection_path)
+            Intersection.generate_residential_low_demand_routes(intersection, enable_bicycle, enable_pedestrian, enable_motorcycle, enable_passenger, enable_truck)
             if enable_bicycle:
                 Intersection.generate_bicycle_routes(intersection)
             if enable_pedestrian:
