@@ -12,6 +12,7 @@ import torch
 import time
 import torch.nn as nn
 import copy
+from sklearn.preprocessing import OneHotEncoder
 
 GREEN_ACTION = 0
 RED_ACTION = 1
@@ -462,7 +463,7 @@ class Simulation(SUMO):
         Get the current state at a specific traffic light in the simulation.
 
         Returns:
-            np.ndarray: 2D array of shape (num_detectors, 4)
+            np.ndarray: 1D array representing the full input state
         """
         state = [0, 0, 0, 0]  # min_free_capacity, density, waiting_time, queue_length
 
@@ -478,9 +479,15 @@ class Simulation(SUMO):
             state[2] += waiting_time
             state[3] += queue_length
 
+        # Get phase string and green time from DESRA
         best_phase, best_green_time = self.desra.select_phase(traffic_light)
 
-        state.append(best_phase)
+        # Convert phase string to one-hot
+        phase_chars = np.array(list(best_phase)).reshape(-1, 1)
+        encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+        onehot_phase = encoder.transform(phase_chars).flatten()
+
+        state.append(onehot_phase)
         state.append(best_green_time)
 
         return np.array(state)
