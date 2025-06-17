@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-06-17 13:04:32.049224 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-06-18 00:26:53.676332 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <output-trip-file value="osm.motorcycle.trips.xml"/>
@@ -19,7 +19,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-06-17 13:04:31 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-06-18 00:26:53 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -142,9 +142,6 @@
     <vehicle id="motorcycle44" type="motorcycle_motorcycle" depart="340.46" departLane="best">
         <route edges="-295386152#6 -295386152#4 -295386152#3 -295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4"/>
     </vehicle>
-    <vehicle id="motorcycle45" type="motorcycle_motorcycle" depart="348.20" departLane="best" departSpeed="max">
-        <route edges="-295386152#8 -295386152#7 -295386152#6 -295386152#4 -295386152#3 -295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 695025559 693885802#0"/>
-    </vehicle>
     <vehicle id="motorcycle46" type="motorcycle_motorcycle" depart="355.93" departLane="best" departSpeed="max">
         <route edges="694830396 694830397 694830397.22 695025562#1 695025559 693885802#0 693885802#1 693885802#2 693885802#3 -295386152#0 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 302739240#0"/>
     </vehicle>
@@ -198,9 +195,6 @@
     </vehicle>
     <vehicle id="motorcycle79" type="motorcycle_motorcycle" depart="611.28" departLane="best" departSpeed="max">
         <route edges="-828678746 295386152#3 698936203#2 698936203#3 695040105#0 695040105#1 695040105#2 695040105#3 118573606#3 118573606#4 118573606#6 118573606#8 118573606#9 118573606#10"/>
-    </vehicle>
-    <vehicle id="motorcycle80" type="motorcycle_motorcycle" depart="619.02" departLane="best">
-        <route edges="-295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 695025559 693885802#0"/>
     </vehicle>
     <vehicle id="motorcycle81" type="motorcycle_motorcycle" depart="626.75" departLane="best" departSpeed="max">
         <route edges="-828678746 -295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4 828678743"/>
@@ -363,9 +357,6 @@
     </vehicle>
     <vehicle id="motorcycle161" type="motorcycle_motorcycle" depart="1245.77" departLane="best">
         <route edges="695025559 693885802#0 693885802#1 693885802#2 693885802#3 -295386152#0 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 828678742"/>
-    </vehicle>
-    <vehicle id="motorcycle162" type="motorcycle_motorcycle" depart="1253.51" departLane="best">
-        <route edges="-118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 695025559"/>
     </vehicle>
     <vehicle id="motorcycle164" type="motorcycle_motorcycle" depart="1268.98" departLane="best">
         <route edges="694830397 694830397.22 695025562#1 695025559 693885802#0 693885802#1 693885802#2 693885802#3 -295386152#0 -118575975#6 -118575975#5 -118575975#4 -118575975#3 828678741#0"/>
@@ -703,9 +694,6 @@
     <vehicle id="motorcycle327" type="motorcycle_motorcycle" depart="2530.23" departLane="best">
         <route edges="695030266 695040105#0 695040105#1 695040105#2 695040102#0 695040102#1 295386152#6 295386152#7"/>
     </vehicle>
-    <vehicle id="motorcycle328" type="motorcycle_motorcycle" depart="2537.97" departLane="best">
-        <route edges="-295386152#3 -295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 695025559 693885802#0"/>
-    </vehicle>
     <vehicle id="motorcycle329" type="motorcycle_motorcycle" depart="2545.71" departLane="best">
         <route edges="-1255581684 -828678741#0 118575975#3 118575975#4 118575975#5 118575975#6 295386152#1 295386152#2 295386152#3 295386152#4 -695040102#1 -695040102#0"/>
     </vehicle>
@@ -853,14 +841,8 @@
     <vehicle id="motorcycle423" type="motorcycle_motorcycle" depart="3273.05" departLane="best">
         <route edges="118575975#4 118575975#5 118575975#6 295386152#1 295386152#2 295386152#3 698936203#2 698936203#3 1279915895#1"/>
     </vehicle>
-    <vehicle id="motorcycle426" type="motorcycle_motorcycle" depart="3296.26" departLane="best">
-        <route edges="-295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 695025559 693885802#0"/>
-    </vehicle>
     <vehicle id="motorcycle427" type="motorcycle_motorcycle" depart="3304.00" departLane="best">
         <route edges="828678740 302739240#2 302739240#3 693885802#2 693885802#3 -295386152#0 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 693885804#1 E4"/>
-    </vehicle>
-    <vehicle id="motorcycle429" type="motorcycle_motorcycle" depart="3319.48" departLane="best">
-        <route edges="-295386152#7 -295386152#6 -295386152#4 -295386152#3 -295386152#2 -295386152#1 -118575975#6 -118575975#5 -118575975#4 -118575975#3 -118575975#2 -118575975#1 -118575975#0 118575972#1 689583179#1 689583179#2 689583179#4 689583179#5 695025559 693885802#0 693885802#1"/>
     </vehicle>
     <vehicle id="motorcycle431" type="motorcycle_motorcycle" depart="3334.95" departLane="best">
         <route edges="693885802#0 693885802#1 693885802#2 693885802#3 -295386152#0 -118575975#6 -118575975#5 -118575975#4 828678743"/>
