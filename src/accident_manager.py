@@ -112,7 +112,8 @@ class AccidentManager:
                 self.stopped_vehicle = self.random_stop_vehicle(vehicle_list)
                 self.accident_active = True
                 print(f"Accident started at step {current_step}.")
-
+            else:
+                print(f"No vehicles found to stop at step {current_step}.")
         if current_step == self.start_step + self.duration and self.accident_active:
             self.remove_stopped_vehicle()
             self.accident_active = False

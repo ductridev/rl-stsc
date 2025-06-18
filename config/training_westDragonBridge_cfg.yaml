@@ -14,7 +14,7 @@ model:
 agent:
   gamma: 0.99
   num_states: 4 # min free capacity, waiting time, density, queue length
-  green_duration_deltas: [-2, -1, 0, 1, 2] 
+  green_duration_deltas: [-2, -1, 0, 1, 2]
   model:
     num_layers: 8
     batch_size: 128
@@ -35,7 +35,7 @@ dir:
 traffic_lights:
   - traffic_light_1:
     id: "clusterJ35_cluster2988146972_9662761813_J33_J34_#1more"
-    phase: 
+    phase:
       - GrrrrrrrrrrGGGGG
       - rrrrrGGGGGGrrrrr
       - GGGGGGrrrrrrrrrr
@@ -130,7 +130,7 @@ traffic_lights:
           - 4
   - traffic_light_2:
     id: "joinedS_6528582408_6528582409_cluster_2988146960_2988146981_3068684710_6528582411"
-    phase: 
+    phase:
       - GrrrrrrrrrrrrGGGGGGG
       - GGGGGGGrrrrrrrrrrrrr
       - rrrrrrrGGGGGGrrrrrrr
@@ -194,7 +194,7 @@ traffic_lights:
           - 13
   - traffic_light_3:
     id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
-    phase: 
+    phase:
       - rrrrrGGGrrGGGG
       - GGGGGrrrrrrrrr
       - rrrrrGGGGGrrrr
@@ -237,3 +237,11 @@ traffic_lights:
         street: "DB-NVL"
         lane_idx:
           - 6
+
+accident:
+  start_step: 400
+  duration: 100
+  junction:
+    - id: "clusterJ35_cluster2988146972_9662761813_J33_J34_#1more"
+    - id: "cluster_2988146960_2988146981_3068684710_6528582411"
+    - id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
