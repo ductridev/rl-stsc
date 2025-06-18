@@ -86,6 +86,13 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 
 [start_step, duration, junction_id_list, edge_id_list]
 
+#### Accident Impact
+
+- Accidents introduce new dynamics, such as blocked junctions or edges, increased waiting times, and reduced throughput.
+- The agent must explore and learn how to handle both normal traffic conditions and accident scenarios.
+- The reward function is updated to penalize high waiting times, queue lengths, and stopped vehicles caused by accidents.
+- Training duration may need to be increased to allow the agent to learn effective strategies for handling accidents.
+
 ### Benefits
 
 - Parameter sharing improves generalization across intersections.
