@@ -337,7 +337,7 @@ class Simulation:
                 )
 
                 self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
-                self.history["max_next_q_value"][traffic_light_id].append(metrics["avg_max_next_q_value"])
+                self.history["next_q_value"][traffic_light_id].append(metrics["avg_next_q_value"])
                 self.history["target"][traffic_light_id].append(metrics["avg_target"])
                 self.history["loss"][traffic_light_id].append(metrics["loss"])
 
