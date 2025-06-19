@@ -21,6 +21,12 @@ We are aiming to multi-agent reinforcement learning approach, where each interse
 
 This shared backbone enables all intersections to benefit from global learning patterns in traffic dynamics, even though their control spaces differ.
 
+### Attention Layer
+
+- After the backbone, a self-attention mechanism is applied to enhance feature representation.
+- By default, a Squeeze-and-Excitation Network (SENet) is used as the attention module, operating on the 256-dimensional feature vector.
+- This allows the model to adaptively recalibrate channel-wise feature responses, improving the agent's ability to focus on important traffic features.
+
 ### Multiple Heads
 
 - The heads are individual output layers tailored for each unique action space (number of valid phase-duration combinations).
@@ -43,23 +49,29 @@ Then heads = `{ '15': Linear(128 → 15), '25': Linear(128 → 25) }`
 
 ```python
 def forward(self, x, action_dim):
-    x = self.backbone(x)
+    features = self.backbone(x)
+    attn_out = self.attn(features)
     head = self.heads[str(action_dim)]
-    return head(x)
+    return head(attn_out)
 ```
 
 Each agent (intersection) will:
 1. Encode its state via the shared backbone.
-2. Use its corresponding head (determined by its action space) to predict Q-values.
+2. Enhance features via the attention layer.
+3. Use its corresponding head (determined by its action space) to predict Q-values.
 
 ### Benefits
 
 - Parameter sharing improves generalization across intersections.
+- Attention mechanism helps the agent focus on the most relevant traffic features.
 - Multiple heads ensure flexibility for multiple action spaces.
 - Supports scalable learning as city-size grows (many intersections).
 
 ### Training Logic
 Check [TRAINING.md](TRAINING.md)
+
+### Project Methodlogy Summary
+Check [SUMMARY.md](SUMMARY.md)
 
 ## License
 
