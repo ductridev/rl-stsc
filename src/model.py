@@ -64,6 +64,7 @@ class DQN(nn.Module):
         print("Backbone summary:")
         summary(self.backbone, input_size=(self.batch_size, self.input_dim))
         print("\nAttention layer: SENet(channel=256)")
+        summary(self.attn, input_size=(self.batch_size, 256))
         for dim in self._output_dims:
             print(f"\nHead summary for output_dim={dim}:")
             summary(self.heads[str(dim)], input_size=(self.batch_size, 256))
