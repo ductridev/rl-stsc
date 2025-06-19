@@ -10,9 +10,6 @@ from src.memory import ReplayMemory
 from src.accident_manager import AccidentManager
 
 config = import_train_configuration("config/training_westDragonBridge_cfg.yaml")
-
-set_sumo(True, config["sumo_cfg_file"], config["max_steps"])
-config = import_train_configuration("config/training_westDragonBridge_cfg.yaml")
 green_duration_deltas = config["agent"]["green_duration_deltas"]
 min_epsilon = config["agent"]["min_epsilon"]
 decay_rate = config["agent"]["decay_rate"]
@@ -46,9 +43,6 @@ simulation = Simulation(
     path=path,
 )
 
-
-
-
 Intersection.generate_routes(
     config["sumo_cfg_file"].split("/")[1],
     enable_bicycle=True,
@@ -56,6 +50,8 @@ Intersection.generate_routes(
     enable_motorcycle=True,
     enable_passenger=True,
 )
+
+set_sumo(True, config["sumo_cfg_file"], config["max_steps"])
 
 episode = 0
 simulation_time, training_time = simulation.run(epsilon, episode)
