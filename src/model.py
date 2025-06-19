@@ -177,11 +177,13 @@ class DQN(nn.Module):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+         
+        max_next_q_value = next_q_values.max(dim=1)[0]
 
         return {
             "loss": loss.item(),
             "avg_q_value": q_value.mean().item(),
-            "avg_next_q_value": next_q_values.mean().item(),
+            "avg_max_next_q_value": max_next_q_value.mean().item(),
             "avg_target": target_q_value.mean().item()
         }
     
