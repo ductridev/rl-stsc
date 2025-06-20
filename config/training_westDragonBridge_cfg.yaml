@@ -13,8 +13,8 @@ model:
 
 agent:
   gamma: 0.99
-  num_states: 4 # min free capacity, waiting time, density, queue length
-  green_duration_deltas: [-2, -1, 0, 1, 2]
+  num_states: 6 # min_free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time
+  green_duration_deltas: [-2, -1, 0, 1, 2] 
   model:
     num_layers: 8
     batch_size: 128
@@ -35,10 +35,10 @@ dir:
 traffic_lights:
   - traffic_light_1:
     id: "clusterJ35_cluster2988146972_9662761813_J33_J34_#1more"
-    phase:
-      - GrrrrrrrrrrGGGGG
-      - rrrrrGGGGGGrrrrr
-      - GGGGGGrrrrrrrrrr
+    phase: 
+      - rrrrrrrrrrrrrrrrrrrrrrrGGGGG
+      - rrrrrgggggGgggggGGGggGGrrrrr
+      - GGGGGrrrrrrrrrrrrrrrrrrGGGgg
     detectors:
       - id: "e2_3"
         street: "NVL-DB"
@@ -130,10 +130,10 @@ traffic_lights:
           - 4
   - traffic_light_2:
     id: "joinedS_6528582408_6528582409_cluster_2988146960_2988146981_3068684710_6528582411"
-    phase:
-      - GrrrrrrrrrrrrGGGGGGG
-      - GGGGGGGrrrrrrrrrrrrr
-      - rrrrrrrGGGGGGrrrrrrr
+    phase: 
+      - rrrrrrrrGGGrrrsGGGGGG
+      - ggGGGGGGrrrrrrsrrrrrr
+      - rrrrrrrrGGGGGGsrrrrrr
     detectors:
       - id: "e2_0"
         street: "NVL-DB"
@@ -194,10 +194,10 @@ traffic_lights:
           - 13
   - traffic_light_3:
     id: "cluster_2988146980_3068684702_6528628239_6528628242_#1more"
-    phase:
-      - rrrrrGGGrrGGGG
-      - GGGGGrrrrrrrrr
-      - rrrrrGGGGGrrrr
+    phase: 
+      - rrrrrrrrGGGrrrsGGGGGG
+      - rrrrrrrrGGGGGGsrrrrrr
+      - ggGGGGGGrrrrrrsrrrrrr
     detectors:
       - id: "e2_24"
         street: "NVL-DB"

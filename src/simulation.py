@@ -2,6 +2,8 @@ from src.model import DQN
 from src.memory import ReplayMemory
 from src.visualization import Visualization
 from src.normalizer import Normalizer
+from src.desra import DESRA
+from src.sumo import SUMO
 from src.accident_manager import AccidentManager
 
 import traci
@@ -19,11 +21,12 @@ RED_ACTION = 1
 def index_to_action(index, actions_map):
     return actions_map[index]["phase"], actions_map[index]["duration"]
 
+def phase_to_index(phase, actions_map, duration):
+    for i, action in actions_map.items():
+        if action["phase"] == phase:
+            return i
 
-def action_to_index(phase_idx, delta_idx, num_deltas):
-    return phase_idx * num_deltas + delta_idx
-
-class Simulation:
+class Simulation(SUMO):
     def __init__(
         self,
         memory: ReplayMemory,
@@ -94,15 +97,17 @@ class Simulation:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.agent : DQN = DQN(
-            num_layers=self.agent_cfg['num_layers'],
-            batch_size=self.agent_cfg['batch_size'],
-            learning_rate=self.agent_cfg['learning_rate'],
-            input_dim=self.agent_cfg['num_states'],
+        self.agent: DQN = DQN(
+            num_layers=self.agent_cfg["num_layers"],
+            batch_size=self.agent_cfg["batch_size"],
+            learning_rate=self.agent_cfg["learning_rate"],
+            input_dim=self.agent_cfg["num_states"],
             output_dims=self.get_output_dims(),
-            gamma=self.agent_cfg['gamma'],
-            device=self.device
+            gamma=self.agent_cfg["gamma"],
+            device=self.device,
         )
+
+        self.desra = DESRA(interphase_duration=self.interphase_duration)
 
         if torch.cuda.device_count() > 1:
             print(f"Using {torch.cuda.device_count()} GPUs")
@@ -111,6 +116,23 @@ class Simulation:
         self.agent = self.agent.to(self.device)
         self.target_net = copy.deepcopy(self.agent)
         self.target_net.eval()
+
+        self.longest_phase, self.longest_phase_len, self.longest_phase_id = self.get_longest_phase()
+
+    def get_longest_phase(self):
+        max_len = -1
+        longest_phase = None
+        longest_id = None
+
+        for tl_id, actions in self.actions_map.items():
+            for action in actions.values():
+                phase = action["phase"]
+                if len(phase) > max_len:
+                    max_len = len(phase)
+                    longest_phase = phase
+                    longest_id = tl_id
+
+        return longest_phase, max_len, longest_id
 
     def initState(self):
         for traffic_light in self.traffic_lights:
@@ -204,7 +226,7 @@ class Simulation:
         while self.step < self.max_steps:
             for traffic_light in self.traffic_lights:
                 traffic_light_id = traffic_light["id"]
-                state = self.get_state(traffic_light)
+                state, green_time = self.get_state(traffic_light)
                 action_idx = self.select_action(
                     traffic_light_id,
                     self.agent,
@@ -216,7 +238,7 @@ class Simulation:
                     action_idx,
                     self.actions_map[traffic_light_id],
                 )
-                green_time = max(1, self.green_time[traffic_light_id] + green_delta)
+                green_time = max(green_time, self.green_time[traffic_light_id] + green_delta)
 
                 self.green_time_old[traffic_light_id] = self.green_time[
                     traffic_light_id
@@ -232,9 +254,7 @@ class Simulation:
                 self.old_travel_time[traffic_light_id] = self.travel_time[
                     traffic_light_id
                 ]
-                self.old_density[traffic_light_id] = self.density[
-                    traffic_light_id
-                ]
+                self.old_density[traffic_light_id] = self.density[traffic_light_id]
 
                 old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
 
@@ -269,26 +289,44 @@ class Simulation:
                 )
 
                 # Get new traffic metrics
-                self.travel_speed[traffic_light_id] = ( travel_speed / green_time if green_time > 0 else 0 )
-                self.travel_time[traffic_light_id] = ( self.get_avg_travel_time(traffic_light) / green_time if green_time > 0 else 0 )
-                self.density[traffic_light_id] = ( density / green_time if green_time > 0 else 0 )
+                self.travel_speed[traffic_light_id] = (
+                    travel_speed / green_time if green_time > 0 else 0
+                )
+                self.travel_time[traffic_light_id] = (
+                    self.get_avg_travel_time(traffic_light) / green_time
+                    if green_time > 0
+                    else 0
+                )
+                self.density[traffic_light_id] = (
+                    density / green_time if green_time > 0 else 0
+                )
 
                 reward = self.get_reward(traffic_light_id)
                 # print(f"Traffic light: {traffic_light['id']}, Phase: {phase}, Green time: {green_time}, Reward: {reward}")
 
                 done = self.step >= self.max_steps
 
-                next_state = self.get_state(traffic_light)
+                next_state, _ = self.get_state(traffic_light)
                 self.agent_memory[traffic_light_id].push(
                     state, action_idx, reward, next_state, done
                 )
 
                 self.history["agent_reward"][traffic_light_id].append(reward)
-                self.history["travel_speed"][traffic_light_id].append(self.travel_speed[traffic_light_id])
-                self.history["travel_time"][traffic_light_id].append(self.travel_time[traffic_light_id])
-                self.history["density"][traffic_light_id].append(self.density[traffic_light_id])
-                self.history["outflow_rate"][traffic_light_id].append(self.outflow_rate[traffic_light_id])
-                self.history["green_time"][traffic_light_id].append(self.green_time[traffic_light_id])
+                self.history["travel_speed"][traffic_light_id].append(
+                    self.travel_speed[traffic_light_id]
+                )
+                self.history["travel_time"][traffic_light_id].append(
+                    self.travel_time[traffic_light_id]
+                )
+                self.history["density"][traffic_light_id].append(
+                    self.density[traffic_light_id]
+                )
+                self.history["outflow_rate"][traffic_light_id].append(
+                    self.outflow_rate[traffic_light_id]
+                )
+                self.history["green_time"][traffic_light_id].append(
+                    self.green_time[traffic_light_id]
+                )
 
         simulation_time = time.time() - start
 
@@ -328,42 +366,56 @@ class Simulation:
         """
         for traffic_light in self.traffic_lights:
             traffic_light_id = traffic_light["id"]
-            batch = self.agent_memory[traffic_light_id].get_samples(self.agent.batch_size)
+            batch = self.agent_memory[traffic_light_id].get_samples(
+                self.agent.batch_size
+            )
 
             if len(batch) > 0:
                 states, actions, rewards, next_states, done = zip(*batch)
 
                 metrics = self.agent.train_batch(
-                    states, actions, rewards, next_states,
+                    states,
+                    actions,
+                    rewards,
+                    next_states,
                     output_dim=self.num_actions[traffic_light_id],
                     done=done,
-                    target_net=self.target_net
+                    target_net=self.target_net,
                 )
 
                 self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
-                self.history["max_next_q_value"][traffic_light_id].append(metrics["avg_max_next_q_value"])
+                self.history["max_next_q_value"][traffic_light_id].append(
+                    metrics["avg_max_next_q_value"]
+                )
                 self.history["target"][traffic_light_id].append(metrics["avg_target"])
                 self.history["loss"][traffic_light_id].append(metrics["loss"])
 
     def get_reward(self, traffic_light_id):
         return (
-            self.weight['green_time'] * self.green_time_normalizer.normalize(
+            self.weight["green_time"]
+            * self.green_time_normalizer.normalize(
                 self.green_time_old[traffic_light_id]
                 - self.green_time[traffic_light_id]
             )
-            + self.weight['outflow_rate'] * self.outflow_rate_normalizer.normalize(
+            + self.weight["outflow_rate"]
+            * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
                 - self.old_outflow_rate[traffic_light_id]
             )
-            + self.weight['travel_speed'] * self.travel_speed_normalizer.normalize(
+            + self.weight["travel_speed"]
+            * self.travel_speed_normalizer.normalize(
                 self.travel_speed[traffic_light_id]
                 - self.old_travel_speed[traffic_light_id]
             )
-            + self.weight['travel_time'] * self.travel_time_normalizer.normalize(
+            + self.weight["travel_time"]
+            * self.travel_time_normalizer.normalize(
                 self.old_travel_time[traffic_light_id]
                 - self.travel_time[traffic_light_id]
             )
-            + self.weight['density'] * self.density_normalizer.normalize(self.old_density[traffic_light_id] - self.density[traffic_light_id])
+            + self.weight["density"]
+            * self.density_normalizer.normalize(
+                self.old_density[traffic_light_id] - self.density[traffic_light_id]
+            )
         )
 
     def save_plot(self, episode):
@@ -381,7 +433,9 @@ class Simulation:
             data_lists = [data[:min_length] for data in data_lists]
 
             # Average per timestep
-            avg_data = [sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)]
+            avg_data = [
+                sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)
+            ]
 
             # Take the last 100 entries (or all if less)
             avg_history[metric] = avg_data[-100:]
@@ -454,7 +508,9 @@ class Simulation:
         else:
             state = torch.from_numpy(state).to(self.device, dtype=torch.float32)
             with torch.no_grad():
-                q_values: torch.Tensor = agent.predict_one(state, self.num_actions[traffic_light_id])
+                q_values: torch.Tensor = agent.predict_one(
+                    state, self.num_actions[traffic_light_id]
+                )
                 return q_values.argmax().item()
 
     def get_state(self, traffic_light):
@@ -462,9 +518,17 @@ class Simulation:
         Get the current state at a specific traffic light in the simulation.
 
         Returns:
-            np.ndarray: 2D array of shape (num_detectors, 4)
+            np.ndarray: 1D array representing the full input state
+            int: green time
         """
-        state = [0, 0, 0, 0]  # min_free_capacity, density, waiting_time, queue_length
+        state = [
+            0,
+            0,
+            0,
+            0,
+            [],
+            0,
+        ]  # min_free_capacity, density, waiting_time, queue_length, phase_one_hot, green_time
 
         for detector in traffic_light["detectors"]:
             detector_id = detector["id"]
@@ -478,7 +542,13 @@ class Simulation:
             state[2] += waiting_time
             state[3] += queue_length
 
-        return np.array(state, dtype=np.float32)
+        # Get green times and outflows
+        phase, green_time = self.desra.select_phase(traffic_light)
+
+        state[4] = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
+        state[5] = green_time
+
+        return np.array(state, dtype=np.float32), green_time
 
     def get_queue_length(self, detector_id):
         """
@@ -491,7 +561,7 @@ class Simulation:
         Get the minimum free capacity of a lane.
         """
         lane_length = traci.lanearea.getLength(detector_id)
-        occupied_length = traci.lanearea.getLastStepOccupancy(detector_id) * lane_length
+        occupied_length = traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
 
         return lane_length - occupied_length
 
@@ -499,7 +569,7 @@ class Simulation:
         """
         Get the density of vehicles on a lane.
         """
-        return traci.lanearea.getLastStepOccupancy(detector_id)
+        return traci.lanearea.getLastStepOccupancy(detector_id) / 100
 
     def get_waiting_time(self, detector_id):
         """
@@ -542,31 +612,3 @@ class Simulation:
         Returns the number of custom-defined traffic light phases.
         """
         return len(traffic_light["phase"])
-
-    def get_vehicles_in_phase(self, traffic_light, phase_str):
-        """
-        Returns the vehicle IDs on lanes with a green signal in the specified phase.
-        """
-
-        lane_idxs = []
-
-        # Group all lane_idx in detectors
-        lane_idxs = [
-            detector["id"]
-            for detector in traffic_light["detectors"]
-        ]
-
-        green_lanes = [
-            lane_idxs[i]
-            for i, light_state in enumerate(phase_str)
-            if light_state.upper() == "G" and i < len(lane_idxs)
-        ]
-
-        vehicle_ids = []
-        for lane in green_lanes:
-            try:
-                vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(lane))
-            except:
-                pass  # Skip any invalid or unavailable lanes
-
-        return vehicle_ids

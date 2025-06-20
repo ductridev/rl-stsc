@@ -92,7 +92,6 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 - The agent must explore and learn how to handle both normal traffic conditions and accident scenarios.
 - The reward function is updated to penalize high waiting times, queue lengths, and stopped vehicles caused by accidents.
 - Training duration may need to be increased to allow the agent to learn effective strategies for handling accidents.
-
 ### Benefits
 
 - Parameter sharing improves generalization across intersections.
