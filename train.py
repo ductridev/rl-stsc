@@ -4,7 +4,7 @@ from src.model import DQN
 from src.simulation import Simulation
 from src.visualization import Visualization
 from src.intersection import Intersection
-
+from src.accident_manager import AccidentManager
 import datetime
 
 if __name__ == "__main__":
@@ -25,6 +25,13 @@ if __name__ == "__main__":
 
     visualization = Visualization(path=path, dpi=100)
 
+    # Initialize accident manager
+    accident_manager = AccidentManager(
+        start_step=config["start_step"],
+        duration=config["duration"],
+        junction_id_list=config["junction_id_list"],
+    )
+    
     # Initialize simulation
     simulation = Simulation(
         memory=agent_memory,
@@ -33,6 +40,7 @@ if __name__ == "__main__":
         max_steps=config["max_steps"],
         traffic_lights=config["traffic_lights"],
         interphase_duration=config["interphase_duration"],
+        accident_manager= accident_manager,
         epoch=config["training_epochs"],
         path=path,
     )

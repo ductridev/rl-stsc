@@ -4,6 +4,7 @@ from src.visualization import Visualization
 from src.normalizer import Normalizer
 from src.desra import DESRA
 from src.sumo import SUMO
+from src.accident_manager import AccidentManager
 
 import traci
 import numpy as np
@@ -33,6 +34,7 @@ class Simulation(SUMO):
         agent_cfg,
         max_steps,
         traffic_lights,
+        accident_manager: AccidentManager,
         interphase_duration=3,
         epoch=1000,
         path=None,
@@ -42,6 +44,7 @@ class Simulation(SUMO):
         self.agent_cfg = agent_cfg
         self.max_steps = max_steps
         self.traffic_lights = traffic_lights
+        self.accident_manager = accident_manager
         self.interphase_duration = interphase_duration
         self.epoch = epoch
         self.path = path
@@ -267,6 +270,7 @@ class Simulation(SUMO):
                 green_time = min(green_time, self.max_steps - self.step)
 
                 for _ in range(green_time):
+                    self.accident_manager.create_accident(current_step=self.step) 
                     self.step += 1
                     traci.simulationStep()
 
