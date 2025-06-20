@@ -1,4 +1,5 @@
 # rl-stsc
+
 Reinforcement Learning-Based Smart Traffic Signal Control for Urban Congestion Reduction Model
 
 ## Agent Architecture
@@ -26,11 +27,13 @@ This shared backbone enables all intersections to benefit from global learning p
 - The heads are individual output layers tailored for each unique action space (number of valid phase-duration combinations).
 - Each head is a simple `Linear(128 → output_dim)` layer.
 - The output dimension is determined by:
-    ```python
-    output_dims = list(dict.fromkeys([len(phases) * len(time_deltas) for intersection in scenario]))
-    ```
 
-    which ensures unique heads for unique action sizes.
+  ```python
+  output_dims = list(dict.fromkeys([len(phases) * len(time_deltas) for intersection in scenario]))
+  ```
+
+  which ensures unique heads for unique action sizes.
+
 - The correct head is selected at runtime based on the current intersection’s configuration.
 
 #### Example
@@ -49,16 +52,57 @@ def forward(self, x, action_dim):
 ```
 
 Each agent (intersection) will:
+
 1. Encode its state via the shared backbone.
 2. Use its corresponding head (determined by its action space) to predict Q-values.
+
+### DESRA Integration
+
+We integrate **DESRA** (DEcentralized Spillback Resistant Acyclic) as a rule-based policy module that uses shockwave theory to compute optimal traffic phases and green times based on queue lengths and downstream congestion.
+
+#### DQN + DESRA
+
+- DESRA’s selected phase ID and green time are appended to the DQN agent’s state input.
+- The DQN model learns to interpret DESRA’s decision as guidance, and can either follow it or override it based on long-term rewards.
+- This hybrid architecture offers the stability of rule-based control and the adaptivity of deep reinforcement learning.
+
+#### State Format
+
+The input to the DQN model becomes:
+
+```python
+[min_free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time]
+
+```
+
+- This maintains compatibility with the existing architecture while improving spillback awareness and decision robustness.
+
+### Accident Integration
+
+We integrate the Accident Manager module to simulate traffic accidents at specific junctions or edges during the simulation by random stop
+a vehicle inside a junction or edge for a period of time and remove it after the duration is over.
+
+#### Accident Format
+
+[start_step, duration, junction_id_list, edge_id_list]
+
+#### Accident Impact
+
+- Accidents introduce new dynamics, such as blocked junctions or edges, increased waiting times, and reduced throughput.
+- The agent must explore and learn how to handle both normal traffic conditions and accident scenarios.
+- The reward function is updated to penalize high waiting times, queue lengths, and stopped vehicles caused by accidents.
+- Training duration may need to be increased to allow the agent to learn effective strategies for handling accidents.
 
 ### Benefits
 
 - Parameter sharing improves generalization across intersections.
 - Multiple heads ensure flexibility for multiple action spaces.
+- The combination between DESRA-DQN enhances stability in congestion and accelerates learning.
 - Supports scalable learning as city-size grows (many intersections).
+- Allows the system to evaluate the robustness of traffic signal control under unexpected disruptions like accident.
 
 ### Training Logic
+
 Check [TRAINING.md](TRAINING.md)
 
 ## License
