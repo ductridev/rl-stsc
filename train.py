@@ -1,7 +1,8 @@
 from src.memory import ReplayMemory
 from src.utils import set_train_path, set_sumo, import_train_configuration
 from src.model import DQN
-from src.simulation import Simulation
+# from src.simulation import Simulation
+from src.Qlearning import Simulation
 from src.visualization import Visualization
 from src.intersection import Intersection
 from src.accident_manager import AccidentManager
@@ -9,7 +10,7 @@ import datetime
 
 if __name__ == "__main__":
     # Load configuration
-    config = import_train_configuration("config/training_westDragonBridge_cfg.yaml")
+    config = import_train_configuration("config/training_testngatu.yaml")
     green_duration_deltas = config["agent"]["green_duration_deltas"]
     min_epsilon = config["agent"]["min_epsilon"]
     decay_rate = config["agent"]["decay_rate"]
