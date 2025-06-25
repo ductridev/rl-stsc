@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-06-25 11:07:46.016074 by randomTrips.py v1_23_1+0000-676720d13f6
+<configuration>
+    <net-file value="osm.net.xml.gz"/>
+    <output-trip-file value="osm.res_ped.trips.xml"/>
+    <route-file value="osm.res_ped.rou.xml"/>
+    <prefix value="res_ped"/>
+    <trip-attributes value="departLane=&quot;best&quot;"/>
+    <fringe-start-attributes value="departSpeed=&quot;max&quot;"/>
+    <vehicle-class value="pedestrian"/>
+    <fringe-factor value="2"/>
+    <edge-permission value="pedestrian"/>
+    <via-edge-types value="highway.residential"/>
+    <min-distance value="150.0"/>
+    <remove-loops value="True"/>
+    <validate value="True"/>
+    <insertion-rate value="0.00417"/>
+</configuration>
+-->
+
+<!-- generated on 2025-06-25 11:07:45 by Eclipse SUMO duarouter Version 1.23.1
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_ped.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_ped.rou.xml"/>
+        <alternatives-output value="NUL"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="0.0"/>
+        <end value="3600.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_ped_pedestrian" vClass="pedestrian"/>
+    <vehicle id="res_ped0" type="res_ped_pedestrian" depart="0.00" departLane="best">
+        <route edges="E4"/>
+    </vehicle>
+</routes>
