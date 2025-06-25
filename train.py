@@ -3,6 +3,7 @@ from src.utils import set_train_path, set_sumo, import_train_configuration
 from src.model import DQN
 # from src.simulation import Simulation
 from src.Qlearning import Simulation
+from src.base_simulation import SimulationBase
 from src.visualization import Visualization
 from src.intersection import Intersection
 from src.accident_manager import AccidentManager
@@ -34,18 +35,27 @@ if __name__ == "__main__":
     )
     
     # Initialize simulation
-    simulation = Simulation(
-        memory=agent_memory,
-        visualization=visualization,
-        agent_cfg=config["agent"],
+    # simulation = Simulation(
+    #     memory=agent_memory,
+    #     visualization=visualization,
+    #     agent_cfg=config["agent"],
+    #     max_steps=config["max_steps"],
+    #     traffic_lights=config["traffic_lights"],
+    #     interphase_duration=config["interphase_duration"],
+    #     accident_manager= accident_manager,
+    #     epoch=config["training_epochs"],
+    #     path=path,
+    # )
+
+    simulation = SimulationBase(
         max_steps=config["max_steps"],
         traffic_lights=config["traffic_lights"],
+        accident_manager=accident_manager,
+        visualization=visualization,
         interphase_duration=config["interphase_duration"],
-        accident_manager= accident_manager,
         epoch=config["training_epochs"],
         path=path,
     )
-
     episode = 0
     timestamp_start = datetime.datetime.now()
 
@@ -65,18 +75,22 @@ if __name__ == "__main__":
 
         set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
 
-        simulation_time, training_time = simulation.run(epsilon, episode)
+        # simulation_time, training_time = simulation.run(epsilon, episode)
+        simulation_time = simulation.run(episode)
         epsilon = max(min_epsilon, epsilon * decay_rate)
+        # print(
+        #     "Simulation time:",
+        #     simulation_time,
+        #     "s - Training time:",
+        #     training_time,
+        #     "s - Total:",
+        #     round(simulation_time + training_time, 1),
+        #     "s",
+        # )
         print(
             "Simulation time:",
             simulation_time,
-            "s - Training time:",
-            training_time,
-            "s - Total:",
-            round(simulation_time + training_time, 1),
-            "s",
         )
-
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
