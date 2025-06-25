@@ -151,7 +151,7 @@ class SimulationBase(SUMO):
 
 
         # Save and plot averaged metrics
-        if episode % 10 == 0:
+        if episode % 100 == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data_and_plot(
