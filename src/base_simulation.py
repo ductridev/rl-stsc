@@ -12,7 +12,6 @@ class SimulationBase(SUMO):
         traffic_lights,
         accident_manager: AccidentManager,
         visualization: Visualization,
-        interphase_duration=3,
         epoch=1000,
         path=None,
     ):
@@ -20,7 +19,6 @@ class SimulationBase(SUMO):
         self.traffic_lights = traffic_lights
         self.accident_manager = accident_manager
         self.visualization = visualization
-        self.interphase_duration = interphase_duration
         self.epoch = epoch
         self.path = path
 
@@ -61,15 +59,12 @@ class SimulationBase(SUMO):
         while self.step < self.max_steps:
             for traffic_light in self.traffic_lights:
                 traffic_light_id = traffic_light["id"]
-                phase = traffic_light["phase"][0]  # Always use first phase for baseline
+                current_phase = traci.trafficlight.getRedYellowGreenState(traffic_light_id)
                 green_time = self.green_time[traffic_light_id]
+                traci.trafficlight.setPhaseDuration(traffic_light_id, green_time)
 
-                old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
-                self.set_green_phase(
-                    traffic_light_id,
-                    green_time,
-                    phase,
-                )
+                old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, current_phase)
+                # Do NOT call self.set_green_phase here; let SUMO handle the logic
 
                 travel_speed = 0
                 density = 0
@@ -80,7 +75,9 @@ class SimulationBase(SUMO):
                     self.step += 1
                     traci.simulationStep()
 
-                    new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
+                    # Get the updated phase in case SUMO changed it
+                    current_phase = traci.trafficlight.getRedYellowGreenState(traffic_light_id)
+                    new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, current_phase)
                     outflow = sum(
                         1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
                     )

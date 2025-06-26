@@ -52,7 +52,6 @@ if __name__ == "__main__":
         traffic_lights=config["traffic_lights"],
         accident_manager=accident_manager,
         visualization=visualization,
-        interphase_duration=config["interphase_duration"],
         epoch=config["training_epochs"],
         path=path,
     )
