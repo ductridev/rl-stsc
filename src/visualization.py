@@ -57,3 +57,45 @@ class Visualization:
         with open(os.path.join(self.path, filename + '.txt'), 'w') as f:
             for item in data:
                 f.write("%s\n" % item)
+
+    def save_plot(self, episode=0, metrics=None, names=None):
+        """
+        Plot and compare multiple metrics (e.g., density_avg, green_time_avg, travel_time_avg)
+        for DQN, Q, and Base, based on file naming convention.
+
+        Args:
+            path (str): Directory where the metric files are saved.
+            episode (int): Episode number to load (default: 0).
+            metrics (list): List of metric names to compare (e.g., ["density_avg", "green_time_avg"]).
+            names (list): List of experiment names (default: ["dqn", "q", "base"]).
+        """
+        if metrics is None:
+            metrics = ["density_avg", "green_time_avg", "travel_time_avg", "outflow_rate_avg", "loss_avg"]
+        if names is None:
+            names = ["dqn", "q", "base"]
+
+        for metric in metrics:
+            data = {}
+            for name in names:
+                filename = os.path.join(
+                    self.path, f"{name}_{metric}_episode_{episode}.txt"
+                )
+                if os.path.exists(filename):
+                    with open(filename, "r") as f:
+                        data[name] = [float(line.strip()) for line in f if line.strip()]
+                else:
+                    print(f"File not found: {filename}")
+
+            plt.figure(figsize=(12, 7))
+            for name in names:
+                if name in data:
+                    plt.plot(data[name], label=name.upper())
+
+            plt.xlabel("Step")
+            plt.ylabel(metric.replace("_", " ").title())
+            plt.title(f"Comparison of {metric.replace('_', ' ').title()} (Episode {episode})")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.path, f"compare_{metric}_episode_{episode}.png"), dpi=150)
+            plt.close()
