@@ -21,7 +21,7 @@ def phase_to_index(phase, actions_map, duration):
         if action["phase"] == phase:
             return i
 
-class Simulation(SUMO):
+class QSimulation(SUMO):
     def __init__(
         self,
         memory: ReplayMemory,
@@ -346,11 +346,9 @@ class Simulation(SUMO):
         if episode % 100 == 0:
             print(f"Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
-                self.visualization.save_data_and_plot(
+                self.visualization.save_data(
                     data=data,
-                    filename=f"{metric}_avg_episode_{episode}",
-                    xlabel="Step",
-                    ylabel=metric.replace("_", " ").title(),
+                    filename=f"q_{metric}_avg_episode_{episode}",
                 )
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")

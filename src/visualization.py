@@ -45,3 +45,15 @@ class Visualization:
         fig.set_size_inches(20, 11.25)
         fig.savefig(os.path.join(self.path, filename + '.png'), dpi=self.dpi)
         plt.close("all")
+    
+    def save_data(self, data, filename):
+        """
+        Save the data to a file.
+
+        Args:
+            data (list): Data to be saved.
+            filename (str): Name of the file to save the data.
+        """
+        with open(os.path.join(self.path, filename + '.txt'), 'w') as f:
+            for item in data:
+                f.write("%s\n" % item)

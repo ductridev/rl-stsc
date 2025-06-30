@@ -151,11 +151,9 @@ class SimulationBase(SUMO):
         if episode % 100 == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
-                self.visualization.save_data_and_plot(
+                self.visualization.save_data(
                     data=data,
-                    filename=f"{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
-                    xlabel="Step",
-                    ylabel=metric.replace("_", " ").title(),
+                    filename=f"base_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
                 )
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")

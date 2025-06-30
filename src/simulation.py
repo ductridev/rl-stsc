@@ -449,12 +449,10 @@ class Simulation(SUMO):
 
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
-                self.visualization.save_data_and_plot(
+                self.visualization.save_data(
                     data=data,
-                    filename=f"{metric}_avg_episode_{episode}",
-                    xlabel="Step",
-                    ylabel=metric.replace("_", " ").title(),
-                )
+                    filename=f"dqn_{metric}_avg_episode_{episode}",
+                 )
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
 

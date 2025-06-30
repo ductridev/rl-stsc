@@ -1,8 +1,8 @@
 from src.memory import ReplayMemory
 from src.utils import set_train_path, set_sumo, import_train_configuration
 from src.model import DQN
-# from src.simulation import Simulation
-from src.Qlearning import Simulation
+from src.simulation import Simulation
+from src.Qlearning import QSimulation
 from src.base_simulation import SimulationBase
 from src.visualization import Visualization
 from src.intersection import Intersection
@@ -18,7 +18,11 @@ if __name__ == "__main__":
     epsilon = 1
 
     # Create replay memory for the agent
-    agent_memory = ReplayMemory(
+    agent_memory_dqn = ReplayMemory(
+        max_size=config["memory_size_max"], min_size=config["memory_size_min"]
+    )
+
+    agent_memory_q = ReplayMemory(
         max_size=config["memory_size_max"], min_size=config["memory_size_min"]
     )
 
@@ -35,23 +39,35 @@ if __name__ == "__main__":
     )
     
     # Initialize simulation
-    # simulation = Simulation(
-    #     memory=agent_memory,
-    #     visualization=visualization,
-    #     agent_cfg=config["agent"],
-    #     max_steps=config["max_steps"],
-    #     traffic_lights=config["traffic_lights"],
-    #     interphase_duration=config["interphase_duration"],
-    #     accident_manager= accident_manager,
-    #     epoch=config["training_epochs"],
-    #     path=path,
-    # )
+    simulation_dqn = Simulation(
+        memory=agent_memory_dqn,
+        visualization=visualization,
+        agent_cfg=config["agent"],
+        max_steps=config["max_steps"],
+        traffic_lights=config["traffic_lights"],
+        interphase_duration=config["interphase_duration"],
+        accident_manager= accident_manager,
+        epoch=config["training_epochs"],
+        path=path,
+    )
 
     simulation = SimulationBase(
         max_steps=config["max_steps"],
         traffic_lights=config["traffic_lights"],
         accident_manager=accident_manager,
         visualization=visualization,
+        epoch=config["training_epochs"],
+        path=path,
+    )
+
+    simulation_q = QSimulation(
+        memory=agent_memory_q,
+        visualization=visualization,
+        agent_cfg=config["agent"],
+        max_steps=config["max_steps"],
+        traffic_lights=config["traffic_lights"],
+        interphase_duration=config["interphase_duration"],
+        accident_manager=accident_manager,
         epoch=config["training_epochs"],
         path=path,
     )
@@ -72,24 +88,24 @@ if __name__ == "__main__":
         )
         print("Routes generated")
 
-        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
 
-        # simulation_time, training_time = simulation.run(epsilon, episode)
-        simulation_time = simulation.run(episode)
+        # --- Run all three simulations ---
+        print("Running SimulationBase (static baseline)...")
+        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        simulation_time_base = simulation.run(episode)
+        print("SimulationBase time:", simulation_time_base)
+
+        print("Running QSimulation (Q-learning)...")
+        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        simulation_time_q = simulation_q.run(epsilon, episode)
+        print("QSimulation time:", simulation_time_q)
+
+        print("Running Simulation (DQN)...")
+        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        simulation_time_dqn, training_time_dqn = simulation_dqn.run(epsilon, episode)
+        print("Simulation (DQN) time:", simulation_time_dqn, "Training time:", training_time_dqn)
+
         epsilon = max(min_epsilon, epsilon * decay_rate)
-        # print(
-        #     "Simulation time:",
-        #     simulation_time,
-        #     "s - Training time:",
-        #     training_time,
-        #     "s - Total:",
-        #     round(simulation_time + training_time, 1),
-        #     "s",
-        # )
-        print(
-            "Simulation time:",
-            simulation_time,
-        )
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
