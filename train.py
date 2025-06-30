@@ -106,6 +106,17 @@ if __name__ == "__main__":
         print("Simulation (DQN) time:", simulation_time_dqn, "Training time:", training_time_dqn)
 
         epsilon = max(min_epsilon, epsilon * decay_rate)
+
+        # --- Save comparison plots ---
+        print("Saving comparison plots...")
+        if episode % 100 == 0:
+            print("Generating plots at episode", episode, "...")
+            visualization.save_plot(
+                episode=episode,
+                metrics=["density_avg", "green_time_avg", "travel_time_avg", "outflow_rate_avg", "travel_speed_avg", "agent_reward_avg"],
+                names=["dqn", "q", "base"],
+            )
+            print("Plots at episode", episode, "generated")
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
