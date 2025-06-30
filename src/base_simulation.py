@@ -56,15 +56,21 @@ class SimulationBase(SUMO):
         print("---------------------------------------")
         start = time.time()
 
+        # Track last phase for each traffic light
+        last_phase = {tl["id"]: None for tl in self.traffic_lights}
+
         while self.step < self.max_steps:
             for traffic_light in self.traffic_lights:
                 traffic_light_id = traffic_light["id"]
                 current_phase = traci.trafficlight.getRedYellowGreenState(traffic_light_id)
                 green_time = self.green_time[traffic_light_id]
-                traci.trafficlight.setPhaseDuration(traffic_light_id, green_time)
+
+                # Only set phase duration when phase changes
+                if last_phase[traffic_light_id] != current_phase:
+                    traci.trafficlight.setPhaseDuration(traffic_light_id, green_time)
+                    last_phase[traffic_light_id] = current_phase
 
                 old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, current_phase)
-                # Do NOT call self.set_green_phase here; let SUMO handle the logic
 
                 travel_speed = 0
                 density = 0
@@ -77,6 +83,8 @@ class SimulationBase(SUMO):
 
                     # Get the updated phase in case SUMO changed it
                     current_phase = traci.trafficlight.getRedYellowGreenState(traffic_light_id)
+                    print(f"Traffic light {traffic_light_id} current phase: {current_phase}")
+                    print("duration:", green_time)
                     new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, current_phase)
                     outflow = sum(
                         1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
@@ -85,6 +93,11 @@ class SimulationBase(SUMO):
                     travel_speed += self.get_avg_speed(traffic_light)
                     density += self.get_avg_density(traffic_light)
                     old_vehicle_ids = new_vehicle_ids
+
+                    # If phase changed during simulation steps, update duration
+                    if last_phase[traffic_light_id] != current_phase:
+                        traci.trafficlight.setPhaseDuration(traffic_light_id, green_time)
+                        last_phase[traffic_light_id] = current_phase
 
                 self.outflow_rate[traffic_light_id] = (
                     outflow / green_time if green_time > 0 else 0
@@ -129,9 +142,6 @@ class SimulationBase(SUMO):
         Save and plot metrics similar to save_plot in simulation.py.
         If episode is provided, include it in the filename.
         """
-
-        import json
-
 
         # Average history over all traffic lights
         avg_history = {}
