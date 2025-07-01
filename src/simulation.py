@@ -234,6 +234,7 @@ class Simulation(SUMO):
             tl_states[tl_id] = {
                 "green_time_remaining": 0,
                 "travel_speed_sum": 0,
+                "travel_time_sum": 0,
                 "density_sum": 0,
                 "outflow": 0,
                 "old_vehicle_ids": [],
