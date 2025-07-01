@@ -303,6 +303,7 @@ class Simulation(SUMO):
                     )
                     tl_state["outflow"] += outflow
                     tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
                     tl_state["density_sum"] += self.get_avg_density(tl)
                     tl_state["old_vehicle_ids"] = new_vehicle_ids
                     tl_state["green_time_remaining"] -= 1
@@ -315,7 +316,7 @@ class Simulation(SUMO):
                             tl_state["travel_speed_sum"] / green_time
                         )
                         self.travel_time[tl_id] = (
-                            self.get_avg_travel_time(tl) / green_time
+                            tl_state["travel_time_sum"] / green_time
                         )
                         self.density[tl_id] = tl_state["density_sum"] / green_time
 
