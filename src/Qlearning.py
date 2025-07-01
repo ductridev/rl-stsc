@@ -181,100 +181,128 @@ class QSimulation(SUMO):
 
         start = time.time()
 
+        # Initialize per-light state tracking
+        tl_states = {}
+        for tl in self.traffic_lights:
+            tl_id = tl["id"]
+            tl_states[tl_id] = {
+                "green_time_remaining": 0,
+                "travel_speed_sum": 0,
+                "travel_time_sum": 0,
+                "density_sum": 0,
+                "outflow": 0,
+                "old_vehicle_ids": [],
+                "state": None,
+                "action_idx": None,
+                "phase": None,
+                "green_time": 0,
+            }
+
         while self.step < self.max_steps:
-            for traffic_light in self.traffic_lights:
-                traffic_light_id = traffic_light["id"]
-                state, green_time = self.get_state(traffic_light)
-                action_idx = self.select_action(
-                    traffic_light_id,
-                    state,
-                    epsilon,
-                )
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                tl_state = tl_states[tl_id]
 
-                phase, green_delta = index_to_action(
-                    action_idx,
-                    self.actions_map[traffic_light_id],
-                )
-                green_time = max(green_time, self.green_time[traffic_light_id] + green_delta)
-
-                self.green_time_old[traffic_light_id] = self.green_time[traffic_light_id]
-                self.green_time[traffic_light_id] = green_time
-
-                self.old_outflow_rate[traffic_light_id] = self.outflow_rate[traffic_light_id]
-                self.old_travel_speed[traffic_light_id] = self.travel_speed[traffic_light_id]
-                self.old_travel_time[traffic_light_id] = self.travel_time[traffic_light_id]
-                self.old_density[traffic_light_id] = self.density[traffic_light_id]
-
-                old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
-
-                self.set_green_phase(
-                    traffic_light_id,
-                    green_time,
-                    phase,
-                )
-
-                travel_speed = 0
-                density = 0
-
-                green_time = min(green_time, self.max_steps - self.step)
-
-                for _ in range(green_time):
-                    self.accident_manager.create_accident(current_step=self.step) 
-                    self.step += 1
-                    traci.simulationStep()
-
-                    new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
-                    outflow = sum(
-                        1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
+                # If time to choose a new action
+                if tl_state["green_time_remaining"] == 0:
+                    state, base_green_time = self.get_state(tl)
+                    action_idx = self.select_action(
+                        tl_id,
+                        state,
+                        epsilon,
                     )
 
-                    travel_speed += self.get_avg_speed(traffic_light)
-                    density += self.get_avg_density(traffic_light)
+                    phase, green_delta = index_to_action(
+                        action_idx,
+                        self.actions_map[tl_id],
+                    )
 
-                    old_vehicle_ids = new_vehicle_ids
+                    green_time = max(
+                        base_green_time, self.green_time[tl_id] + green_delta
+                    )
+                    green_time = min(green_time, self.max_steps - self.step)
 
-                self.outflow_rate[traffic_light_id] = (
-                    outflow / green_time if green_time > 0 else 0
-                )
+                    self.set_green_phase(tl_id, green_time, phase)
 
-                self.travel_speed[traffic_light_id] = (
-                    travel_speed / green_time if green_time > 0 else 0
-                )
-                self.travel_time[traffic_light_id] = (
-                    self.get_avg_travel_time(traffic_light) / green_time
-                    if green_time > 0
-                    else 0
-                )
-                self.density[traffic_light_id] = (
-                    density / green_time if green_time > 0 else 0
-                )
+                    tl_state.update(
+                        {
+                            "green_time": green_time,
+                            "green_time_remaining": green_time,
+                            "travel_speed_sum": 0,
+                            "travel_time_sum": 0,
+                            "density_sum": 0,
+                            "outflow": 0,
+                            "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
+                            "state": state,
+                            "action_idx": action_idx,
+                            "phase": phase,
+                        }
+                    )
 
-                reward = self.get_reward(traffic_light_id)
-                done = self.step >= self.max_steps
+            self.accident_manager.create_accident(current_step=self.step)
+            traci.simulationStep()
+            self.step += 1
 
-                next_state, _ = self.get_state(traffic_light)
-                self.agent_memory[traffic_light_id].push(
-                    state, action_idx, reward, next_state, done
-                )
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                tl_state = tl_states[tl_id]
 
-                self.qlearn_update(state, action_idx, reward, next_state, done, traffic_light_id)
+                if tl_state["green_time_remaining"] > 0:
+                    phase = tl_state["phase"]
+                    new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
+                    outflow = sum(
+                        1 for vid in tl_state["old_vehicle_ids"] if vid not in new_vehicle_ids
+                    )
+                    tl_state["outflow"] += outflow
+                    tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
+                    tl_state["density_sum"] += self.get_avg_density(tl)
+                    tl_state["old_vehicle_ids"] = new_vehicle_ids
+                    tl_state["green_time_remaining"] -= 1
 
-                self.history["agent_reward"][traffic_light_id].append(reward)
-                self.history["travel_speed"][traffic_light_id].append(
-                    self.travel_speed[traffic_light_id]
-                )
-                self.history["travel_time"][traffic_light_id].append(
-                    self.travel_time[traffic_light_id]
-                )
-                self.history["density"][traffic_light_id].append(
-                    self.density[traffic_light_id]
-                )
-                self.history["outflow_rate"][traffic_light_id].append(
-                    self.outflow_rate[traffic_light_id]
-                )
-                self.history["green_time"][traffic_light_id].append(
-                    self.green_time[traffic_light_id]
-                )
+                    # When phase ends, store metrics and update Q-table
+                    if tl_state["green_time_remaining"] == 0:
+                        green_time = tl_state["green_time"]
+
+                        self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
+                        self.travel_speed[tl_id] = (
+                            tl_state["travel_speed_sum"] / green_time
+                        )
+                        self.travel_time[tl_id] = (
+                            tl_state["travel_time_sum"] / green_time
+                        )
+                        self.density[tl_id] = tl_state["density_sum"] / green_time
+
+                        reward = self.get_reward(tl_id)
+                        next_state, _ = self.get_state(tl)
+                        done = self.step >= self.max_steps
+
+                        self.agent_memory[tl_id].push(
+                            tl_state["state"],
+                            tl_state["action_idx"],
+                            reward,
+                            next_state,
+                            done,
+                        )
+
+                        self.qlearn_update(
+                            tl_state["state"],
+                            tl_state["action_idx"],
+                            reward,
+                            next_state,
+                            done,
+                            tl_id,
+                        )
+
+                        self.history["agent_reward"][tl_id].append(reward)
+                        self.history["travel_speed"][tl_id].append(self.travel_speed[tl_id])
+                        self.history["travel_time"][tl_id].append(self.travel_time[tl_id])
+                        self.history["density"][tl_id].append(self.density[tl_id])
+                        self.history["outflow_rate"][tl_id].append(self.outflow_rate[tl_id])
+                        self.history["green_time"][tl_id].append(green_time)
+
+                        self.green_time_old[tl_id] = self.green_time[tl_id]
+                        self.green_time[tl_id] = green_time
 
         simulation_time = time.time() - start
 
@@ -382,28 +410,44 @@ class QSimulation(SUMO):
         return "".join(s_list)
 
     def get_state(self, traffic_light):
+        """
+        Get the current state at a specific traffic light in the simulation.
+
+        Returns:
+            np.ndarray: 1D array representing the full input state
+            int: green time
+        """
         state = [
             0,
             0,
             0,
             0,
-            [],
             0,
-        ]  # min_free_capacity, density, waiting_time, queue_length, phase_one_hot, green_time
+            0,
+        ]  # free_capacity, density, waiting_time, queue_length, phase_idx, green_time
 
+        num_detectors = len(traffic_light["detectors"])
         for detector in traffic_light["detectors"]:
             detector_id = detector["id"]
-            min_free_capacity = self.get_min_free_capacity(detector_id)
+            free_capacity = self.get_free_capacity(detector_id)
             density = self.get_density(detector_id)
             waiting_time = self.get_waiting_time(detector_id)
             queue_length = self.get_queue_length(detector_id)
 
-            state[0] += min_free_capacity
+            state[0] += free_capacity
             state[1] += density
             state[2] += waiting_time
             state[3] += queue_length
 
+        if num_detectors > 0:
+            state[0] /= num_detectors
+            state[1] /= num_detectors
+            state[2] /= num_detectors
+            state[3] /= num_detectors
+
+        # Get phase and green time from DESRA (or your phase selection logic)
         phase, green_time = self.desra.select_phase(traffic_light)
+        
         state[4] = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
         state[5] = green_time
 
@@ -415,20 +459,21 @@ class QSimulation(SUMO):
         """
         return traci.lanearea.getLastStepHaltingNumber(detector_id)
 
-    def get_min_free_capacity(self, detector_id):
+    def get_free_capacity(self, detector_id):
         """
-        Get the minimum free capacity of a lane.
+        Get the free capacity of a lane.
         """
         lane_length = traci.lanearea.getLength(detector_id)
-        occupied_length = traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
-
-        return lane_length - occupied_length
+        occupied_length = (
+            traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
+        )
+        return (lane_length - occupied_length) / lane_length
 
     def get_density(self, detector_id):
         """
         Get the density of vehicles on a lane.
         """
-        return traci.lanearea.getLastStepOccupancy(detector_id) / 100
+        return traci.lanearea.getLastStepOccupancy(detector_id)
 
     def get_waiting_time(self, detector_id):
         """
