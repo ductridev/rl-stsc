@@ -161,7 +161,7 @@ class DQN(nn.Module):
         target_q_value = rewards + (1 - done) * self.gamma * max_next_q_values
 
         # Compute loss
-        loss = F.mse_loss(q_value, target_q_value.detach())
+        loss = F.smooth_l1_loss(q_value, target_q_value.detach())
 
         # Backpropagation
         self.optimizer.zero_grad()

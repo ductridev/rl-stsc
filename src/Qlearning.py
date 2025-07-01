@@ -9,7 +9,7 @@ import traci
 import numpy as np
 import random
 import time
-
+import pickle
 GREEN_ACTION = 0
 RED_ACTION = 1
 
@@ -353,6 +353,13 @@ class QSimulation(SUMO):
                 self.old_density[traffic_light_id] - self.density[traffic_light_id]
             )
         )
+    def save_q_table(self, path=None, episode=None):
+        if path is None:
+            path = self.path if hasattr(self, "path") else ""
+        filename = f"{path}q_table_episode_{episode}.pkl" if episode is not None else f"{path}q_table.pkl"
+        with open(filename, "wb") as f:
+            pickle.dump(self.q_table, f)
+        print(f"Q-table saved to {filename}")
 
     def save_plot(self, episode):
         avg_history = {}
@@ -378,7 +385,8 @@ class QSimulation(SUMO):
                     data=data,
                     filename=f"q_{metric}_avg_episode_{episode}",
                 )
-            print("Plots at episode", episode, "generated")
+            self.save_q_table(episode=episode)
+            print("Plots and Q-table at episode", episode, "generated")
             print("---------------------------------------")
 
     def set_yellow_phase(self, phase):
