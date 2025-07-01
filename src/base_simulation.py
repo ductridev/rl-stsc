@@ -56,85 +56,89 @@ class SimulationBase(SUMO):
         print("---------------------------------------")
         start = time.time()
 
-        # Track last phase for each traffic light
-        last_phase = {tl["id"]: None for tl in self.traffic_lights}
+        # Initialize per-light state tracking
+        tl_states = {}
+        for tl in self.traffic_lights:
+            tl_id = tl["id"]
+            tl_states[tl_id] = {
+                "green_time_remaining": 0,
+                "travel_speed_sum": 0,
+                "travel_time_sum": 0,
+                "density_sum": 0,
+                "outflow": 0,
+                "old_vehicle_ids": [],
+                "phase": None,
+                "green_time": 0,
+                "last_phase": None,
+            }
 
         while self.step < self.max_steps:
-            for traffic_light in self.traffic_lights:
-                traffic_light_id = traffic_light["id"]
-                current_phase = traci.trafficlight.getRedYellowGreenState(traffic_light_id)
-                green_time = self.green_time[traffic_light_id]
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                tl_state = tl_states[tl_id]
 
-                # Only set phase duration when phase changes
-                if last_phase[traffic_light_id] != current_phase:
-                    traci.trafficlight.setPhaseDuration(traffic_light_id, green_time)
-                    last_phase[traffic_light_id] = current_phase
+                current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
 
-                old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, current_phase)
+                # If time to choose a new phase (always use the first phase for baseline)
+                if tl_state["green_time_remaining"] == 0 and current_phase != tl_state["last_phase"]:
+                    green_time = self.green_time[tl_id]
+                    green_time = min(green_time, self.max_steps - self.step)
+                    traci.trafficlight.setPhaseDuration(tl_id, green_time)
+                    
+                    tl_state.update({
+                        "green_time": green_time,
+                        "green_time_remaining": green_time,
+                        "travel_speed_sum": 0,
+                        "travel_time_sum": 0,
+                        "density_sum": 0,
+                        "outflow": 0,
+                        "old_vehicle_ids": self.get_vehicles_in_phase(tl, current_phase),
+                        "phase": current_phase,
+                        "last_phase": current_phase,
+                    })
 
-                travel_speed = 0
-                density = 0
+            self.accident_manager.create_accident(current_step=self.step)
+            traci.simulationStep()
+            self.step += 1
 
-                green_time = min(green_time, self.max_steps - self.step)
-                for _ in range(green_time):
-                    self.accident_manager.create_accident(current_step=self.step)
-                    self.step += 1
-                    traci.simulationStep()
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                tl_state = tl_states[tl_id]
 
-                    # Get the updated phase in case SUMO changed it
-                    current_phase = traci.trafficlight.getRedYellowGreenState(traffic_light_id)
-                    print(f"Traffic light {traffic_light_id} current phase: {current_phase}")
-                    print("duration:", green_time)
-                    new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, current_phase)
+                if tl_state["green_time_remaining"] > 0:
+                    phase = tl_state["phase"]
+                    new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
                     outflow = sum(
-                        1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
+                        1 for vid in tl_state["old_vehicle_ids"] if vid not in new_vehicle_ids
                     )
+                    tl_state["outflow"] += outflow
+                    tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
+                    tl_state["density_sum"] += self.get_avg_density(tl)
+                    tl_state["old_vehicle_ids"] = new_vehicle_ids
+                    tl_state["green_time_remaining"] -= 1
 
-                    travel_speed += self.get_avg_speed(traffic_light)
-                    density += self.get_avg_density(traffic_light)
-                    old_vehicle_ids = new_vehicle_ids
+                    # When phase ends, store metrics
+                    if tl_state["green_time_remaining"] == 0:
+                        green_time = tl_state["green_time"]
 
-                    # If phase changed during simulation steps, update duration
-                    if last_phase[traffic_light_id] != current_phase:
-                        traci.trafficlight.setPhaseDuration(traffic_light_id, green_time)
-                        last_phase[traffic_light_id] = current_phase
+                        self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
+                        self.travel_speed[tl_id] = tl_state["travel_speed_sum"] / green_time
+                        self.travel_time[tl_id] = tl_state["travel_time_sum"] / green_time
+                        self.density[tl_id] = tl_state["density_sum"] / green_time
 
-                self.outflow_rate[traffic_light_id] = (
-                    outflow / green_time if green_time > 0 else 0
-                )
-                self.travel_speed[traffic_light_id] = (
-                    travel_speed / green_time if green_time > 0 else 0
-                )
-                self.travel_time[traffic_light_id] = (
-                    self.get_avg_travel_time(traffic_light) / green_time
-                    if green_time > 0
-                    else 0
-                )
-                self.density[traffic_light_id] = (
-                    density / green_time if green_time > 0 else 0
-                )
-
-                self.history["travel_speed"][traffic_light_id].append(
-                    self.travel_speed[traffic_light_id]
-                )
-                self.history["travel_time"][traffic_light_id].append(
-                    self.travel_time[traffic_light_id]
-                )
-                self.history["density"][traffic_light_id].append(
-                    self.density[traffic_light_id]
-                )
-                self.history["outflow_rate"][traffic_light_id].append(
-                    self.outflow_rate[traffic_light_id]
-                )
-                self.history["green_time"][traffic_light_id].append(
-                    self.green_time[traffic_light_id]
-                )
+                        self.history["travel_speed"][tl_id].append(self.travel_speed[tl_id])
+                        self.history["travel_time"][tl_id].append(self.travel_time[tl_id])
+                        self.history["density"][tl_id].append(self.density[tl_id])
+                        self.history["outflow_rate"][tl_id].append(self.outflow_rate[tl_id])
+                        self.history["green_time"][tl_id].append(green_time)
 
         simulation_time = time.time() - start
         traci.close()
         print("Simulation ended")
         print("---------------------------------------")
         self.save_metrics(episode=episode)
+        self.step = 0
         return simulation_time
 
     def save_metrics(self, episode=None):
