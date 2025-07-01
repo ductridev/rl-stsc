@@ -559,13 +559,11 @@ class Simulation(SUMO):
 
             state[0] += free_capacity
             state[1] += density
-            state[2] += waiting_time
-            state[3] += queue_length
+            state[2] = max(state[2], waiting_time)
+            state[3] = max(state[3], queue_length)
 
         state[0] /= len(traffic_light["detectors"])
         state[1] /= len(traffic_light["detectors"])
-        state[2] /= len(traffic_light["detectors"])
-        state[3] /= len(traffic_light["detectors"])
 
         # Get green times and outflows
         phase, green_time = self.desra.select_phase(traffic_light)
