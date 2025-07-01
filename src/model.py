@@ -4,9 +4,9 @@ import torch.nn.functional as F
 import numpy as np
 from torchinfo import summary
 from typing import Optional
-
+from src.SENet_module import SENet
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
+    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, attn_heads=4 , device = 'cpu'):
         """
         Initialize the DQN model.
 
@@ -16,6 +16,7 @@ class DQN(nn.Module):
             learning_rate (float): Learning rate for the optimizer.
             input_dim (int): Dimension of the input state.
             output_dims (list[int]): A list defining multiple output actions space.
+            attn_heads (int): Number of attention heads.
         """
         super(DQN, self).__init__()
         self.num_layers = num_layers
@@ -25,9 +26,10 @@ class DQN(nn.Module):
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
+        self.attn_heads = attn_heads
 
-        # Build model parts: backbone + heads
-        self.backbone, self.heads = self.__build_model()
+        # Build model parts: backbone + attention + heads
+        self.backbone, self.attn, self.heads = self.__build_model()
 
         self.summary()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
@@ -47,11 +49,13 @@ class DQN(nn.Module):
             backbone.append(nn.Linear(256, 256))
             backbone.append(nn.ReLU())
 
+        attn = SENet(channel=256)  # Replace multihead attention
+
         heads = nn.ModuleDict()
         for dim in self._output_dims:
             heads[str(dim)] = nn.Linear(256, dim)
 
-        return backbone, heads
+        return backbone, attn, heads
     
     def summary(self):
         """
@@ -59,7 +63,8 @@ class DQN(nn.Module):
         """
         print("Backbone summary:")
         summary(self.backbone, input_size=(self.batch_size, self.input_dim))
-
+        print("\nAttention layer: SENet(channel=256)")
+        summary(self.attn, input_size=(self.batch_size, 256))
         for dim in self._output_dims:
             print(f"\nHead summary for output_dim={dim}:")
             summary(self.heads[str(dim)], input_size=(self.batch_size, 256))
@@ -79,9 +84,14 @@ class DQN(nn.Module):
         assert isinstance(output_dim, int), "output_dim must be an integer"
         assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
 
-        features = self.backbone(x)
+        assert output_dim is not None, "output_dim must be specified"
+        assert isinstance(output_dim, int), "output_dim must be an integer"
+        assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
+
+        features = self.backbone(x)  # [B, 256]
+        attn_out = self.attn(features)  # Apply SENet, input shape [B, 256]
         head = self.heads[str(output_dim)]
-        return head(features)
+        return head(attn_out)
     
     def predict_one(self, x, output_dim = 15):
         """
@@ -133,7 +143,6 @@ class DQN(nn.Module):
             actions (ndarray): Batch of actions.
             rewards (ndarray): Batch of rewards.
             next_states (ndarray): Batch of next states.
-            dones (ndarray): Batch of done flags.
             output_dim (int): Output dimension (action space size).
 
         Returns:
@@ -146,32 +155,36 @@ class DQN(nn.Module):
         next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(self.device)
         done = torch.tensor(done, dtype=torch.float32).to(self.device)
         # Forward pass
-        q_values = self.predict_batch(states, output_dim)             # [B, output_dim]
-        with torch.no_grad():
-            if target_net is not None:
-                next_q_values = target_net.predict_batch(next_states, output_dim)
-            else:
-                next_q_values = self.predict_batch(next_states, output_dim)  # fallback
+        # Compute target Q-value using DDQN logic
+        next_q_values = (
+            target_net.predict_batch(next_states, output_dim)
+            if target_net is not None else self.predict_batch(next_states, output_dim)
+        )
+        next_actions = torch.argmax(self.predict_batch(next_states, output_dim), dim=1)
+        target_q_value = rewards + (1 - done) * self.gamma * next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze(1)
 
-        # Get Q-value for taken actions: Q(s,a)
+        # Current Q-value
+        q_values = self.predict_batch(states, output_dim)
         q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        # Compute target Q-value
-        max_next_q_values = torch.max(next_q_values, dim=1)[0]
-        target_q_value = rewards + (1 - done) * self.gamma * max_next_q_values
+        # Weighted loss: if Q < target => weight = 1, else weight = target / Q (clipped at min δ)
+        delta = 0.85
+        weights = torch.where(q_value < target_q_value, 
+                            torch.ones_like(q_value),
+                            torch.clamp(target_q_value / (q_value + 1e-6), min=delta))
 
-        # Compute loss
-        loss = F.mse_loss(q_value, target_q_value.detach())
-
+        loss = (weights * (q_value - target_q_value.detach()) ** 2).mean()
         # Backpropagation
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+         
+        max_next_q_value = next_q_values.max(dim=1)[0]
 
         return {
             "loss": loss.item(),
             "avg_q_value": q_value.mean().item(),
-            "avg_max_next_q_value": max_next_q_values.mean().item(),
+            "avg_max_next_q_value": max_next_q_value.mean().item(),
             "avg_target": target_q_value.mean().item()
         }
     
