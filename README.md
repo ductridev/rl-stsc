@@ -71,7 +71,7 @@ We integrate **DESRA** (DEcentralized Spillback Resistant Acyclic) as a rule-bas
 The input to the DQN model becomes:
 
 ```python
-[min_free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time]
+[free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time]
 
 ```
 
