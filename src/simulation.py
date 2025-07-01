@@ -21,10 +21,12 @@ RED_ACTION = 1
 def index_to_action(index, actions_map):
     return actions_map[index]["phase"], actions_map[index]["duration"]
 
+
 def phase_to_index(phase, actions_map, duration):
     for i, action in actions_map.items():
         if action["phase"] == phase:
             return i
+
 
 class Simulation(SUMO):
     def __init__(
@@ -117,7 +119,9 @@ class Simulation(SUMO):
         self.target_net = copy.deepcopy(self.agent)
         self.target_net.eval()
 
-        self.longest_phase, self.longest_phase_len, self.longest_phase_id = self.get_longest_phase()
+        self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
+            self.get_longest_phase()
+        )
 
     def get_longest_phase(self):
         max_len = -1
@@ -223,110 +227,126 @@ class Simulation(SUMO):
 
         start = time.time()
 
+        # Initialize per-light state tracking
+        tl_states = {}
+        for tl in self.traffic_lights:
+            tl_id = tl["id"]
+            tl_states[tl_id] = {
+                "green_time_remaining": 0,
+                "travel_speed_sum": 0,
+                "density_sum": 0,
+                "outflow": 0,
+                "old_vehicle_ids": [],
+                "state": None,
+                "action_idx": None,
+                "phase": None,
+                "green_time": 0,
+            }
+
         while self.step < self.max_steps:
-            for traffic_light in self.traffic_lights:
-                traffic_light_id = traffic_light["id"]
-                state, green_time = self.get_state(traffic_light)
-                action_idx = self.select_action(
-                    traffic_light_id,
-                    self.agent,
-                    state,
-                    epsilon,
-                )
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                tl_state = tl_states[tl_id]
 
-                phase, green_delta = index_to_action(
-                    action_idx,
-                    self.actions_map[traffic_light_id],
-                )
-                green_time = max(green_time, self.green_time[traffic_light_id] + green_delta)
-
-                self.green_time_old[traffic_light_id] = self.green_time[
-                    traffic_light_id
-                ]
-                self.green_time[traffic_light_id] = green_time
-
-                self.old_outflow_rate[traffic_light_id] = self.outflow_rate[
-                    traffic_light_id
-                ]
-                self.old_travel_speed[traffic_light_id] = self.travel_speed[
-                    traffic_light_id
-                ]
-                self.old_travel_time[traffic_light_id] = self.travel_time[
-                    traffic_light_id
-                ]
-                self.old_density[traffic_light_id] = self.density[traffic_light_id]
-
-                old_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
-
-                self.set_green_phase(
-                    traffic_light_id,
-                    green_time,
-                    phase,
-                )
-
-                travel_speed = 0
-                density = 0
-
-                green_time = min(green_time, self.max_steps - self.step)
-
-                for _ in range(green_time):
-                    self.accident_manager.create_accident(current_step=self.step) 
-                    self.step += 1
-                    traci.simulationStep()
-
-                    new_vehicle_ids = self.get_vehicles_in_phase(traffic_light, phase)
-                    outflow = sum(
-                        1 for vid in old_vehicle_ids if vid not in new_vehicle_ids
+                # If time to choose a new action
+                if tl_state["green_time_remaining"] == 0:
+                    state, base_green_time = self.get_state(tl)
+                    action_idx = self.select_action(
+                        tl_id,
+                        self.agent,
+                        state,
+                        epsilon,
                     )
 
-                    travel_speed += self.get_avg_speed(traffic_light)
-                    density += self.get_avg_density(traffic_light)
+                    phase, green_delta = index_to_action(
+                        action_idx,
+                        self.actions_map[tl_id],
+                    )
 
-                    old_vehicle_ids = new_vehicle_ids
+                    green_time = max(
+                        base_green_time, self.green_time[tl_id] + green_delta
+                    )
 
-                self.outflow_rate[traffic_light_id] = (
-                    outflow / green_time if green_time > 0 else 0
-                )
+                    green_time = min(green_time, self.max_steps - self.step)
 
-                # Get new traffic metrics
-                self.travel_speed[traffic_light_id] = (
-                    travel_speed / green_time if green_time > 0 else 0
-                )
-                self.travel_time[traffic_light_id] = (
-                    self.get_avg_travel_time(traffic_light) / green_time
-                    if green_time > 0
-                    else 0
-                )
-                self.density[traffic_light_id] = (
-                    density / green_time if green_time > 0 else 0
-                )
+                    self.set_green_phase(tl_id, green_time, phase)
 
-                reward = self.get_reward(traffic_light_id)
-                # print(f"Traffic light: {traffic_light['id']}, Phase: {phase}, Green time: {green_time}, Reward: {reward}")
+                    tl_state.update(
+                        {
+                            "green_time": green_time,
+                            "green_time_remaining": green_time,
+                            "travel_speed_sum": 0,
+                            "density_sum": 0,
+                            "outflow": 0,
+                            "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
+                            "state": state,
+                            "action_idx": action_idx,
+                            "phase": phase,
+                        }
+                    )
 
-                done = self.step >= self.max_steps
+            self.accident_manager.create_accident(current_step=self.step)
+            traci.simulationStep()
+            self.step += 1
 
-                next_state, _ = self.get_state(traffic_light)
-                self.agent_memory[traffic_light_id].push(
-                    state, action_idx, reward, next_state, done
-                )
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                tl_state = tl_states[tl_id]
 
-                self.history["agent_reward"][traffic_light_id].append(reward)
-                self.history["travel_speed"][traffic_light_id].append(
-                    self.travel_speed[traffic_light_id]
-                )
-                self.history["travel_time"][traffic_light_id].append(
-                    self.travel_time[traffic_light_id]
-                )
-                self.history["density"][traffic_light_id].append(
-                    self.density[traffic_light_id]
-                )
-                self.history["outflow_rate"][traffic_light_id].append(
-                    self.outflow_rate[traffic_light_id]
-                )
-                self.history["green_time"][traffic_light_id].append(
-                    self.green_time[traffic_light_id]
-                )
+                if tl_state["green_time_remaining"] > 0:
+                    phase = tl_state["phase"]
+                    new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
+                    outflow = sum(
+                        1
+                        for vid in tl_state["old_vehicle_ids"]
+                        if vid not in new_vehicle_ids
+                    )
+                    tl_state["outflow"] += outflow
+                    tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
+                    tl_state["density_sum"] += self.get_avg_density(tl)
+                    tl_state["old_vehicle_ids"] = new_vehicle_ids
+                    tl_state["green_time_remaining"] -= 1
+
+                    if tl_state["green_time_remaining"] == 0:
+                        green_time = tl_state["green_time"]
+
+                        self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
+                        self.travel_speed[tl_id] = (
+                            tl_state["travel_speed_sum"] / green_time
+                        )
+                        self.travel_time[tl_id] = (
+                            tl_state["travel_time_sum"] / green_time
+                        )
+                        self.density[tl_id] = tl_state["density_sum"] / green_time
+
+                        reward = self.get_reward(tl_id)
+                        next_state, _ = self.get_state(tl)
+                        done = self.step >= self.max_steps
+
+                        self.agent_memory[tl_id].push(
+                            tl_state["state"],
+                            tl_state["action_idx"],
+                            reward,
+                            next_state,
+                            done,
+                        )
+
+                        self.history["agent_reward"][tl_id].append(reward)
+                        self.history["travel_speed"][tl_id].append(
+                            self.travel_speed[tl_id]
+                        )
+                        self.history["travel_time"][tl_id].append(
+                            self.travel_time[tl_id]
+                        )
+                        self.history["density"][tl_id].append(self.density[tl_id])
+                        self.history["outflow_rate"][tl_id].append(
+                            self.outflow_rate[tl_id]
+                        )
+                        self.history["green_time"][tl_id].append(green_time)
+
+                        self.green_time_old[tl_id] = self.green_time[tl_id]
+                        self.green_time[tl_id] = green_time
 
         simulation_time = time.time() - start
 
@@ -524,21 +544,26 @@ class Simulation(SUMO):
             0,
             0,
             0,
-            [],
             0,
-        ]  # min_free_capacity, density, waiting_time, queue_length, phase_one_hot, green_time
+            0,
+        ]  # free_capacity, density, waiting_time, queue_length, phase_idx, green_time
 
         for detector in traffic_light["detectors"]:
             detector_id = detector["id"]
-            min_free_capacity = self.get_min_free_capacity(detector_id)
+            free_capacity = self.get_free_capacity(detector_id)
             density = self.get_density(detector_id)
             waiting_time = self.get_waiting_time(detector_id)
             queue_length = self.get_queue_length(detector_id)
 
-            state[0] += min_free_capacity
+            state[0] += free_capacity
             state[1] += density
             state[2] += waiting_time
             state[3] += queue_length
+
+        state[0] /= len(traffic_light["detectors"])
+        state[1] /= len(traffic_light["detectors"])
+        state[2] /= len(traffic_light["detectors"])
+        state[3] /= len(traffic_light["detectors"])
 
         # Get green times and outflows
         phase, green_time = self.desra.select_phase(traffic_light)
@@ -554,20 +579,22 @@ class Simulation(SUMO):
         """
         return traci.lanearea.getLastStepHaltingNumber(detector_id)
 
-    def get_min_free_capacity(self, detector_id):
+    def get_free_capacity(self, detector_id):
         """
-        Get the minimum free capacity of a lane.
+        Get the free capacity of a lane.
         """
         lane_length = traci.lanearea.getLength(detector_id)
-        occupied_length = traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
+        occupied_length = (
+            traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
+        )
 
-        return lane_length - occupied_length
+        return (lane_length - occupied_length) / lane_length
 
     def get_density(self, detector_id):
         """
         Get the density of vehicles on a lane.
         """
-        return traci.lanearea.getLastStepOccupancy(detector_id) / 100
+        return traci.lanearea.getLastStepOccupancy(detector_id)
 
     def get_waiting_time(self, detector_id):
         """
