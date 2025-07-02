@@ -270,6 +270,13 @@ class Simulation(SUMO):
 
                     green_time = min(green_time, self.max_steps - self.step)
 
+                    if tl_state["phase"] is not None:
+                        self.set_yellow_phase(tl_id, tl_state["phase"])
+                        for _ in range(self.interphase_duration):
+                            self.accident_manager.create_accident(current_step=self.step)
+                            traci.simulationStep()
+                            self.step += 1
+
                     self.set_green_phase(tl_id, green_time, phase)
 
                     tl_state.update(
@@ -458,8 +465,8 @@ class Simulation(SUMO):
                 sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)
             ]
 
-            # Take the last 100 entries (or all if less)
-            avg_history[metric] = avg_data[-100:]
+          
+            avg_history[metric] = avg_data
 
         if episode % 100 == 0:
             print(f"Saving models at episode {episode} ...")
@@ -477,14 +484,18 @@ class Simulation(SUMO):
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
 
-    def set_yellow_phase(self, phase):
+    def get_yellow_phase(self, green_phase):
         """
-        Set the traffic light to yellow phase.
+        Convert a green phase string to a yellow phase string by replacing all 'G' with 'y'.
         """
-        traci.trafficlight.setPhase(self.traffic_light_id, phase)
-        traci.trafficlight.setPhaseDuration(
-            self.traffic_light_id, self.interphase_duration
-        )
+        return green_phase.replace('G', 'y')
+    def set_yellow_phase(self, tlsId, green_phase):
+        """
+        Set the traffic light to yellow phase by converting green phase string to yellow.
+        """
+        yellow_phase = self.get_yellow_phase(green_phase)
+        traci.trafficlight.setPhaseDuration(tlsId, 3)
+        traci.trafficlight.setRedYellowGreenState(tlsId, yellow_phase)
 
     def set_green_phase(self, tlsId, duration, new_phase):
         traci.trafficlight.setPhaseDuration(tlsId, duration)
