@@ -43,7 +43,7 @@ class SimulationBase(SUMO):
     def init_state(self):
         for traffic_light in self.traffic_lights:
             traffic_light_id = traffic_light["id"]
-            self.green_time[traffic_light_id] = 20
+            self.green_time[traffic_light_id] = 60
             self.outflow_rate[traffic_light_id] = 0
             self.travel_speed[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
@@ -78,13 +78,12 @@ class SimulationBase(SUMO):
                 tl_state = tl_states[tl_id]
 
                 current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
-
-                # If time to choose a new phase (always use the first phase for baseline)
-                if tl_state["green_time_remaining"] == 0 and current_phase != tl_state["last_phase"]:
+                # If time to choose a new phase 
+                if tl_state["green_time_remaining"] == 0 and current_phase != tl_state["last_phase"] and "y" not in current_phase:
                     green_time = self.green_time[tl_id]
                     green_time = min(green_time, self.max_steps - self.step)
                     traci.trafficlight.setPhaseDuration(tl_id, green_time)
-                    
+                    # print(f"Setting green time for phase {current_phase} to {green_time} seconds")
                     tl_state.update({
                         "green_time": green_time,
                         "green_time_remaining": green_time,
@@ -96,7 +95,11 @@ class SimulationBase(SUMO):
                         "phase": current_phase,
                         "last_phase": current_phase,
                     })
-
+                elif tl_state["green_time_remaining"] == 0 and current_phase == tl_state["last_phase"]:
+                    green_time = self.green_time[tl_id]
+                    tl_state.update({
+                        "green_time": green_time,
+                    })
             self.accident_manager.create_accident(current_step=self.step)
             traci.simulationStep()
             self.step += 1
@@ -162,7 +165,7 @@ class SimulationBase(SUMO):
 
 
         # Save and plot averaged metrics
-        if episode % 100 == 0:
+        if episode % 10 == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data(
