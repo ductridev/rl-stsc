@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
         # --- Save comparison plots ---
         print("Saving comparison plots...")
-        if episode % 100 == 0:
+        if episode % 10 == 0:
             print("Generating plots at episode", episode, "...")
             visualization.save_plot(
                 episode=episode,

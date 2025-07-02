@@ -461,7 +461,7 @@ class Simulation(SUMO):
             # Take the last 100 entries (or all if less)
             avg_history[metric] = avg_data[-100:]
 
-        if episode % 100 == 0:
+        if episode % 10 == 0:
             print(f"Saving models at episode {episode} ...")
             model_path = self.path + f"model_episode_{episode}.pth"
             self.agent.save(model_path)

@@ -378,7 +378,7 @@ class QSimulation(SUMO):
 
             avg_history[metric] = avg_data[-100:]
 
-        if episode % 100 == 0:
+        if episode % 10 == 0:
             print(f"Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data(
