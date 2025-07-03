@@ -46,7 +46,7 @@ class SimulationBase(SUMO):
     def init_state(self):
         for traffic_light in self.traffic_lights:
             traffic_light_id = traffic_light["id"]
-            self.green_time[traffic_light_id] = 60
+            self.green_time[traffic_light_id] = 20
             self.outflow_rate[traffic_light_id] = 0
             self.travel_speed[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
