@@ -224,6 +224,13 @@ class QSimulation(SUMO):
                     )
                     green_time = min(green_time, self.max_steps - self.step)
 
+                    if tl_state["phase"] is not None:
+                        self.set_yellow_phase(tl_id, tl_state["phase"])
+                        for _ in range(self.interphase_duration):
+                            self.accident_manager.create_accident(current_step=self.step)
+                            traci.simulationStep()
+                            self.step += 1
+
                     self.set_green_phase(tl_id, green_time, phase)
 
                     tl_state.update(
@@ -395,11 +402,19 @@ class QSimulation(SUMO):
             print("Plots and Q-table at episode", episode, "generated")
             print("---------------------------------------")
 
-    def set_yellow_phase(self, phase):
-        traci.trafficlight.setPhase(self.traffic_light_id, phase)
-        traci.trafficlight.setPhaseDuration(
-            self.traffic_light_id, self.interphase_duration
-        )
+    def get_yellow_phase(self, green_phase):
+        """
+        Convert a green phase string to a yellow phase string by replacing all 'G' with 'y'.
+        """
+        return green_phase.replace('G', 'y')
+    
+    def set_yellow_phase(self, tlsId, green_phase):
+        """
+        Set the traffic light to yellow phase by converting green phase string to yellow.
+        """
+        yellow_phase = self.get_yellow_phase(green_phase)
+        traci.trafficlight.setPhaseDuration(tlsId, 3)
+        traci.trafficlight.setRedYellowGreenState(tlsId, yellow_phase)
 
     def set_green_phase(self, tlsId, duration, new_phase):
         traci.trafficlight.setPhaseDuration(tlsId, duration)
