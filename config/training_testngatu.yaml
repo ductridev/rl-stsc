@@ -36,12 +36,12 @@ traffic_lights:
   - traffic_light_1:
     id: "Ngatu"
     phase: 
-      - rrrrrGGGGrrrrrrGGGGr
-      - GGGGrrrrrrGGGGrrrrrr
-      - rrrrrGrrrrrrrrrGGGGg
-      - GGGGGrrrrrGrrrrrrrrr
-      - GrrrrrrrrrGGGGGrrrrr
-      - rrrrrGGGGGrrrrrGrrrr
+      - GGGGGrrrrrrrrrrrGGGGGrrrrrrrrrrr
+      - GGGGGGGGGrrrrrrrGrrrrrrrrrrrrrrr
+      - rrrrrrrrGGGGGGGGGrrrrrrrGrrrrrrr
+      - GrrrrrrrrrrrrrrrGGGGGGGGGrrrrrrr
+      - GrrrrrrrGrrrrrrrrrrrrrrrGGGGGGGG
+      - rrrrrrrrGGGGGrrrrrrrrrrrGGGGGrrr
     detectors:
       - id: "e2_0"
       - id: "e2_1"
@@ -54,7 +54,12 @@ traffic_lights:
       - id: "e2_8"
       - id: "e2_9"
       - id: "e2_10"
-      - id: "e2_11"
+      - id: "e2_11"   
+      - id: "e2_12"
+      - id: "e2_13"
+      - id: "e2_14"
+      - id: "e2_15"
+
 accident:
   start_step: 400
   duration: 100
