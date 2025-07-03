@@ -88,6 +88,8 @@ class Simulation(SUMO):
             "max_next_q_value": {},
             "target": {},
             "loss": {},
+            "queue_length": {},
+            "waiting_time": {},
         }
 
         self.initState()
@@ -636,3 +638,28 @@ class Simulation(SUMO):
         Returns the number of custom-defined traffic light phases.
         """
         return len(traffic_light["phase"])
+
+    def get_avg_queue_length(self, traffic_light):
+        """
+        Get the average queue length of a lane.
+        """
+        queue_lengths = []
+        for detector in traffic_light["detectors"]:
+            try:
+                queue_lengths.append(traci.lanearea.getLastStepHaltingNumber(detector["id"]))
+            except:
+                pass
+        return np.mean(queue_lengths) if queue_lengths else 0.0
+
+    def get_avg_waiting_time(self, traffic_light):
+        """
+        Estimate waiting time by summing waiting times of all vehicles in the lane.
+        """
+        vehicle_ids = []
+        for detector in traffic_light["detectors"]:
+            vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(detector["id"]))
+
+        total_waiting_time = 0.0
+        for vid in vehicle_ids:
+            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        return total_waiting_time
