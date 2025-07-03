@@ -81,6 +81,8 @@ class QSimulation(SUMO):
             "max_next_q_value": {},
             "target": {},
             "loss": {},
+            "queue_length": {},
+            "waiting_time": {},
         }
 
         self.initState()
@@ -247,6 +249,10 @@ class QSimulation(SUMO):
                 tl_id = tl["id"]
                 tl_state = tl_states[tl_id]
 
+                #plot 60s 
+
+
+                
                 if tl_state["green_time_remaining"] > 0:
                     phase = tl_state["phase"]
                     new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
@@ -444,14 +450,12 @@ class QSimulation(SUMO):
 
             state[0] += free_capacity
             state[1] += density
-            state[2] += waiting_time
-            state[3] += queue_length
+            state[2] = max(state[2], waiting_time)
+            state[3] = max(state[3], queue_length)
 
         if num_detectors > 0:
             state[0] /= num_detectors
             state[1] /= num_detectors
-            state[2] /= num_detectors
-            state[3] /= num_detectors
 
         # Get phase and green time from DESRA (or your phase selection logic)
         phase, green_time = self.desra.select_phase(traffic_light)
