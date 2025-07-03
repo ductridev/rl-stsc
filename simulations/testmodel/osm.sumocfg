@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-01 14:27:22 by Eclipse SUMO sumo Version 1.23.1
+<!-- generated on 2025-07-03 17:48:38 by Eclipse SUMO sumo Version 1.23.1
 -->
 
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
@@ -10,10 +10,12 @@
         <route-files value="osm.motorcycle.trips.xml,osm.passenger.trips.xml,osm.bicycle.trips.xml"/>
         <additional-files value="osm.add.xml"/>
     </input>
+
     <processing>
         <ignore-route-errors value="true"/>
         <tls.actuated.jam-threshold value="30"/>
     </processing>
+
     <routing>
         <device.rerouting.adaptation-steps value="18"/>
         <device.rerouting.adaptation-interval value="10"/>
