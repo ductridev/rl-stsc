@@ -169,7 +169,7 @@ class SimulationBase(SUMO):
                 # step state metrics
                 step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
                 step_outflow = sum(
-                    1 for vid in tl_state["old_vehicle_ids"] if vid not in step_new_vehicle_ids
+                    1 for vid in tl_state["step_old_vehicle_ids"] if vid not in step_new_vehicle_ids
                 )
                 tl_state["step_travel_speed_sum"] += self.get_avg_speed(tl)
                 tl_state["step_travel_time_sum"] += self.get_avg_travel_time(tl)
@@ -184,6 +184,7 @@ class SimulationBase(SUMO):
         print("Simulation ended")
         print("---------------------------------------")
         self.save_metrics(episode=episode)
+        self.reset_history()
         self.step = 0
         return simulation_time
 
@@ -204,19 +205,7 @@ class SimulationBase(SUMO):
             avg_data = [
                 sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)
             ]
-            avg_history[metric] = avg_data  # Save all data, not just the last 100
-
-        # Save and plot averaged metrics
-        if episode % 10 == 0:
-            print("Generating plots at episode", episode, "...")
-            for metric, data in avg_history.items():
-                self.visualization.save_data(
-                    data=data,
-                    filename=f"base_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
-                )
-            print("Plots at episode", episode, "generated")
-            print("---------------------------------------")
-
+            avg_history[metric] = avg_data 
 
         # Save and plot averaged metrics
         if episode % 10 == 0:
@@ -282,3 +271,8 @@ class SimulationBase(SUMO):
         for vid in vehicle_ids:
             total_waiting_time += traci.vehicle.getWaitingTime(vid)
         return total_waiting_time
+    
+    def reset_history(self):
+        for key in self.history:
+            for tl_id in self.history[key]:
+                self.history[key][tl_id] = []

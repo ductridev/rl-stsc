@@ -82,7 +82,7 @@ class Simulation(SUMO):
             "travel_speed": {},
             "travel_time": {},
             "density": {},
-            "outflow_rate": {},
+            "outflow": {},
             "green_time": {},
             "q_value": {},
             "max_next_q_value": {},
@@ -244,12 +244,45 @@ class Simulation(SUMO):
                 "action_idx": None,
                 "phase": None,
                 "green_time": 0,
+                "step_travel_speed_sum": 0,
+                "step_travel_time_sum": 0,
+                "step_density_sum": 0,
+                "step_outflow": 0,
+                "step_queue_length": 0,
+                "step_waiting_time": 0,
+                "step_old_vehicle_ids": [],
             }
 
         while self.step < self.max_steps:
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
                 tl_state = tl_states[tl_id]
+
+                #save plot every 60s
+                if self.step % 60 == 0:
+                    travel_speed_avg = tl_state["step_travel_speed_sum"] / 60
+                    travel_time_avg = tl_state["step_travel_time_sum"] / 60
+                    density_avg = tl_state["step_density_sum"] / 60
+                    outflow_avg = tl_state["step_outflow"] 
+                    queue_length_avg = tl_state["step_queue_length"] / 60
+                    waiting_time_avg = tl_state["step_waiting_time"] / 60
+                    green_time = tl_state["green_time"]
+
+                    self.history["travel_speed"][tl_id].append(travel_speed_avg)
+                    self.history["travel_time"][tl_id].append(travel_time_avg)
+                    self.history["density"][tl_id].append(density_avg)
+                    self.history["outflow"][tl_id].append(outflow_avg)
+                    self.history["green_time"][tl_id].append(green_time)
+                    self.history["queue_length"][tl_id].append(queue_length_avg)
+                    self.history["waiting_time"][tl_id].append(waiting_time_avg)
+
+                    # Reset step metrics
+                    tl_state["step_travel_speed_sum"] = 0
+                    tl_state["step_travel_time_sum"] = 0
+                    tl_state["step_density_sum"] = 0
+                    tl_state["step_outflow"] = 0
+                    tl_state["step_queue_length"] = 0
+                    tl_state["step_waiting_time"] = 0
 
                 # If time to choose a new action
                 if tl_state["green_time_remaining"] == 0:
@@ -342,21 +375,20 @@ class Simulation(SUMO):
                             done,
                         )
 
-                        self.history["agent_reward"][tl_id].append(reward)
-                        self.history["travel_speed"][tl_id].append(
-                            self.travel_speed[tl_id]
-                        )
-                        self.history["travel_time"][tl_id].append(
-                            self.travel_time[tl_id]
-                        )
-                        self.history["density"][tl_id].append(self.density[tl_id])
-                        self.history["outflow_rate"][tl_id].append(
-                            self.outflow_rate[tl_id]
-                        )
-                        self.history["green_time"][tl_id].append(green_time)
-
                         self.green_time_old[tl_id] = self.green_time[tl_id]
                         self.green_time[tl_id] = green_time
+                # step state metrics
+                step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
+                step_outflow = sum(
+                    1 for vid in tl_state["step_old_vehicle_ids"] if vid not in step_new_vehicle_ids
+                )
+                tl_state["step_travel_speed_sum"] += self.get_avg_speed(tl)
+                tl_state["step_travel_time_sum"] += self.get_avg_travel_time(tl)
+                tl_state["step_density_sum"] += self.get_avg_density(tl)
+                tl_state["step_outflow"] += step_outflow
+                tl_state["step_queue_length"] += self.get_avg_queue_length(tl)
+                tl_state["step_waiting_time"] += self.get_avg_waiting_time(tl)
+                tl_state["step_old_vehicle_ids"] = step_new_vehicle_ids    
 
         simulation_time = time.time() - start
 
@@ -379,7 +411,7 @@ class Simulation(SUMO):
         print("---------------------------------------")
 
         self.save_plot(episode=episode)
-
+        self.reset_history()
         self.step = 0
 
         total_reward = 0
@@ -449,42 +481,32 @@ class Simulation(SUMO):
         )
 
     def save_plot(self, episode):
-        # We simplify by averaging the history over all traffic lights
-        avg_history = {}
 
+        # Average history over all traffic lights
+        avg_history = {}
         for metric, data_per_tls in self.history.items():
-            # Collect valid histories
             data_lists = [data for data in data_per_tls.values() if len(data) > 0]
             if not data_lists:
                 continue
-
-            # Truncate to minimum length across all lists
             min_length = min(len(data) for data in data_lists)
             data_lists = [data[:min_length] for data in data_lists]
-
-            # Average per timestep
             avg_data = [
                 sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)
             ]
+            avg_history[metric] = avg_data 
 
-          
-            avg_history[metric] = avg_data
-
+        # Save and plot averaged metrics
         if episode % 10 == 0:
-            print(f"Saving models at episode {episode} ...")
-            model_path = self.path + f"model_episode_{episode}.pth"
-            self.agent.save(model_path)
-            print("Models saved")
-            print("---------------------------------------")
-
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data(
                     data=data,
-                    filename=f"dqn_{metric}_avg_episode_{episode}",
-                 )
+                    filename=f"dqn_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
+                )
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
+            # Reset history after saving plots
+
 
     def get_yellow_phase(self, green_phase):
         """
@@ -674,3 +696,8 @@ class Simulation(SUMO):
         for vid in vehicle_ids:
             total_waiting_time += traci.vehicle.getWaitingTime(vid)
         return total_waiting_time
+
+    def reset_history(self):
+        for key in self.history:
+            for tl_id in self.history[key]:
+                self.history[key][tl_id] = []

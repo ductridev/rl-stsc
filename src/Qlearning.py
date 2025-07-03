@@ -75,7 +75,7 @@ class QSimulation(SUMO):
             "travel_speed": {},
             "travel_time": {},
             "density": {},
-            "outflow_rate": {},
+            "outflow": {},
             "green_time": {},
             "q_value": {},
             "max_next_q_value": {},
@@ -198,6 +198,13 @@ class QSimulation(SUMO):
                 "action_idx": None,
                 "phase": None,
                 "green_time": 0,
+                "step_travel_speed_sum": 0,
+                "step_travel_time_sum": 0,
+                "step_density_sum": 0,
+                "step_outflow": 0,
+                "step_queue_length": 0,
+                "step_waiting_time": 0,
+                "step_old_vehicle_ids": [],
             }
 
         while self.step < self.max_steps:
@@ -256,10 +263,31 @@ class QSimulation(SUMO):
                 tl_id = tl["id"]
                 tl_state = tl_states[tl_id]
 
-                #plot 60s 
+                if self.step % 60 == 0:
+                    travel_speed_avg = tl_state["step_travel_speed_sum"] / 60
+                    travel_time_avg = tl_state["step_travel_time_sum"] / 60
+                    density_avg = tl_state["step_density_sum"] / 60
+                    outflow_avg = tl_state["step_outflow"] 
+                    queue_length_avg = tl_state["step_queue_length"] / 60
+                    waiting_time_avg = tl_state["step_waiting_time"] / 60
+                    green_time = tl_state["green_time"]
 
+                    self.history["travel_speed"][tl_id].append(travel_speed_avg)
+                    self.history["travel_time"][tl_id].append(travel_time_avg)
+                    self.history["density"][tl_id].append(density_avg)
+                    self.history["outflow"][tl_id].append(outflow_avg)
+                    self.history["green_time"][tl_id].append(green_time)
+                    self.history["queue_length"][tl_id].append(queue_length_avg)
+                    self.history["waiting_time"][tl_id].append(waiting_time_avg)
 
-                
+                    # Reset step metrics
+                    tl_state["step_travel_speed_sum"] = 0
+                    tl_state["step_travel_time_sum"] = 0
+                    tl_state["step_density_sum"] = 0
+                    tl_state["step_outflow"] = 0
+                    tl_state["step_queue_length"] = 0
+                    tl_state["step_waiting_time"] = 0
+
                 if tl_state["green_time_remaining"] > 0:
                     phase = tl_state["phase"]
                     new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
@@ -306,16 +334,20 @@ class QSimulation(SUMO):
                             done,
                             tl_id,
                         )
-
-                        self.history["agent_reward"][tl_id].append(reward)
-                        self.history["travel_speed"][tl_id].append(self.travel_speed[tl_id])
-                        self.history["travel_time"][tl_id].append(self.travel_time[tl_id])
-                        self.history["density"][tl_id].append(self.density[tl_id])
-                        self.history["outflow_rate"][tl_id].append(self.outflow_rate[tl_id])
-                        self.history["green_time"][tl_id].append(green_time)
-
                         self.green_time_old[tl_id] = self.green_time[tl_id]
                         self.green_time[tl_id] = green_time
+                # step state metrics
+                step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
+                step_outflow = sum(
+                    1 for vid in tl_state["step_old_vehicle_ids"] if vid not in step_new_vehicle_ids
+                )
+                tl_state["step_travel_speed_sum"] += self.get_avg_speed(tl)
+                tl_state["step_travel_time_sum"] += self.get_avg_travel_time(tl)
+                tl_state["step_density_sum"] += self.get_avg_density(tl)
+                tl_state["step_outflow"] += step_outflow
+                tl_state["step_queue_length"] += self.get_avg_queue_length(tl)
+                tl_state["step_waiting_time"] += self.get_avg_waiting_time(tl)
+                tl_state["step_old_vehicle_ids"] = step_new_vehicle_ids   
 
         simulation_time = time.time() - start
 
@@ -325,7 +357,7 @@ class QSimulation(SUMO):
         print("---------------------------------------")
 
         self.save_plot(episode=episode)
-
+        self.reset_history()
         self.step = 0
 
         total_reward = 0
@@ -375,28 +407,25 @@ class QSimulation(SUMO):
         print(f"Q-table saved to {filename}")
 
     def save_plot(self, episode):
-        avg_history = {}
 
+        avg_history = {}
         for metric, data_per_tls in self.history.items():
             data_lists = [data for data in data_per_tls.values() if len(data) > 0]
             if not data_lists:
                 continue
-
             min_length = min(len(data) for data in data_lists)
             data_lists = [data[:min_length] for data in data_lists]
-
             avg_data = [
                 sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)
             ]
-
-            avg_history[metric] = avg_data[-100:]
+            avg_history[metric] = avg_data 
 
         if episode % 10 == 0:
-            print(f"Generating plots at episode", episode, "...")
+            print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data(
                     data=data,
-                    filename=f"q_{metric}_avg_episode_{episode}",
+                    filename=f"q_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
                 )
             self.save_q_table(episode=episode)
             print("Plots and Q-table at episode", episode, "generated")
@@ -543,3 +572,32 @@ class QSimulation(SUMO):
         Returns the number of custom-defined traffic light phases.
         """
         return len(traffic_light["phase"])
+    def get_avg_queue_length(self, traffic_light):
+        """
+        Get the average queue length of a lane.
+        """
+        queue_lengths = []
+        for detector in traffic_light["detectors"]:
+            try:
+                queue_lengths.append(traci.lanearea.getLastStepHaltingNumber(detector["id"]))
+            except:
+                pass
+        return np.mean(queue_lengths) if queue_lengths else 0.0
+
+    def get_avg_waiting_time(self, traffic_light):
+        """
+        Estimate waiting time by summing waiting times of all vehicles in the lane.
+        """
+        vehicle_ids = []
+        for detector in traffic_light["detectors"]:
+            vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(detector["id"]))
+
+        total_waiting_time = 0.0
+        for vid in vehicle_ids:
+            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        return total_waiting_time
+    
+    def reset_history(self):
+        for key in self.history:
+            for tl_id in self.history[key]:
+                self.history[key][tl_id] = []
