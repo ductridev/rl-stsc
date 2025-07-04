@@ -365,6 +365,7 @@ class Simulation(SUMO):
                         self.density[tl_id] = tl_state["density_sum"] / green_time
 
                         reward = self.get_reward(tl_id)
+                        print(f"reward for traffic light {tl_id}: {reward}")
                         next_state, _ = self.get_state(tl)
                         done = self.step >= self.max_steps
 
@@ -412,7 +413,6 @@ class Simulation(SUMO):
         print("---------------------------------------")
 
         self.save_plot(episode=episode)
-        self.reset_history()
         self.step = 0
 
         total_reward = 0
@@ -420,7 +420,7 @@ class Simulation(SUMO):
             total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
 
         print("Total reward:", total_reward, "- Epsilon:", epsilon)
-
+        self.reset_history()
         return simulation_time, training_time
 
     def training(self):

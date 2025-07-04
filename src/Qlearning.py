@@ -358,7 +358,6 @@ class QSimulation(SUMO):
         print("---------------------------------------")
 
         self.save_plot(episode=episode)
-        self.reset_history()
         self.step = 0
 
         total_reward = 0
@@ -366,7 +365,7 @@ class QSimulation(SUMO):
             total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
 
         print("Total reward:", total_reward, "- Epsilon:", epsilon)
-
+        self.reset_history()
         # Decay epsilon
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
