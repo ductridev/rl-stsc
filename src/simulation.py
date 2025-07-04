@@ -375,7 +375,7 @@ class Simulation(SUMO):
                             next_state,
                             done,
                         )
-
+                        self.history["agent_reward"][tl_id].append(reward)
                         self.green_time_old[tl_id] = self.green_time[tl_id]
                         self.green_time[tl_id] = green_time
                 # step state metrics
