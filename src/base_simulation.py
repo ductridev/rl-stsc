@@ -87,32 +87,6 @@ class SimulationBase(SUMO):
                 tl_id = tl["id"]
                 tl_state = tl_states[tl_id]
 
-                #save plot every 60s
-                if self.step % 60 == 0:
-                    travel_speed_avg = tl_state["step_travel_speed_sum"] / 60
-                    travel_time_avg = tl_state["step_travel_time_sum"] / 60
-                    density_avg = tl_state["step_density_sum"] / 60
-                    outflow_avg = tl_state["step_outflow"] 
-                    queue_length_avg = tl_state["step_queue_length"] / 60
-                    waiting_time_avg = tl_state["step_waiting_time"] / 60
-                    green_time = tl_state["green_time"]
-
-                    self.history["travel_speed"][tl_id].append(travel_speed_avg)
-                    self.history["travel_time"][tl_id].append(travel_time_avg)
-                    self.history["density"][tl_id].append(density_avg)
-                    self.history["outflow"][tl_id].append(outflow_avg)
-                    self.history["green_time"][tl_id].append(green_time)
-                    self.history["queue_length"][tl_id].append(queue_length_avg)
-                    self.history["waiting_time"][tl_id].append(waiting_time_avg)
-
-                    # Reset step metrics
-                    tl_state["step_travel_speed_sum"] = 0
-                    tl_state["step_travel_time_sum"] = 0
-                    tl_state["step_density_sum"] = 0
-                    tl_state["step_outflow"] = 0
-                    tl_state["step_queue_length"] = 0
-                    tl_state["step_waiting_time"] = 0
-
                 current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
                 # If time to choose a new phase 
                 if tl_state["green_time_remaining"] == 0 and current_phase != tl_state["last_phase"] and "y" not in current_phase:
@@ -144,6 +118,31 @@ class SimulationBase(SUMO):
                 tl_id = tl["id"]
                 tl_state = tl_states[tl_id]
 
+                if self.step % 60 == 0:
+                    travel_speed_avg = tl_state["step_travel_speed_sum"] / 60
+                    travel_time_avg = tl_state["step_travel_time_sum"] / 60
+                    density_avg = tl_state["step_density_sum"] / 60
+                    outflow_avg = tl_state["step_outflow"] 
+                    queue_length_avg = tl_state["step_queue_length"] / 60
+                    waiting_time_avg = tl_state["step_waiting_time"] / 60
+                    green_time = tl_state["green_time"]
+
+                    self.history["travel_speed"][tl_id].append(travel_speed_avg)
+                    self.history["travel_time"][tl_id].append(travel_time_avg)
+                    self.history["density"][tl_id].append(density_avg)
+                    self.history["outflow"][tl_id].append(outflow_avg)
+                    self.history["green_time"][tl_id].append(green_time)
+                    self.history["queue_length"][tl_id].append(queue_length_avg)
+                    self.history["waiting_time"][tl_id].append(waiting_time_avg)
+
+                    # Reset step metrics
+                    tl_state["step_travel_speed_sum"] = 0
+                    tl_state["step_travel_time_sum"] = 0
+                    tl_state["step_density_sum"] = 0
+                    tl_state["step_outflow"] = 0
+                    tl_state["step_queue_length"] = 0
+                    tl_state["step_waiting_time"] = 0
+                    
                 if tl_state["green_time_remaining"] > 0:
                     phase = tl_state["phase"]
                     new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
