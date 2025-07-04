@@ -6,7 +6,7 @@ from torchinfo import summary
 from typing import Optional
 from src.SENet_module import SENet
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, attn_heads=4 , device = 'cpu'):
+    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
         """
         Initialize the DQN model.
 
@@ -19,6 +19,7 @@ class DQN(nn.Module):
             attn_heads (int): Number of attention heads.
         """
         super(DQN, self).__init__()
+        self.loss_type = "huber"  
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
@@ -26,9 +27,9 @@ class DQN(nn.Module):
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
-        self.attn_heads = attn_heads
-
-        # Build model parts: backbone + attention + heads
+        self.num_quantiles = 51  
+        self.num_atoms     = 51  
+        self.v_min, self.v_max = -10.0, 10.0    
         self.backbone, self.attn, self.heads = self.__build_model()
 
         self.summary()
@@ -53,7 +54,12 @@ class DQN(nn.Module):
 
         heads = nn.ModuleDict()
         for dim in self._output_dims:
-            heads[str(dim)] = nn.Linear(256, dim)
+            if hasattr(self, "loss_type") and self.loss_type in ("qr", "wasserstein"):
+                heads[str(dim)] = nn.Linear(256, dim * self.num_quantiles)
+            elif hasattr(self, "loss_type") and self.loss_type == "c51":
+                heads[str(dim)] = nn.Linear(256, dim * self.num_atoms)
+            else:                                     
+                heads[str(dim)] = nn.Linear(256, dim)
 
         return backbone, attn, heads
     
@@ -91,7 +97,13 @@ class DQN(nn.Module):
         features = self.backbone(x)  # [B, 256]
         attn_out = self.attn(features)  # Apply SENet, input shape [B, 256]
         head = self.heads[str(output_dim)]
-        return head(attn_out)
+        out = head(attn_out)
+        if self.loss_type in ("qr", "wasserstein"):
+            return out.view(-1, output_dim, self.num_quantiles)   
+        elif self.loss_type == "c51":
+            return out.view(-1, output_dim, self.num_atoms)
+        else:
+            return out  
     
     def predict_one(self, x, output_dim = 15):
         """
@@ -149,31 +161,87 @@ class DQN(nn.Module):
             dict: Batch training metrics (avg loss, avg q_value, etc.)
         """
         # Convert to tensors
+        loss_type = self.loss_type 
         states = torch.tensor(np.array(states), dtype=torch.float32).to(self.device)
         actions = torch.tensor(np.array(actions), dtype=torch.int64).to(self.device)
         rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
         next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(self.device)
         done = torch.tensor(done, dtype=torch.float32).to(self.device)
+        online  = self
         # Forward pass
         # Compute target Q-value using DDQN logic
         next_q_values = (
             target_net.predict_batch(next_states, output_dim)
             if target_net is not None else self.predict_batch(next_states, output_dim)
         )
-        next_actions = torch.argmax(self.predict_batch(next_states, output_dim), dim=1)
-        target_q_value = rewards + (1 - done) * self.gamma * next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze(1)
-
-        # Current Q-value
         q_values = self.predict_batch(states, output_dim)
-        q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        # Weighted loss: if Q < target => weight = 1, else weight = target / Q (clipped at min δ)
-        delta = 0.85
-        weights = torch.where(q_value < target_q_value, 
-                            torch.ones_like(q_value),
-                            torch.clamp(target_q_value / (q_value + 1e-6), min=delta))
+        if loss_type in ("mse", "huber", "weighted"):
+            next_actions = torch.argmax(self.predict_batch(next_states, output_dim), dim=1)
+            target_q_value = rewards + (1 - done) * self.gamma * next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze(1)
+            q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+         # === Loss computation ===
+            if loss_type == "mse":
+                loss = F.mse_loss(q_value, target_q_value.detach())
 
-        loss = (weights * (q_value - target_q_value.detach()) ** 2).mean()
+            elif loss_type == "huber":
+                loss = F.smooth_l1_loss(q_value, target_q_value.detach(), beta=1.0)
+
+            elif loss_type == "weighted":
+                delta = 0.85
+                weights = torch.where(q_value < target_q_value,
+                                    torch.ones_like(q_value),
+                                    torch.clamp(target_q_value / (q_value + 1e-6), min=delta))
+                loss = (weights * (q_value - target_q_value.detach()) ** 2).mean()
+        # ----------  Quantile Regression (QR-DQN) ----------
+        elif loss_type == "qr":
+            K = self.num_quantiles
+            
+            q_dist      = q_values.view(-1, output_dim, K)
+            next_q_dist = next_q_values.view(-1, output_dim, K)
+
+            next_a = torch.argmax(next_q_dist.mean(2), dim=1)
+            tgt_dist  = rewards.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * \
+                        next_q_dist[torch.arange(next_q_dist.size(0)), next_a]   
+            pred_dist = q_dist[torch.arange(q_dist.size(0)), actions]            
+
+            u = tgt_dist.unsqueeze(2) - pred_dist.unsqueeze(1)                   
+            huber = F.smooth_l1_loss(pred_dist.unsqueeze(1).expand_as(u),
+                                    tgt_dist.unsqueeze(2).expand_as(u),
+                                    beta=1.0, reduction='none')
+            taus = (torch.arange(K, device=self.device).float() + 0.5) / K
+            weight = torch.abs(taus.unsqueeze(0) - (u.detach() < 0).float())
+            loss = (weight * huber).mean()
+            target_q_value = tgt_dist.mean(1)
+
+        # ----------  Categorical (C51) ----------
+        elif loss_type == "c51":
+            N = self.num_atoms; vmin, vmax = self.v_min, self.v_max
+            Δz = (vmax - vmin) / (N - 1)
+            z  = torch.linspace(vmin, vmax, N, device=self.device)
+            logits      = q_values.view(-1, output_dim, N)
+            next_logits = next_q_values.view(-1, output_dim, N)
+            prob        = F.softmax(logits,      dim=2)
+            prob_next   = F.softmax(next_logits, dim=2)
+
+            with torch.no_grad():
+                next_a = torch.argmax((prob_next * z).sum(2), 1)
+                p_next_a = prob_next[torch.arange(prob_next.size(0)), next_a]         
+                Tz = rewards.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * z
+                Tz = Tz.clamp(vmin, vmax)
+                b  = (Tz - vmin) / Δz
+                l  = b.floor().long(); u = b.ceil().long()
+                m = torch.zeros_like(p_next_a)
+                for j in range(N):
+                    l_mask = (l == j); u_mask = (u == j)
+                    m[..., j] += (p_next_a * (u.float() - b))[l_mask]
+                    m[..., j] += (p_next_a * (b - l.float()))[u_mask]
+
+            loss = -(m * prob.log()).sum(2).mean()
+
+        else:
+            raise ValueError(f"Unknown loss_type '{loss_type}'")
+
         # Backpropagation
         self.optimizer.zero_grad()
         loss.backward()
