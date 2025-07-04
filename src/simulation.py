@@ -365,7 +365,6 @@ class Simulation(SUMO):
                         self.density[tl_id] = tl_state["density_sum"] / green_time
 
                         reward = self.get_reward(tl_id)
-                        print(f"reward for traffic light {tl_id}: {reward}")
                         next_state, _ = self.get_state(tl)
                         done = self.step >= self.max_steps
 
