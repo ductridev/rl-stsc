@@ -51,7 +51,6 @@ class Simulation(SUMO):
         self.epoch = epoch
         self.path = path
         self.weight = agent_cfg["weight"]
-        self.green_time_normalizer = Normalizer()
         self.outflow_rate_normalizer = Normalizer()
         self.density_normalizer = Normalizer()
         self.travel_time_normalizer = Normalizer()
@@ -75,7 +74,6 @@ class Simulation(SUMO):
         self.old_travel_time = {}
         self.old_density = {}
         self.green_time = {}
-        self.green_time_old = {}
 
         self.history = {
             "agent_reward": {},
@@ -83,7 +81,6 @@ class Simulation(SUMO):
             "travel_time": {},
             "density": {},
             "outflow": {},
-            "green_time": {},
             "q_value": {},
             "max_next_q_value": {},
             "target": {},
@@ -147,9 +144,6 @@ class Simulation(SUMO):
 
             # Initialize the green time
             self.green_time[traffic_light_id] = 20
-
-            # Initialize the old green time
-            self.green_time_old[traffic_light_id] = 20
 
             # Initialize the number of actions
             self.num_actions[traffic_light_id] = len(
@@ -319,13 +313,11 @@ class Simulation(SUMO):
                     outflow_avg = tl_state["step_outflow"] 
                     queue_length_avg = tl_state["step_queue_length"] / 60
                     waiting_time_avg = tl_state["step_waiting_time"] / 60
-                    green_time = tl_state["green_time"]
 
                     self.history["travel_speed"][tl_id].append(travel_speed_avg)
                     self.history["travel_time"][tl_id].append(travel_time_avg)
                     self.history["density"][tl_id].append(density_avg)
                     self.history["outflow"][tl_id].append(outflow_avg)
-                    self.history["green_time"][tl_id].append(green_time)
                     self.history["queue_length"][tl_id].append(queue_length_avg)
                     self.history["waiting_time"][tl_id].append(waiting_time_avg)
 
@@ -376,7 +368,6 @@ class Simulation(SUMO):
                             done,
                         )
                         self.history["agent_reward"][tl_id].append(reward)
-                        self.green_time_old[tl_id] = self.green_time[tl_id]
                         self.green_time[tl_id] = green_time
                 # step state metrics
                 step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
@@ -452,12 +443,12 @@ class Simulation(SUMO):
 
     def get_reward(self, traffic_light_id):
         return (
-            self.weight["green_time"]
-            * self.green_time_normalizer.normalize(
-                self.green_time_old[traffic_light_id]
-                - self.green_time[traffic_light_id]
-            )
-            + self.weight["outflow_rate"]
+            # self.weight["green_time"]
+            # * self.green_time_normalizer.normalize(
+            #     self.green_time_old[traffic_light_id]
+            #     - self.green_time[traffic_light_id]
+            # )
+            self.weight["outflow_rate"]
             * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
                 - self.old_outflow_rate[traffic_light_id]
