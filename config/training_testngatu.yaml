@@ -1,5 +1,5 @@
 simulation:
-  gui: True
+  gui: False
   total_episodes: 1000
   max_steps: 3600
   interphase_duration: 5
@@ -22,10 +22,9 @@ agent:
     decay_rate: 0.995
     min_epsilon: 0.01
   weight:
-    green_time: 0.1
     outflow_rate: 0.3
     travel_speed: 0.2
-    travel_time: 0.2
+    travel_time: 0.3
     density: 0.2
 
 dir:
@@ -43,21 +42,37 @@ traffic_lights:
 
     detectors:
       - id: "e2_0"
+        street: "1"
       - id: "e2_1"
+        street: "1"
       - id: "e2_2"
+        street: "1"
       - id: "e2_3"
+        street: "1"
       - id: "e2_4"
+        street: "2"
       - id: "e2_5"
+        street: "2"
       - id: "e2_6"
+        street: "2"
       - id: "e2_7"
+        street: "2"
       - id: "e2_8"
+        street: "3"
       - id: "e2_9"
+        street: "3"
       - id: "e2_10"
-      - id: "e2_11"   
+        street: "3"
+      - id: "e2_11"
+        street: "3"
       - id: "e2_12"
+        street: "4"
       - id: "e2_13"
+        street: "4"
       - id: "e2_14"
+        street: "4"
       - id: "e2_15"
+        street: "4"
 
 accident:
   start_step: 400
