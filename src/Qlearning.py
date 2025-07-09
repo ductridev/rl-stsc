@@ -44,7 +44,6 @@ class QSimulation(SUMO):
         self.epoch = epoch
         self.path = path
         self.weight = agent_cfg["weight"]
-        self.green_time_normalizer = Normalizer()
         self.outflow_rate_normalizer = Normalizer()
         self.density_normalizer = Normalizer()
         self.travel_time_normalizer = Normalizer()
@@ -68,7 +67,6 @@ class QSimulation(SUMO):
         self.old_travel_time = {}
         self.old_density = {}
         self.green_time = {}
-        self.green_time_old = {}
 
         self.history = {
             "agent_reward": {},
@@ -76,7 +74,6 @@ class QSimulation(SUMO):
             "travel_time": {},
             "density": {},
             "outflow": {},
-            "green_time": {},
             "q_value": {},
             "max_next_q_value": {},
             "target": {},
@@ -119,7 +116,6 @@ class QSimulation(SUMO):
             self.agent_memory[traffic_light_id] = self.memory
 
             self.green_time[traffic_light_id] = 20
-            self.green_time_old[traffic_light_id] = 20
             self.num_actions[traffic_light_id] = len(
                 self.agent_cfg["green_duration_deltas"]
             ) * len(traffic_light["phase"])
@@ -270,13 +266,11 @@ class QSimulation(SUMO):
                     outflow_avg = tl_state["step_outflow"] 
                     queue_length_avg = tl_state["step_queue_length"] / 60
                     waiting_time_avg = tl_state["step_waiting_time"] / 60
-                    green_time = tl_state["green_time"]
 
                     self.history["travel_speed"][tl_id].append(travel_speed_avg)
                     self.history["travel_time"][tl_id].append(travel_time_avg)
                     self.history["density"][tl_id].append(density_avg)
                     self.history["outflow"][tl_id].append(outflow_avg)
-                    self.history["green_time"][tl_id].append(green_time)
                     self.history["queue_length"][tl_id].append(queue_length_avg)
                     self.history["waiting_time"][tl_id].append(waiting_time_avg)
 
@@ -335,7 +329,6 @@ class QSimulation(SUMO):
                             tl_id,
                         )
                         self.history["agent_reward"][tl_id].append(reward)
-                        self.green_time_old[tl_id] = self.green_time[tl_id]
                         self.green_time[tl_id] = green_time
                 # step state metrics
                 step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
@@ -373,12 +366,7 @@ class QSimulation(SUMO):
 
     def get_reward(self, traffic_light_id):
         return (
-            self.weight["green_time"]
-            * self.green_time_normalizer.normalize(
-                self.green_time_old[traffic_light_id]
-                - self.green_time[traffic_light_id]
-            )
-            + self.weight["outflow_rate"]
+            self.weight["outflow_rate"]
             * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
                 - self.old_outflow_rate[traffic_light_id]
@@ -482,28 +470,39 @@ class QSimulation(SUMO):
             0,
             0,
             0,
-        ]  # free_capacity, density, waiting_time, queue_length, phase_idx, green_time
+        ]  # min_street_free_capacity, density, waiting_time, queue_length, phase_idx, green_time
 
-        num_detectors = len(traffic_light["detectors"])
+        # Group detectors by street and calculate total free capacity per street
+        street_free_capacities = {}
+        
         for detector in traffic_light["detectors"]:
             detector_id = detector["id"]
+            street = detector["street"]
+            
             free_capacity = self.get_free_capacity(detector_id)
             density = self.get_density(detector_id)
             waiting_time = self.get_waiting_time(detector_id)
             queue_length = self.get_queue_length(detector_id)
 
-            state[0] += free_capacity
+            # Sum free capacity by street
+            if street not in street_free_capacities:
+                street_free_capacities[street] = 0
+            street_free_capacities[street] += free_capacity
+            
+            # Aggregate other metrics across all detectors
             state[1] += density
             state[2] = max(state[2], waiting_time)
             state[3] = max(state[3], queue_length)
 
-        if num_detectors > 0:
-            state[0] /= num_detectors
-            state[1] /= num_detectors
-
-        # Get phase and green time from DESRA (or your phase selection logic)
-        phase, green_time = self.desra.select_phase(traffic_light)
+        # state[0] = minimum total free capacity among all streets (most congested)
+        state[0] = min(street_free_capacities.values()) 
         
+        # Average density across all detectors
+        state[1] /= len(traffic_light["detectors"])
+
+        # Get green times and outflows
+        phase, green_time = self.desra.select_phase(traffic_light)
+
         state[4] = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
         state[5] = green_time
 
