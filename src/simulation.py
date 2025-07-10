@@ -612,8 +612,6 @@ class Simulation(SUMO):
         state_vector.append(desra_phase_idx)
         state_vector.append(desra_green_time)
 
-        print(state_vector)
-
         return np.array(state_vector, dtype=np.float32), desra_green_time
 
     def get_queue_length(self, detector_id):
