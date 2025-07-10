@@ -564,37 +564,42 @@ class Simulation(SUMO):
             np.ndarray: 1D array representing the full input state
             int: green time
         """
-        state = [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ]  # free_capacity, density, waiting_time, queue_length, phase_idx, green_time
+        states = [] # state of phases, phase_idx, green_time
 
-        for detector in traffic_light["detectors"]:
-            detector_id = detector["id"]
-            free_capacity = self.get_free_capacity(detector_id)
-            density = self.get_density(detector_id)
-            waiting_time = self.get_waiting_time(detector_id)
-            queue_length = self.get_queue_length(detector_id)
+        for phase_str in traffic_light["phase"]:
+            movements = self.get_movements_from_phase(traffic_light, phase_str)
 
-            state[0] += free_capacity
-            state[1] += density
-            state[2] = max(state[2], waiting_time)
-            state[3] = max(state[3], queue_length)
+            state = [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            ] # free_capacity, density, waiting_time, queue_length
+            for detector_id in movements:
+                free_capacity = self.get_free_capacity(detector_id)
+                density = self.get_density(detector_id)
+                waiting_time = self.get_waiting_time(detector_id)
+                queue_length = self.get_queue_length(detector_id)
 
-        state[0] /= len(traffic_light["detectors"])
-        state[1] /= len(traffic_light["detectors"])
+                state[0] += free_capacity
+                state[1] += density
+                state[2] = max(state[2], waiting_time)
+                state[3] = max(state[3], queue_length)
+
+            state[0] /= len(movements)
+            state[1] /= len(movements)
+
+            states.append(state)
 
         # Get green times and outflows
         phase, green_time = self.desra.select_phase(traffic_light)
 
-        state[4] = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
-        state[5] = green_time
+        states.append(phase_to_index(phase, self.actions_map[traffic_light["id"]], 0))
+        states.append(green_time)
 
-        return np.array(state, dtype=np.float32), green_time
+        return np.array(states, dtype=np.float32), green_time
 
     def get_queue_length(self, detector_id):
         """
@@ -660,6 +665,24 @@ class Simulation(SUMO):
         Returns the number of custom-defined traffic light phases.
         """
         return len(traffic_light["phase"])
+
+    def get_movements_from_phase(self, traffic_light, phase_str):
+        detectors = [det["id"] for det in traffic_light["detectors"]]
+        active_detectors = [
+            detectors[i]
+            for i, state in enumerate(phase_str)
+            if state.upper() == "G" and i < len(detectors)
+        ]
+        return active_detectors
+
+    def get_movements_from_phase(self, traffic_light, phase_str):
+        detectors = [det["id"] for det in traffic_light["detectors"]]
+        active_detectors = [
+            detectors[i]
+            for i, state in enumerate(phase_str)
+            if state.upper() == "G" and i < len(detectors)
+        ]
+        return active_detectors
 
     def get_avg_queue_length(self, traffic_light):
         """
