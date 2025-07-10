@@ -6,7 +6,7 @@ from torchinfo import summary
 from typing import Optional
 from src.SENet_module import SENet
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
+    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu', max_phases = 10):
         """
         Initialize the DQN model.
 
@@ -23,7 +23,7 @@ class DQN(nn.Module):
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
-        self._input_dim = input_dim
+        self._input_dim = max_phases*input_dim + 2
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
