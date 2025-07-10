@@ -6,7 +6,7 @@ from torchinfo import summary
 from typing import Optional
 from src.SENet_module import SENet
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
+    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu', max_phases = 10):
         """
         Initialize the DQN model.
 
@@ -19,11 +19,11 @@ class DQN(nn.Module):
             attn_heads (int): Number of attention heads.
         """
         super(DQN, self).__init__()
-        self.loss_type = "huber"  
+        self.loss_type = "qr"  
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
-        self._input_dim = input_dim
+        self._input_dim = max_phases*input_dim + 2
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
@@ -213,31 +213,34 @@ class DQN(nn.Module):
             weight = torch.abs(taus.unsqueeze(0) - (u.detach() < 0).float())
             loss = (weight * huber).mean()
             target_q_value = tgt_dist.mean(1)
+            q_value = pred_dist.mean(1)   
 
         # ----------  Categorical (C51) ----------
-        elif loss_type == "c51":
-            N = self.num_atoms; vmin, vmax = self.v_min, self.v_max
-            Δz = (vmax - vmin) / (N - 1)
-            z  = torch.linspace(vmin, vmax, N, device=self.device)
-            logits      = q_values.view(-1, output_dim, N)
-            next_logits = next_q_values.view(-1, output_dim, N)
-            prob        = F.softmax(logits,      dim=2)
-            prob_next   = F.softmax(next_logits, dim=2)
+        # elif loss_type == "c51":
+        #     N = self.num_atoms; vmin, vmax = self.v_min, self.v_max
+        #     Δz = (vmax - vmin) / (N - 1)
+        #     z  = torch.linspace(vmin, vmax, N, device=self.device)
+        #     logits      = q_values.view(-1, output_dim, N)
+        #     next_logits = next_q_values.view(-1, output_dim, N)
+        #     prob        = F.softmax(logits,      dim=2)
+        #     prob_next   = F.softmax(next_logits, dim=2)
 
-            with torch.no_grad():
-                next_a = torch.argmax((prob_next * z).sum(2), 1)
-                p_next_a = prob_next[torch.arange(prob_next.size(0)), next_a]         
-                Tz = rewards.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * z
-                Tz = Tz.clamp(vmin, vmax)
-                b  = (Tz - vmin) / Δz
-                l  = b.floor().long(); u = b.ceil().long()
-                m = torch.zeros_like(p_next_a)
-                for j in range(N):
-                    l_mask = (l == j); u_mask = (u == j)
-                    m[..., j] += (p_next_a * (u.float() - b))[l_mask]
-                    m[..., j] += (p_next_a * (b - l.float()))[u_mask]
+        #     with torch.no_grad():
+        #         next_a = torch.argmax((prob_next * z).sum(2), 1)
+        #         p_next_a = prob_next[torch.arange(prob_next.size(0)), next_a]         
+        #         Tz = rewards.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * z
+        #         Tz = Tz.clamp(vmin, vmax)
+        #         b  = (Tz - vmin) / Δz
+        #         l  = b.floor().long(); u = b.ceil().long()
+        #         m = torch.zeros_like(p_next_a)
+        #         for j in range(N):
+        #             l_mask = (l == j); u_mask = (u == j)
+        #             m[..., j] += (p_next_a * (u.float() - b))[l_mask]
+        #             m[..., j] += (p_next_a * (b - l.float()))[u_mask]
 
-            loss = -(m * prob.log()).sum(2).mean()
+        #     loss = -(m * prob.log()).sum(2).mean()
+        #     target_q_value = (m * z).sum(1)    # ✅ Estimate target_q_value
+        #     q_value = (prob * z).sum(2).gather(1, actions.unsqueeze(1)).squeeze(1)  # ✅ Add this line
 
         else:
             raise ValueError(f"Unknown loss_type '{loss_type}'")

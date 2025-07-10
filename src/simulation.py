@@ -5,7 +5,7 @@ from src.normalizer import Normalizer
 from src.desra import DESRA
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
-
+import torch.nn.functional as F
 import traci
 import numpy as np
 import random
@@ -548,13 +548,16 @@ class Simulation(SUMO):
         """
         if random.random() < epsilon:
             return random.randint(0, self.num_actions[traffic_light_id] - 1)
-        else:
-            state = torch.from_numpy(state).to(self.device, dtype=torch.float32)
-            with torch.no_grad():
-                q_values: torch.Tensor = agent.predict_one(
-                    state, self.num_actions[traffic_light_id]
-                )
-                return q_values.argmax().item()
+        state_t = torch.from_numpy(state).to(self.device, dtype=torch.float32)
+
+        with torch.no_grad():
+            dist = agent.predict_one(state_t, self.num_actions[traffic_light_id])
+            if agent.loss_type == "qr":                       # ► collapse quantiles to mean Q
+                q = dist.mean(2)                              #   [1, A]
+            else:                                             # ► standard DQN
+                q = dist                                      #   [1, A]
+
+            return q.squeeze(0).argmax().item()  
 
     def get_state(self, traffic_light):
         """
@@ -564,42 +567,54 @@ class Simulation(SUMO):
             np.ndarray: 1D array representing the full input state
             int: green time
         """
-        states = [] # state of phases, phase_idx, green_time
+        state_vector = []
 
         for phase_str in traffic_light["phase"]:
             movements = self.get_movements_from_phase(traffic_light, phase_str)
 
-            state = [
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ] # free_capacity, density, waiting_time, queue_length
+            # Skip phases with no movements (safety check)
+            if not movements:
+                continue
+
+            free_capacity_sum = 0
+            density_sum = 0
+            max_waiting_time = 0
+            max_queue_length = 0
+
             for detector_id in movements:
-                free_capacity = self.get_free_capacity(detector_id)
-                density = self.get_density(detector_id)
-                waiting_time = self.get_waiting_time(detector_id)
-                queue_length = self.get_queue_length(detector_id)
+                free_capacity_sum += self.get_free_capacity(detector_id)
+                density_sum += self.get_density(detector_id)
+                max_waiting_time = max(max_waiting_time, self.get_waiting_time(detector_id))
+                max_queue_length = max(max_queue_length, self.get_queue_length(detector_id))
 
-                state[0] += free_capacity
-                state[1] += density
-                state[2] = max(state[2], waiting_time)
-                state[3] = max(state[3], queue_length)
+            movement_count = len(movements)
+            avg_free_capacity = free_capacity_sum / movement_count
+            avg_density = density_sum / movement_count
 
-            state[0] /= len(movements)
-            state[1] /= len(movements)
+            # Append per-phase state: [free_capacity, density, waiting_time, queue_length]
+            state_vector.extend([
+                avg_free_capacity,
+                avg_density,
+                max_waiting_time,
+                max_queue_length
+            ])
 
-            states.append(state)
+        # DESRA recommended phase and green time
+        desra_phase, desra_green_time = self.desra.select_phase(traffic_light)
 
-        # Get green times and outflows
-        phase, green_time = self.desra.select_phase(traffic_light)
+        # Convert phase to index
+        desra_phase_idx = phase_to_index(desra_phase, self.actions_map[traffic_light["id"]], 0)
 
-        states.append(phase_to_index(phase, self.actions_map[traffic_light["id"]], 0))
-        states.append(green_time)
+        padding = self.agent._input_dim - 2 - len(state_vector)
+        state_vector.extend([0] * padding)
 
-        return np.array(states, dtype=np.float32), green_time
+        # Append DESRA guidance
+        state_vector.append(desra_phase_idx)
+        state_vector.append(desra_green_time)
+
+        print(state_vector)
+
+        return np.array(state_vector, dtype=np.float32), desra_green_time
 
     def get_queue_length(self, detector_id):
         """
@@ -674,7 +689,6 @@ class Simulation(SUMO):
             if state.upper() == "G" and i < len(detectors)
         ]
         return active_detectors
-
 
     def get_avg_queue_length(self, traffic_light):
         """
