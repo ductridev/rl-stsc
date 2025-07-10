@@ -463,50 +463,57 @@ class QSimulation(SUMO):
             np.ndarray: 1D array representing the full input state
             int: green time
         """
-        state = [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ]  # min_street_free_capacity, density, waiting_time, queue_length, phase_idx, green_time
+        state_vector = []
+        features_per_phase = 4  # free_capacity, density, waiting_time, queue_length
+        # Compute max_phases from agent_cfg or fallback to number of phases
+        max_phases = self.agent_cfg.get("max_phases", len(traffic_light["phase"]))
 
-        # Group detectors by street and calculate total free capacity per street
-        street_free_capacities = {}
-        
-        for detector in traffic_light["detectors"]:
-            detector_id = detector["id"]
-            street = detector["street"]
-            
-            free_capacity = self.get_free_capacity(detector_id)
-            density = self.get_density(detector_id)
-            waiting_time = self.get_waiting_time(detector_id)
-            queue_length = self.get_queue_length(detector_id)
-
-            # Sum free capacity by street
-            if street not in street_free_capacities:
-                street_free_capacities[street] = 0
-            street_free_capacities[street] += free_capacity
-            
-            # Aggregate other metrics across all detectors
-            state[1] += density
-            state[2] = max(state[2], waiting_time)
-            state[3] = max(state[3], queue_length)
-
-        # state[0] = minimum total free capacity among all streets (most congested)
-        state[0] = min(street_free_capacities.values()) 
-        
-        # Average density across all detectors
-        state[1] /= len(traffic_light["detectors"])
-
-        # Get green times and outflows
+        for phase_str in traffic_light["phase"]:
+            movements = self.get_movements_from_phase(traffic_light, phase_str)
+            # Skip phases with no movements (safety check)
+            if not movements:
+                continue
+            free_capacity_sum = 0
+            density_sum = 0
+            max_waiting_time = 0
+            max_queue_length = 0
+            for detector_id in movements:
+                free_capacity_sum += self.get_free_capacity(detector_id)
+                density_sum += self.get_density(detector_id)
+                max_waiting_time = max(max_waiting_time, self.get_waiting_time(detector_id))
+                max_queue_length = max(max_queue_length, self.get_queue_length(detector_id))
+            movement_count = len(movements)
+            avg_free_capacity = free_capacity_sum / movement_count
+            avg_density = density_sum / movement_count
+            # Append per-phase state: [free_capacity, density, waiting_time, queue_length]
+            state_vector.extend([
+                avg_free_capacity,
+                avg_density,
+                max_waiting_time,
+                max_queue_length
+            ])
+        # DESRA recommended phase and green time
         phase, green_time = self.desra.select_phase(traffic_light)
+        desra_phase_idx = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
+        # Calculate required input dim: max_phases * features_per_phase + 2
+        input_dim = max_phases * features_per_phase + 2
+        # Pad with zeros if needed (before appending DESRA info)
+        padding = input_dim - 2 - len(state_vector)
+        if padding > 0:
+            state_vector.extend([0] * padding)
+        # Append DESRA guidance
+        state_vector.append(desra_phase_idx)
+        state_vector.append(green_time)
+        return np.array(state_vector, dtype=np.float32), green_time
 
-        state[4] = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
-        state[5] = green_time
-
-        return np.array(state, dtype=np.float32), green_time
+    def get_movements_from_phase(self, traffic_light, phase_str):
+        detectors = [det["id"] for det in traffic_light["detectors"]]
+        active_detectors = [
+            detectors[i]
+            for i, state in enumerate(phase_str)
+            if state.upper() == "G" and i < len(detectors)
+        ]
+        return active_detectors
 
     def get_queue_length(self, detector_id):
         """
