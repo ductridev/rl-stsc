@@ -5,7 +5,7 @@ from src.normalizer import Normalizer
 from src.desra import DESRA
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
-
+import torch.nn.functional as F
 import traci
 import numpy as np
 import random
@@ -548,13 +548,16 @@ class Simulation(SUMO):
         """
         if random.random() < epsilon:
             return random.randint(0, self.num_actions[traffic_light_id] - 1)
-        else:
-            state = torch.from_numpy(state).to(self.device, dtype=torch.float32)
-            with torch.no_grad():
-                q_values: torch.Tensor = agent.predict_one(
-                    state, self.num_actions[traffic_light_id]
-                )
-                return q_values.argmax().item()
+        state_t = torch.from_numpy(state).to(self.device, dtype=torch.float32)
+
+        with torch.no_grad():
+            dist = agent.predict_one(state_t, self.num_actions[traffic_light_id])
+            if agent.loss_type == "qr":                       # ► collapse quantiles to mean Q
+                q = dist.mean(2)                              #   [1, A]
+            else:                                             # ► standard DQN
+                q = dist                                      #   [1, A]
+
+            return q.squeeze(0).argmax().item()  
 
     def get_state(self, traffic_light):
         """
