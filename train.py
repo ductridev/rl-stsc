@@ -39,17 +39,20 @@ if __name__ == "__main__":
     )
     
     # Initialize simulation
-    simulation_dqn = Simulation(
-        memory=agent_memory_dqn,
-        visualization=visualization,
-        agent_cfg=config["agent"],
-        max_steps=config["max_steps"],
-        traffic_lights=config["traffic_lights"],
-        interphase_duration=config["interphase_duration"],
-        accident_manager= accident_manager,
-        epoch=config["training_epochs"],
-        path=path,
-    )
+    simulations_dqn = {
+        loss: Simulation(
+            memory=agent_memory_dqn,
+            visualization=visualization,
+            agent_cfg={**config["agent"], "loss_type": loss},
+            max_steps=config["max_steps"],
+            traffic_lights=config["traffic_lights"],
+            interphase_duration=config["interphase_duration"],
+            accident_manager=accident_manager,
+            epoch=config["training_epochs"],
+            path=path,
+        )
+        for loss in ["mse", "huber", "weighted", "qr"]
+    }
 
     simulation = SimulationBase(
         max_steps=config["max_steps"],
@@ -100,10 +103,12 @@ if __name__ == "__main__":
         simulation_time_q = simulation_q.run(epsilon, episode)
         print("QSimulation time:", simulation_time_q)
 
-        print("Running Simulation (DQN)...")
-        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-        simulation_time_dqn, training_time_dqn = simulation_dqn.run(epsilon, episode)
-        print("Simulation (DQN) time:", simulation_time_dqn, "Training time:", training_time_dqn)
+        for loss_type, sim_dqn in simulations_dqn.items():
+            print(f"Running DQN Simulation (loss: {loss_type})...")
+            set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+            simulation_time_dqn, training_time_dqn = sim_dqn.run(epsilon, episode)
+            print(f"Simulation (DQN - {loss_type}) time:", simulation_time_dqn, "Training time:", training_time_dqn)
+
 
         epsilon = max(min_epsilon, epsilon * decay_rate)
 
@@ -114,7 +119,7 @@ if __name__ == "__main__":
             visualization.save_plot(
                 episode=episode,
                 metrics=["density_avg", "green_time_avg", "travel_time_avg", "outflow_avg", "travel_speed_avg", "waiting_time_avg", "queue_length_avg"],
-                names=["dqn", "q", "base"],
+                names=["dqn_qr", "dqn_mse","dqn_huber", "dqn_weighted", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
         episode += 1

@@ -44,6 +44,7 @@ class Simulation(SUMO):
         self.memory = memory
         self.visualization = visualization
         self.agent_cfg = agent_cfg
+        self.loss_type = agent_cfg["loss_type"]
         self.max_steps = max_steps
         self.traffic_lights = traffic_lights
         self.accident_manager = accident_manager
@@ -109,6 +110,7 @@ class Simulation(SUMO):
             output_dims=self.get_output_dims(),
             gamma=self.agent_cfg["gamma"],
             device=self.device,
+            loss_type=self.loss_type,
         )
 
         self.desra = DESRA(interphase_duration=self.interphase_duration)
@@ -499,7 +501,7 @@ class Simulation(SUMO):
             for metric, data in avg_history.items():
                 self.visualization.save_data(
                     data=data,
-                    filename=f"dqn_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
+                    filename=f"dqn_{self.loss_type}_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
                 )
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")

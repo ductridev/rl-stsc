@@ -72,7 +72,7 @@ class Visualization:
         if metrics is None:
             metrics = ["density_avg", "green_time_avg", "travel_time_avg", "outflow_rate_avg", "loss_avg"]
         if names is None:
-            names = ["dqn", "q", "base"]
+            names = ["dqn_qr", "dqn_mse","dqn_huber", "dqn_weighted", "q", "base"]
 
         for metric in metrics:
             data = {}

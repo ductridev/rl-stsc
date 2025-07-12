@@ -6,7 +6,7 @@ from torchinfo import summary
 from typing import Optional
 from src.SENet_module import SENet
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu'):
+    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, device = 'cpu', loss_type = "qr"):
         """
         Initialize the DQN model.
 
@@ -19,7 +19,7 @@ class DQN(nn.Module):
             attn_heads (int): Number of attention heads.
         """
         super(DQN, self).__init__()
-        self.loss_type = "qr"  
+        self.loss_type = loss_type
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
