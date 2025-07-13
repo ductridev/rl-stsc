@@ -37,7 +37,7 @@ if __name__ == "__main__":
         duration=config["duration"],
         junction_id_list=config["junction_id_list"],
     )
-    
+
     # Initialize simulation
     simulation_dqn = Simulation(
         memory=agent_memory_dqn,
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         max_steps=config["max_steps"],
         traffic_lights=config["traffic_lights"],
         interphase_duration=config["interphase_duration"],
-        accident_manager= accident_manager,
+        accident_manager=accident_manager,
         epoch=config["training_epochs"],
         path=path,
     )
@@ -79,15 +79,17 @@ if __name__ == "__main__":
         print("Generating routes...")
         # Run the build routes file command
 
-        Intersection.generate_routes(
+        Intersection.generate_residential_demand_routes(
+            config,
             config["sumo_cfg_file"].split("/")[1],
-            enable_bicycle=True,
-            enable_pedestrian=True,
+            demand_level="low",
             enable_motorcycle=True,
             enable_passenger=True,
+            enable_truck=True,
+            enable_bicycle=True,
+            enable_pedestrian=True,
         )
         print("Routes generated")
-
 
         # --- Run all three simulations ---
         print("Running SimulationBase (static baseline)...")
@@ -103,7 +105,12 @@ if __name__ == "__main__":
         print("Running Simulation (DQN)...")
         set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
         simulation_time_dqn, training_time_dqn = simulation_dqn.run(epsilon, episode)
-        print("Simulation (DQN) time:", simulation_time_dqn, "Training time:", training_time_dqn)
+        print(
+            "Simulation (DQN) time:",
+            simulation_time_dqn,
+            "Training time:",
+            training_time_dqn,
+        )
 
         epsilon = max(min_epsilon, epsilon * decay_rate)
 
@@ -113,7 +120,15 @@ if __name__ == "__main__":
             print("Generating plots at episode", episode, "...")
             visualization.save_plot(
                 episode=episode,
-                metrics=["density_avg", "green_time_avg", "travel_time_avg", "outflow_avg", "travel_speed_avg", "waiting_time_avg", "queue_length_avg"],
+                metrics=[
+                    "density_avg",
+                    "green_time_avg",
+                    "travel_time_avg",
+                    "outflow_avg",
+                    "travel_speed_avg",
+                    "waiting_time_avg",
+                    "queue_length_avg",
+                ],
                 names=["dqn", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
@@ -125,7 +140,7 @@ if __name__ == "__main__":
 
     print(f"Saving models at {path}...")
     model_path = path + f"model.pth"
-    simulation.agent.save(model_path)
+    simulation_dqn.agent.save(model_path)
     print("Models saved")
     print("---------------------------------------")
 
@@ -133,7 +148,7 @@ if __name__ == "__main__":
     # We simple by averaging the history over all traffic lights
     avg_history = {}
 
-    for metric, data_per_tls in simulation.history.items():
+    for metric, data_per_tls in simulation_dqn.history.items():
         # Transpose the list of lists into per-timestep values
         # Filter out missing/empty lists first
         data_lists = [data for data in data_per_tls.values() if len(data) > 0]
@@ -150,7 +165,7 @@ if __name__ == "__main__":
 
         # Save to avg_history
         avg_history[metric] = avg_data
-        
+
     for metric, data in avg_history.items():
         visualization.save_data_and_plot(
             data=data,
