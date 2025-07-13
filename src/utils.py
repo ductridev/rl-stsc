@@ -141,6 +141,12 @@ def import_train_configuration(file_path):
         # config['selector_phase_agent']['batch_size'] = content['selector_phase_agent']['model']['batch_size']
         # config['selector_phase_agent']['learning_rate'] = content['selector_phase_agent']['model']['learning_rate']
 
+        # Traffic demand configuration
+        config['vehicle_counts'] = content['vehicle_counts']
+        config['vehicle_counts']['low'] = content['vehicle_counts']['low']
+        config['vehicle_counts']['medium'] = content['vehicle_counts']['medium']
+        config['vehicle_counts']['high'] = content['vehicle_counts']['high']
+
         # Training configuration
         config['training_epochs'] = content['model']['training_epochs']
         config['models_path_name'] = content['dir']['models_path_name']
