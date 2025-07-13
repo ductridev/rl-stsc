@@ -113,7 +113,7 @@ if __name__ == "__main__":
             print("Generating plots at episode", episode, "...")
             visualization.save_plot(
                 episode=episode,
-                metrics=["density_avg", "green_time_avg", "travel_time_avg", "outflow_avg", "travel_speed_avg", "waiting_time_avg", "queue_length_avg"],
+                metrics=["density_avg", "travel_time_avg", "outflow_avg", "travel_speed_avg", "waiting_time_avg", "queue_length_avg"],
                 names=["dqn", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
