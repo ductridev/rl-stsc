@@ -233,6 +233,49 @@ class QSimulation(SUMO):
                             self.accident_manager.create_accident(current_step=self.step)
                             traci.simulationStep()
                             self.step += 1
+                            
+                            # Calculate step metrics during interphase for all traffic lights
+                            for tl_inner in self.traffic_lights:
+                                tl_inner_id = tl_inner["id"]
+                                tl_inner_state = tl_states[tl_inner_id]
+                                
+                                step_new_vehicle_ids = self.get_vehicles_in_phase(tl_inner, tl_inner_state["phase"] if tl_inner_state["phase"] is not None else 0)
+                                step_outflow = sum(
+                                    1
+                                    for vid in tl_inner_state["step_old_vehicle_ids"]
+                                    if vid not in step_new_vehicle_ids
+                                )
+                                tl_inner_state["step_travel_speed_sum"] += self.get_avg_speed(tl_inner)
+                                tl_inner_state["step_travel_time_sum"] += self.get_avg_travel_time(tl_inner)
+                                tl_inner_state["step_density_sum"] += self.get_avg_density(tl_inner)
+                                tl_inner_state["step_outflow"] += step_outflow
+                                tl_inner_state["step_queue_length"] += self.get_avg_queue_length(tl_inner)
+                                tl_inner_state["step_waiting_time"] += self.get_avg_waiting_time(tl_inner)
+                                tl_inner_state["step_old_vehicle_ids"] = step_new_vehicle_ids
+                                
+                                # Check if it's time to save data (dynamic interval for exactly 60 data points)
+                                if self.step % 60 == 0:
+                                    travel_speed_avg = tl_inner_state["step_travel_speed_sum"] / 60
+                                    travel_time_avg = tl_inner_state["step_travel_time_sum"] / 60
+                                    density_avg = tl_inner_state["step_density_sum"] / 60
+                                    outflow_avg = tl_inner_state["step_outflow"]
+                                    queue_length_avg = tl_inner_state["step_queue_length"] / 60
+                                    waiting_time_avg = tl_inner_state["step_waiting_time"] / 60
+
+                                    self.history["travel_speed"][tl_inner_id].append(travel_speed_avg)
+                                    self.history["travel_time"][tl_inner_id].append(travel_time_avg)
+                                    self.history["density"][tl_inner_id].append(density_avg)
+                                    self.history["outflow"][tl_inner_id].append(outflow_avg)
+                                    self.history["queue_length"][tl_inner_id].append(queue_length_avg)
+                                    self.history["waiting_time"][tl_inner_id].append(waiting_time_avg)
+
+                                    # Reset step metrics
+                                    tl_inner_state["step_travel_speed_sum"] = 0
+                                    tl_inner_state["step_travel_time_sum"] = 0
+                                    tl_inner_state["step_density_sum"] = 0
+                                    tl_inner_state["step_outflow"] = 0
+                                    tl_inner_state["step_queue_length"] = 0
+                                    tl_inner_state["step_waiting_time"] = 0
 
                     self.set_green_phase(tl_id, green_time, phase)
 
