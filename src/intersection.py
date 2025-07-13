@@ -1,6 +1,7 @@
 import os
 import traci
 
+
 class Intersection:
     @staticmethod
     def get_all_intersections_with_sumo():
@@ -14,12 +15,14 @@ class Intersection:
         """
         # Get all intersections inside intersections folder
         intersections = []
-        for folder in os.listdir(os.path.join(os.getcwd(), 'simulations')):
-            if os.path.isdir(os.path.join(os.getcwd(), 'simulations', folder)):
-                if os.path.exists(os.path.join(os.getcwd(), 'simulations', folder, 'osm.sumocfg')):
+        for folder in os.listdir(os.path.join(os.getcwd(), "simulations")):
+            if os.path.isdir(os.path.join(os.getcwd(), "simulations", folder)):
+                if os.path.exists(
+                    os.path.join(os.getcwd(), "simulations", folder, "osm.sumocfg")
+                ):
                     intersections.append(folder)
         return intersections
-    
+
     @staticmethod
     def check_intersection_exists(intersection):
         """
@@ -30,162 +33,137 @@ class Intersection:
         Returns:
             bool: True if the intersection exists, False otherwise
         """
-        return os.path.exists(os.path.join(os.getcwd(), 'simulations', intersection, 'osm.sumocfg'))
-    
+        return os.path.exists(
+            os.path.join(os.getcwd(), "simulations", intersection, "osm.sumocfg")
+        )
+
     @staticmethod
-    def generate_residential_low_demand_routes(
-        intersection,
-        enable_bicycle=False,
-        enable_pedestrian=False,
-        enable_motorcycle=False,
-        enable_passenger=False,
-        enable_truck=False
+    def generate_residential_demand_routes(
+        config,
+        simulation_path,
+        demand_level="low",  # Options: 'low', 'medium', 'high'
+        enable_bicycle=True,
+        enable_pedestrian=True,
+        enable_motorcycle=True,
+        enable_passenger=True,
+        enable_truck=True,
     ):
         """
-        Generate low-demand routes on highway.residential edges for enabled vehicle types.
-        Total target: ~8-10 vehicles per 10 minutes across all selected types.
-        """
-        print("Generating low-demand routes on residential edges...")
+        Generate residential traffic routes based on demand level using pre-defined vehicle counts from config.
 
-        vehicle_configs = [
-            ("bike", "bicycle", "bicycle", enable_bicycle),
-            ("ped", "pedestrian", "pedestrian", enable_pedestrian),
-            ("motorcycle", "motorcycle", "motorcycle", enable_motorcycle),
-            ("veh", "passenger", "passenger", enable_passenger),
-            ("truck", "truck", "truck", enable_truck)
-        ]
-
-        # Total target = 10 vehicles / 600s → 0.01667 veh/s
-        # Divide this across the number of enabled types
-        enabled_types = [v for v in vehicle_configs if v[3]]
-        if not enabled_types:
-            print("No vehicle types enabled for residential low demand. Skipping...")
-            return
-
-        per_type_rate = 0.0167 / len(enabled_types)
-
-        for prefix, vclass, vehicle_class, _enabled in enabled_types:
-            cmd = (
-                f'python "%SUMO_HOME%/tools/randomTrips.py" '
-                f'-n osm.net.xml.gz '
-                f'--fringe-factor 2 '
-                f'--insertion-rate {per_type_rate:.5f} '
-                f'-o osm.res_{prefix}.trips.xml '
-                f'-r osm.res_{prefix}.rou.xml '
-                f'-b 0 -e 3600 '
-                f'--trip-attributes "departLane=\\"best\\"" '
-                f'--fringe-start-attributes "departSpeed=\\"max\\"" '
-                f'--validate --remove-loops '
-                f'--via-edge-types highway.residential '
-                f'--vehicle-class {vehicle_class} '
-                f'--vclass {vclass} '
-                f'--prefix res_{prefix} '
-                f'--min-distance 150'
-            )
-            os.system(cmd)
-            print(f"Residential {vehicle_class} routes generated")
-    
-    @staticmethod
-    def generate_routes(intersection, enable_bicycle=False, enable_pedestrian=False, enable_motorcycle=False, enable_passenger=False, enable_truck=False):
-        """
-        Generate routes for a given intersection.
-        This is done by iterating through the data and checking for routes.
         Args:
-            intersection: input data to check for routes
-            enable_bicycle: boolean to enable bicycle routes
-            enable_pedestrian: boolean to enable pedestrian routes
-            enable_motorcycle: boolean to enable motorcycle routes
-            enable_passenger: boolean to enable passenger routes
-            enable_truck: boolean to enable truck routes
+            config (dict): Configuration dictionary containing 'vehicle_counts'
+            simulation_path (str): Path to the simulation folder
+            demand_level (str): One of 'low', 'medium', 'high'
+            enable_bicycle (bool): Include bicycles
+            enable_pedestrian (bool): Include pedestrians
+            enable_motorcycle (bool): Include motorcycles
+            enable_passenger (bool): Include passenger cars
+            enable_truck (bool): Include trucks
         """
-        # Check if the intersection exists
-        if not Intersection.check_intersection_exists(intersection):
-            raise ValueError(f"Intersection {intersection} does not exist.")
-        
+        print(f"Generating residential routes for {demand_level} demand...")
+
         original_path = os.getcwd()
+
         try:
-            intersection_path = os.path.join(os.getcwd(), 'simulations', intersection)
+            intersection_path = os.path.join(
+                os.getcwd(), "simulations", simulation_path
+            )
             os.chdir(intersection_path)
-            Intersection.generate_residential_low_demand_routes(intersection, enable_bicycle, enable_pedestrian, enable_motorcycle, enable_passenger, enable_truck)
-            if enable_bicycle:
-                Intersection.generate_bicycle_routes(intersection)
-            if enable_pedestrian:
-                Intersection.generate_pedestrian_routes(intersection)
-            if enable_motorcycle:
-                Intersection.generate_motorcycle_routes(intersection)
-            if enable_passenger:
-                Intersection.generate_passenger_routes(intersection)
-            if enable_truck:
-                Intersection.generate_truck_routes(intersection)
+
+            if demand_level not in config["vehicle_counts"]:
+                print(
+                    f"Invalid demand level '{demand_level}'. Must be one of {list(config['vehicle_counts'].keys())}."
+                )
+                return
+
+            vehicle_counts = config["vehicle_counts"][demand_level]
+            simulation_duration = 3600  # 1 hour in seconds
+
+            vehicle_configs = [
+                (
+                    "motorcycle",
+                    "motorcycle",
+                    "motorcycle",
+                    enable_motorcycle,
+                    vehicle_counts.get("motorcycle", 0),
+                ),
+                (
+                    "veh",
+                    "passenger",
+                    "passenger",
+                    enable_passenger,
+                    vehicle_counts.get("passenger", 0),
+                ),
+                (
+                    "truck",
+                    "truck",
+                    "truck",
+                    enable_truck,
+                    vehicle_counts.get("truck", 0),
+                ),
+                (
+                    "bike",
+                    "bicycle",
+                    "bicycle",
+                    enable_bicycle,
+                    vehicle_counts.get("bicycle", 0),
+                ),
+                (
+                    "ped",
+                    "pedestrian",
+                    "pedestrian",
+                    enable_pedestrian,
+                    vehicle_counts.get("pedestrian", 0),
+                ),
+            ]
+
+            enabled_types = [v for v in vehicle_configs if v[3] and v[4] > 0]
+
+            if not enabled_types:
+                print(
+                    "No vehicle types enabled or no vehicles specified in this demand level."
+                )
+                return
+
+            total_vehicles = sum(v[4] for v in enabled_types)
+
+            print(
+                f"Total vehicles for {demand_level} demand: {total_vehicles} vehicles over {simulation_duration} seconds"
+            )
+
+            for prefix, vclass, vehicle_class, _enabled, count in enabled_types:
+
+                # 1. Generate trips file
+                trip_cmd = (
+                    f'python "%SUMO_HOME%/tools/randomTrips.py" '
+                    f"-n osm.net.xml.gz "
+                    f"-o osm.res_{prefix}.trips.xml "
+                    f"--insertion-rate {count * 4} "
+                    f"--begin 0 --end {simulation_duration} "
+                    f"--validate --remove-loops "
+                    f"--vehicle-class {vehicle_class} "
+                    f"--vclass {vclass} "
+                    f'--trip-attributes "departLane=\'best\'" '
+                    f'--fringe-start-attributes "departSpeed=\'max\'" '
+                    f"--prefix res_{prefix} "
+                )
+
+                if vehicle_class == "pedestrian":
+                    trip_cmd += " --via-edge-types footway,path,sidewalk"
+
+                # 2. Convert trips to routes using duarouter
+                route_cmd = (
+                    f'duarouter '
+                    f'-n osm.net.xml.gz '
+                    f'--route-files osm.res_{prefix}.trips.xml '
+                    f'-o osm.res_{prefix}.rou.xml'
+                )
+
+                # Run both commands
+                os.system(trip_cmd)
+                os.system(route_cmd)
+
+                print(f"Generated: {count} {vehicle_class} trips")
         finally:
             os.chdir(original_path)
-
-    @staticmethod
-    def generate_bicycle_routes(intersection):
-        """
-        Generate bicycle routes for a given intersection.
-        This is done by iterating through the data and checking for bicycle routes.
-        Args:
-            intersection: input data to check for bicycle routes
-        Returns:
-            list: list of all bicycle routes found in the data
-        """
-        
-        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 2 --insertion-density 60 -o osm.bicycle.trips.xml -r osm.bicycle.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class bicycle --vclass bicycle --prefix bike --max-distance 8000')
-        print("Bicycle routes generated")
-    
-    @staticmethod
-    def generate_pedestrian_routes(intersection):
-        """
-        Generate pedestrian routes for a given intersection.
-        This is done by iterating through the data and checking for pedestrian routes.
-        Args:
-            intersection: input data to check for pedestrian routes
-        Returns:
-            list: list of all pedestrian routes found in the data
-        """
-        
-        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 1 --insertion-density 100 -o osm.pedestrian.trips.xml -r osm.pedestrian.rou.xml -b 0 -e 3600 --vehicle-class pedestrian --prefix ped --pedestrians --max-distance 2000')
-        print("Pedestrian routes generated")
-
-    @staticmethod
-    def generate_motorcycle_routes(intersection):
-        """
-        Generate motorcycle routes for a given intersection.
-        This is done by iterating through the data and checking for motorcycle routes.
-        Args:
-            intersection: input data to check for motorcycle routes
-        Returns:
-            list: list of all motorcycle routes found in the data
-        """
-        
-        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 2 --insertion-density 40 -o osm.motorcycle.trips.xml -r osm.motorcycle.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class motorcycle --vclass motorcycle --prefix motorcycle --max-distance 1200')
-        print("Motorcycle routes generated")
-
-    @staticmethod
-    def generate_passenger_routes(intersection):
-        """
-        Generate passenger routes for a given intersection.
-        This is done by iterating through the data and checking for passenger routes.
-        Args:
-            intersection: input data to check for passenger routes
-        Returns:
-            list: list of all passenger routes found in the data
-        """
-        
-        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 5 --insertion-density 120 -o osm.passenger.trips.xml -r osm.passenger.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class passenger --vclass passenger --prefix veh --min-distance 300 --min-distance.fringe 100 --allow-fringe.min-length 10000 --lanes')
-        print("Passenger routes generated")
-
-    @staticmethod
-    def generate_truck_routes(intersection):
-        """
-        Generate truck routes for a given intersection.
-        This is done by iterating through the data and checking for truck routes.
-        Args:
-            intersection: input data to check for truck routes
-        Returns:
-            list: list of all truck routes found in the data
-        """
-        
-        os.system('python "%SUMO_HOME%/tools/randomTrips.py" -n osm.net.xml.gz --fringe-factor 5 --insertion-density 80 -o osm.truck.trips.xml -r osm.truck.rou.xml -b 0 -e 3600 --trip-attributes "departLane=""best""" --fringe-start-attributes "departSpeed=""max""" --validate --remove-loops --via-edge-types highway.motorway,highway.motorway_link,highway.trunk_link,highway.primary_link,highway.secondary_link,highway.tertiary_link --vehicle-class truck --vclass truck --prefix truck --min-distance 600 --min-distance.fringe 100 --allow-fringe.min-length 10000 --lanes')
-        print("Truck routes generated")
