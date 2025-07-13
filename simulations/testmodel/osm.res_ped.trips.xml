@@ -1,25 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-03 17:54:21.884376 by randomTrips.py v1_23_1+0000-676720d13f6
+<!-- generated on 2025-07-13 19:31:23.430691 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <output-trip-file value="osm.res_ped.trips.xml"/>
-    <route-file value="osm.res_ped.rou.xml"/>
     <prefix value="res_ped"/>
-    <trip-attributes value="departLane=&quot;best&quot;"/>
-    <fringe-start-attributes value="departSpeed=&quot;max&quot;"/>
+    <trip-attributes value="departLane='best'"/>
+    <fringe-start-attributes value="departSpeed='max'"/>
     <vehicle-class value="pedestrian"/>
-    <fringe-factor value="2"/>
-    <edge-permission value="pedestrian"/>
-    <via-edge-types value="highway.residential"/>
-    <min-distance value="150.0"/>
+    <vclass value="pedestrian"/>
+    <via-edge-types value="footway,path,sidewalk"/>
     <remove-loops value="True"/>
     <validate value="True"/>
-    <insertion-rate value="0.00417"/>
+    <insertion-rate value="400.0"/>
 </configuration>
 -->
 
-<!-- generated on 2025-07-03 17:54:21 by Eclipse SUMO duarouter Version 1.23.1
+<!-- generated on 2025-07-13 19:31:23 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -51,4 +48,32 @@
 </duarouterConfiguration>
 -->
 
-<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd"/>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_ped_pedestrian" vClass="pedestrian"/>
+    <trip id="res_ped12" type="res_ped_pedestrian" depart="108.00" departLane="best" departSpeed="max" from="E9" to="E15"/>
+    <trip id="res_ped13" type="res_ped_pedestrian" depart="117.00" departLane="best" from="E1" to="E1"/>
+    <trip id="res_ped21" type="res_ped_pedestrian" depart="189.00" departLane="best" departSpeed="max" from="E12" to="E14"/>
+    <trip id="res_ped29" type="res_ped_pedestrian" depart="261.00" departLane="best" departSpeed="max" from="E11" to="E17"/>
+    <trip id="res_ped42" type="res_ped_pedestrian" depart="378.00" departLane="best" departSpeed="max" from="E19" to="E13"/>
+    <trip id="res_ped72" type="res_ped_pedestrian" depart="648.00" departLane="best" departSpeed="max" from="E19" to="E13"/>
+    <trip id="res_ped74" type="res_ped_pedestrian" depart="666.00" departLane="best" departSpeed="max" from="E12" to="E14"/>
+    <trip id="res_ped95" type="res_ped_pedestrian" depart="855.00" departLane="best" departSpeed="max" from="E19" to="E14"/>
+    <trip id="res_ped119" type="res_ped_pedestrian" depart="1071.00" departLane="best" departSpeed="max" from="E23" to="E22"/>
+    <trip id="res_ped130" type="res_ped_pedestrian" depart="1170.00" departLane="best" from="E7" to="E7"/>
+    <trip id="res_ped144" type="res_ped_pedestrian" depart="1296.00" departLane="best" departSpeed="max" from="E19" to="E14"/>
+    <trip id="res_ped167" type="res_ped_pedestrian" depart="1503.00" departLane="best" from="E6" to="E6"/>
+    <trip id="res_ped181" type="res_ped_pedestrian" depart="1629.00" departLane="best" departSpeed="max" from="E23" to="E20"/>
+    <trip id="res_ped191" type="res_ped_pedestrian" depart="1719.00" departLane="best" departSpeed="max" from="E16" to="E17"/>
+    <trip id="res_ped192" type="res_ped_pedestrian" depart="1728.00" departLane="best" departSpeed="max" from="E19" to="E14"/>
+    <trip id="res_ped193" type="res_ped_pedestrian" depart="1737.00" departLane="best" departSpeed="max" from="E11" to="E17"/>
+    <trip id="res_ped214" type="res_ped_pedestrian" depart="1926.00" departLane="best" from="E5" to="E5"/>
+    <trip id="res_ped236" type="res_ped_pedestrian" depart="2124.00" departLane="best" departSpeed="max" from="E19" to="E13"/>
+    <trip id="res_ped244" type="res_ped_pedestrian" depart="2196.00" departLane="best" departSpeed="max" from="E21" to="E22"/>
+    <trip id="res_ped260" type="res_ped_pedestrian" depart="2340.00" departLane="best" departSpeed="max" from="E9" to="E15"/>
+    <trip id="res_ped282" type="res_ped_pedestrian" depart="2538.00" departLane="best" from="E6" to="E6"/>
+    <trip id="res_ped324" type="res_ped_pedestrian" depart="2916.00" departLane="best" from="E2" to="E2"/>
+    <trip id="res_ped337" type="res_ped_pedestrian" depart="3033.00" departLane="best" departSpeed="max" from="E23" to="E22"/>
+    <trip id="res_ped355" type="res_ped_pedestrian" depart="3195.00" departLane="best" from="E4" to="E4"/>
+    <trip id="res_ped369" type="res_ped_pedestrian" depart="3321.00" departLane="best" departSpeed="max" from="E18" to="E15"/>
+    <trip id="res_ped375" type="res_ped_pedestrian" depart="3375.00" departLane="best" departSpeed="max" from="E18" to="E8"/>
+</routes>
