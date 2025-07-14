@@ -244,7 +244,7 @@ class SimulationBase(SUMO):
                 densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
             except:
                 pass
-        return np.mean(densities) if densities else 0.0
+        return np.mean(densities) / 100 if densities else 0.0
 
     def get_avg_queue_length(self, traffic_light):
         """

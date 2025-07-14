@@ -614,7 +614,7 @@ class QSimulation(SUMO):
                 densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
             except:
                 pass
-        return np.mean(densities) if densities else 0.0
+        return np.mean(densities) / 100 if densities else 0.0
 
     def get_num_phases(self, traffic_light):
         """
