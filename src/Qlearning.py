@@ -437,6 +437,22 @@ class QSimulation(SUMO):
             pickle.dump(self.q_table, f)
         print(f"Q-table saved to {filename}")
 
+    def load_q_table(self, path):
+        """
+        Load Q-table from the specified path.
+
+        Args:
+            path (str): Path to load the Q-table from.
+        """
+        try:
+            with open(path, "rb") as f:
+                self.q_table = pickle.load(f)
+            print(f"Q-table loaded from {path}")
+        except FileNotFoundError:
+            print(f"Q-table file not found: {path}. Starting with empty Q-table.")
+        except Exception as e:
+            print(f"Error loading Q-table: {e}. Starting with empty Q-table.")
+
     def save_plot(self, episode):
 
         avg_history = {}
