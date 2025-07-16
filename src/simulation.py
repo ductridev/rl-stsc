@@ -564,9 +564,9 @@ class Simulation(SUMO):
         with torch.no_grad():
             dist = agent.predict_one(state_t, self.num_actions[traffic_light_id])
             if agent.loss_type == "qr":                       # ► collapse quantiles to mean Q
-                q = dist.mean(2)                              #   [1, A]
+                q = dist.mean(2)                             
             else:                                             # ► standard DQN
-                q = dist                                      #   [1, A]
+                q = dist                                     
 
             return q.squeeze(0).argmax().item()  
 

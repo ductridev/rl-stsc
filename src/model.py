@@ -27,8 +27,7 @@ class DQN(nn.Module):
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
-        self.num_quantiles = 51  
-        self.num_atoms     = 51  
+        self.num_quantiles = 100  
         self.v_min, self.v_max = -10.0, 10.0    
         self.backbone, self.attn, self.heads = self.__build_model()
 
@@ -193,54 +192,34 @@ class DQN(nn.Module):
                                     torch.ones_like(q_value),
                                     torch.clamp(target_q_value / (q_value + 1e-6), min=delta))
                 loss = (weights * (q_value - target_q_value.detach()) ** 2).mean()
-        # ----------  Quantile Regression (QR-DQN) ----------
         elif loss_type == "qr":
             K = self.num_quantiles
             
-            q_dist      = q_values.view(-1, output_dim, K)
+            q_dist      = q_values.view(-1, output_dim, K) # [batch, num_actions, num_quantiles]
             next_q_dist = next_q_values.view(-1, output_dim, K)
-
+            # Get the best next action by averaging quantiles, then taking argmax
             next_a = torch.argmax(next_q_dist.mean(2), dim=1)
+            # Compute target quantile values: rewards + gamma * next_q_values
             tgt_dist  = rewards.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * \
                         next_q_dist[torch.arange(next_q_dist.size(0)), next_a]   
+            # Get predicted quantiles for actions actually taken
             pred_dist = q_dist[torch.arange(q_dist.size(0)), actions]            
+            # Compute pairwise differences between target and predicted quantiles
+            u = tgt_dist.unsqueeze(2) - pred_dist.unsqueeze(1)
 
-            u = tgt_dist.unsqueeze(2) - pred_dist.unsqueeze(1)                   
             huber = F.smooth_l1_loss(pred_dist.unsqueeze(1).expand_as(u),
                                     tgt_dist.unsqueeze(2).expand_as(u),
                                     beta=1.0, reduction='none')
+             # Compute quantile fractions taus = (0.5 + i) / K for i in 0..K-1
             taus = (torch.arange(K, device=self.device).float() + 0.5) / K
+             # Quantile weight: |τ - 𝟙{u < 0}|
+             # Encourages over-estimation and under-estimation sensitivity
             weight = torch.abs(taus.unsqueeze(0) - (u.detach() < 0).float())
+            # Final loss: average over batch, quantiles
             loss = (weight * huber).mean()
             target_q_value = tgt_dist.mean(1)
             q_value = pred_dist.mean(1)   
 
-        # ----------  Categorical (C51) ----------
-        # elif loss_type == "c51":
-        #     N = self.num_atoms; vmin, vmax = self.v_min, self.v_max
-        #     Δz = (vmax - vmin) / (N - 1)
-        #     z  = torch.linspace(vmin, vmax, N, device=self.device)
-        #     logits      = q_values.view(-1, output_dim, N)
-        #     next_logits = next_q_values.view(-1, output_dim, N)
-        #     prob        = F.softmax(logits,      dim=2)
-        #     prob_next   = F.softmax(next_logits, dim=2)
-
-        #     with torch.no_grad():
-        #         next_a = torch.argmax((prob_next * z).sum(2), 1)
-        #         p_next_a = prob_next[torch.arange(prob_next.size(0)), next_a]         
-        #         Tz = rewards.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * z
-        #         Tz = Tz.clamp(vmin, vmax)
-        #         b  = (Tz - vmin) / Δz
-        #         l  = b.floor().long(); u = b.ceil().long()
-        #         m = torch.zeros_like(p_next_a)
-        #         for j in range(N):
-        #             l_mask = (l == j); u_mask = (u == j)
-        #             m[..., j] += (p_next_a * (u.float() - b))[l_mask]
-        #             m[..., j] += (p_next_a * (b - l.float()))[u_mask]
-
-        #     loss = -(m * prob.log()).sum(2).mean()
-        #     target_q_value = (m * z).sum(1)    # ✅ Estimate target_q_value
-        #     q_value = (prob * z).sum(2).gather(1, actions.unsqueeze(1)).squeeze(1)  # ✅ Add this line
 
         else:
             raise ValueError(f"Unknown loss_type '{loss_type}'")
