@@ -14,7 +14,6 @@ model:
 agent:
   gamma: 0.99
   num_states: 6 # free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time
-  green_duration_deltas: [-2, -1, 0, 1, 2] 
   model:
     num_layers: 8
     batch_size: 128

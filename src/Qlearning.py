@@ -116,19 +116,15 @@ class QSimulation(SUMO):
             self.agent_memory[traffic_light_id] = self.memory
 
             self.green_time[traffic_light_id] = 20
-            self.num_actions[traffic_light_id] = len(
-                self.agent_cfg["green_duration_deltas"]
-            ) * len(traffic_light["phase"])
+            self.num_actions[traffic_light_id] = len(traffic_light["phase"])
             self.actions_map[traffic_light_id] = {}
 
             i = 0
             for phase in traffic_light["phase"]:
-                for green_delta in self.agent_cfg["green_duration_deltas"]:
-                    self.actions_map[traffic_light_id][i] = {
-                        "phase": phase,
-                        "duration": green_delta,
-                    }
-                    i += 1
+                self.actions_map[traffic_light_id][i] = {
+                    "phase": phase,
+                }
+                i += 1
 
             self.agent_reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0

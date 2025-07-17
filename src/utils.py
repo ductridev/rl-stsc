@@ -135,7 +135,6 @@ def import_train_configuration(file_path):
         config['agent'] = {}
         config['agent']['num_states'] = content['agent']['num_states']
         config['agent']['gamma'] = content['agent']['gamma']
-        config['agent']['green_duration_deltas'] = content['agent']['green_duration_deltas']
         config['agent']['num_layers'] = content['agent']['model']['num_layers']
         config['agent']['batch_size'] = content['agent']['model']['batch_size']
         config['agent']['learning_rate'] = content['agent']['model']['learning_rate']

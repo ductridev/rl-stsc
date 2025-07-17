@@ -19,7 +19,7 @@ RED_ACTION = 1
 
 
 def index_to_action(index, actions_map):
-    return actions_map[index]["phase"], actions_map[index]["duration"]
+    return actions_map[index]["phase"]
 
 
 def phase_to_index(phase, actions_map, duration):
@@ -148,9 +148,7 @@ class Simulation(SUMO):
             self.green_time[traffic_light_id] = 20
 
             # Initialize the number of actions
-            self.num_actions[traffic_light_id] = len(
-                self.agent_cfg["green_duration_deltas"]
-            ) * len(traffic_light["phase"])
+            self.num_actions[traffic_light_id] = len(traffic_light["phase"])
 
             # Initialize the action map
             self.actions_map[traffic_light_id] = {}
@@ -159,13 +157,11 @@ class Simulation(SUMO):
             i = 0
 
             for phase in traffic_light["phase"]:
-                for green_delta in self.agent_cfg["green_duration_deltas"]:
-                    self.actions_map[traffic_light_id][i] = {
-                        "phase": phase,
-                        "duration": green_delta,
-                    }
+                self.actions_map[traffic_light_id][i] = {
+                    "phase": phase,
+                }
 
-                    i += 1
+                i += 1
 
             # Initialize the agent reward
             self.agent_reward[traffic_light_id] = 0
@@ -257,25 +253,22 @@ class Simulation(SUMO):
                 tl_state = tl_states[tl_id]
 
                 # If time to choose a new action
-                if tl_state["green_time_remaining"] == 0:
-                    state, base_green_time = self.get_state(tl)
-                    action_idx = self.select_action(
+                if tl_state["green_time_remaining"] <= 0:
+                    state, desra_greens = self.get_state(tl)
+                    action_idx, predicted_green = self.select_action(
                         tl_id,
                         self.agent,
                         state,
+                        desra_greens,
                         epsilon,
                     )
 
-                    phase, green_delta = index_to_action(
+                    phase = index_to_action(
                         action_idx,
                         self.actions_map[tl_id],
                     )
 
-                    green_time = max(
-                        base_green_time, self.green_time[tl_id] + green_delta
-                    )
-
-                    green_time = min(green_time, self.max_steps - self.step)
+                    green_time = max(1, min(predicted_green, self.max_steps - self.step))
 
                     if tl_state["phase"] is not None:
                         self.set_yellow_phase(tl_id, tl_state["phase"])
@@ -394,7 +387,7 @@ class Simulation(SUMO):
                     tl_state["old_vehicle_ids"] = new_vehicle_ids
                     tl_state["green_time_remaining"] -= 1
 
-                    if tl_state["green_time_remaining"] == 0:
+                    if tl_state["green_time_remaining"] <= 0:
                         green_time = tl_state["green_time"]
 
                         self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
@@ -592,27 +585,39 @@ class Simulation(SUMO):
 
         return "".join(s_list)
 
-    def select_action(self, traffic_light_id, agent: DQN, state, epsilon):
+    def select_action(self, traffic_light_id: str, agent: DQN, base_state: np.ndarray, desra_green_times: list, epsilon: float):
         """
-        Select an action using epsilon-greedy policy.
+        Select an action using epsilon-greedy policy with DESRA green time hints.
+        
         Args:
-            state (np.array): current state of the simulation
-            epsilon (float): exploration rate for epsilon-greedy policy
+            traffic_light_id (str): ID of the traffic light
+            agent (DQN): The DQN model
+            base_state (np.ndarray): Base traffic state (e.g. queue, arrivals)
+            desra_green_times (list[float]): DESRA suggested green times per phase
+            epsilon (float): Epsilon-greedy exploration factor
+        
         Returns:
-            int: selected action
+            (int, float): Tuple of selected phase index and predicted green time
         """
+        num_actions = self.num_actions[traffic_light_id]
+
+        # Add DESRA green hints to the state
+        state_t = torch.from_numpy(base_state).to(self.device, dtype=torch.float32)
+
         if random.random() < epsilon:
-            return random.randint(0, self.num_actions[traffic_light_id] - 1)
-        state_t = torch.from_numpy(state).to(self.device, dtype=torch.float32)
+            action_idx = random.randint(0, num_actions - 1)
+            predicted_green = desra_green_times[action_idx]  # fallback to DESRA
+            return action_idx, predicted_green
 
         with torch.no_grad():
-            dist = agent.predict_one(state_t, self.num_actions[traffic_light_id])
-            if agent.loss_type == "qr":  # ► collapse quantiles to mean Q
-                q = dist.mean(2)  #   [1, A]
-            else:  # ► standard DQN
-                q = dist  #   [1, A]
+            q_values = agent.predict_one(state_t, output_dim=num_actions)
+            if agent.loss_type == "qr":
+                q_values = q_values.mean(2)  # [1, A]
 
-            return q.squeeze(0).argmax().item()
+            best_action_idx = q_values.squeeze(0).argmax().item()
+            predicted_green_time = q_values.squeeze(0)[best_action_idx].item()  # absolute prediction
+
+            return best_action_idx, predicted_green_time
 
     def get_state(self, traffic_light):
         """
@@ -656,21 +661,21 @@ class Simulation(SUMO):
             )
 
         # DESRA recommended phase and green time
-        desra_phase, desra_green_time = self.desra.select_phase(traffic_light)
+        best_phase, desra_green, desra_green_list = self.desra.select_phase_with_desra_hints(traffic_light)
+
+        padding = self.agent._input_dim - len(state_vector) - len(desra_green_list) - 2
+        state_vector.extend([0] * padding)
 
         # Convert phase to index
         desra_phase_idx = phase_to_index(
-            desra_phase, self.actions_map[traffic_light["id"]], 0
+            best_phase, self.actions_map[traffic_light["id"]], 0
         )
 
-        padding = self.agent._input_dim - 2 - len(state_vector)
-        state_vector.extend([0] * padding)
-
         # Append DESRA guidance
-        state_vector.append(desra_phase_idx)
-        state_vector.append(desra_green_time)
+        state_vector.extend(desra_green_list)
+        state_vector.extend([desra_phase_idx, desra_green])
 
-        return np.array(state_vector, dtype=np.float32), desra_green_time
+        return np.array(state_vector, dtype=np.float32), desra_green_list
 
     def get_queue_length(self, detector_id):
         """
