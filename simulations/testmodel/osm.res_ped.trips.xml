@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-17 16:25:42.983259 by randomTrips.py v1_23_1+0000-676720d13f6
+<!-- generated on 2025-07-17 17:01:37.490887 by randomTrips.py v1_23_1+0000-676720d13f6
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <output-trip-file value="osm.res_ped.trips.xml"/>
@@ -12,11 +12,11 @@
     <via-edge-types value="footway,path,sidewalk"/>
     <remove-loops value="True"/>
     <validate value="True"/>
-    <insertion-rate value="400.0"/>
+    <insertion-rate value="100.0"/>
 </configuration>
 -->
 
-<!-- generated on 2025-07-17 16:25:42 by Eclipse SUMO duarouter Version 1.23.1
+<!-- generated on 2025-07-17 17:01:37 by Eclipse SUMO duarouter Version 1.23.1
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -50,12 +50,5 @@
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
     <vType id="res_ped_pedestrian" vClass="pedestrian"/>
-    <trip id="res_ped13" type="res_ped_pedestrian" depart="117.00" departLane="best" from="E1" to="E1"/>
-    <trip id="res_ped119" type="res_ped_pedestrian" depart="1071.00" departLane="best" from="E3" to="E3"/>
-    <trip id="res_ped130" type="res_ped_pedestrian" depart="1170.00" departLane="best" from="E6" to="E6"/>
-    <trip id="res_ped167" type="res_ped_pedestrian" depart="1503.00" departLane="best" from="E6" to="E6"/>
-    <trip id="res_ped214" type="res_ped_pedestrian" depart="1926.00" departLane="best" from="E4" to="E4"/>
-    <trip id="res_ped282" type="res_ped_pedestrian" depart="2538.00" departLane="best" from="E5" to="E5"/>
-    <trip id="res_ped367" type="res_ped_pedestrian" depart="3303.00" departLane="best" from="E3" to="E3"/>
-    <trip id="res_ped396" type="res_ped_pedestrian" depart="3564.00" departLane="best" from="E6" to="E6"/>
+    <trip id="res_ped13" type="res_ped_pedestrian" depart="468.00" departLane="best" from="E1" to="E1"/>
 </routes>
