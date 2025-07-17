@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-17 08:38:54 by Eclipse SUMO duarouter Version 1.23.1
+<!-- generated on 2025-07-17 16:25:43 by Eclipse SUMO duarouter Version 1.23.1
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -17,134 +17,44 @@
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
     <vType id="res_ped_pedestrian" vClass="pedestrian"/>
-    <vehicle id="res_ped12" type="res_ped_pedestrian" depart="108.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="174.63" probability="1.00000000" edges="E9 E15"/>
-        </routeDistribution>
-    </vehicle>
     <vehicle id="res_ped13" type="res_ped_pedestrian" depart="117.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="81.51" probability="1.00000000" edges="E1"/>
+            <route cost="161.58" probability="1.00000000" edges="E1"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_ped21" type="res_ped_pedestrian" depart="189.00" departLane="best" departSpeed="max">
+    <vehicle id="res_ped119" type="res_ped_pedestrian" depart="1071.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="196.49" probability="1.00000000" edges="E12 E14"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped29" type="res_ped_pedestrian" depart="261.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="183.49" probability="1.00000000" edges="E11 E17"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped42" type="res_ped_pedestrian" depart="378.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="188.15" probability="1.00000000" edges="E19 E13"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped72" type="res_ped_pedestrian" depart="648.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="188.15" probability="1.00000000" edges="E19 E13"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped74" type="res_ped_pedestrian" depart="666.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="196.49" probability="1.00000000" edges="E12 E14"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped95" type="res_ped_pedestrian" depart="855.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="183.60" probability="1.00000000" edges="E19 E14"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped119" type="res_ped_pedestrian" depart="1071.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="177.53" probability="1.00000000" edges="E23 E22"/>
+            <route cost="194.11" probability="1.00000000" edges="E3"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_ped130" type="res_ped_pedestrian" depart="1170.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="88.67" probability="1.00000000" edges="E7"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped144" type="res_ped_pedestrian" depart="1296.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="183.60" probability="1.00000000" edges="E19 E14"/>
+            <route cost="261.48" probability="1.00000000" edges="E6"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_ped167" type="res_ped_pedestrian" depart="1503.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="88.77" probability="1.00000000" edges="E6"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped181" type="res_ped_pedestrian" depart="1629.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="154.42" probability="1.00000000" edges="E23 E20"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped191" type="res_ped_pedestrian" depart="1719.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="165.68" probability="1.00000000" edges="E16 E17"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped192" type="res_ped_pedestrian" depart="1728.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="183.60" probability="1.00000000" edges="E19 E14"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped193" type="res_ped_pedestrian" depart="1737.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="183.49" probability="1.00000000" edges="E11 E17"/>
+            <route cost="261.48" probability="1.00000000" edges="E6"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_ped214" type="res_ped_pedestrian" depart="1926.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="90.20" probability="1.00000000" edges="E5"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped236" type="res_ped_pedestrian" depart="2124.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="188.15" probability="1.00000000" edges="E19 E13"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped244" type="res_ped_pedestrian" depart="2196.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="149.44" probability="1.00000000" edges="E21 E22"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped260" type="res_ped_pedestrian" depart="2340.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="174.63" probability="1.00000000" edges="E9 E15"/>
+            <route cost="247.64" probability="1.00000000" edges="E4"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_ped282" type="res_ped_pedestrian" depart="2538.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="88.77" probability="1.00000000" edges="E6"/>
+            <route cost="247.66" probability="1.00000000" edges="E5"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_ped324" type="res_ped_pedestrian" depart="2916.00" departLane="best">
+    <vehicle id="res_ped367" type="res_ped_pedestrian" depart="3303.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="73.21" probability="1.00000000" edges="E2"/>
+            <route cost="194.11" probability="1.00000000" edges="E3"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_ped337" type="res_ped_pedestrian" depart="3033.00" departLane="best" departSpeed="max">
+    <vehicle id="res_ped396" type="res_ped_pedestrian" depart="3564.00" departLane="best">
         <routeDistribution last="0">
-            <route cost="177.53" probability="1.00000000" edges="E23 E22"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped355" type="res_ped_pedestrian" depart="3195.00" departLane="best">
-        <routeDistribution last="0">
-            <route cost="90.23" probability="1.00000000" edges="E4"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped369" type="res_ped_pedestrian" depart="3321.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="179.38" probability="1.00000000" edges="E18 E15"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_ped375" type="res_ped_pedestrian" depart="3375.00" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="177.32" probability="1.00000000" edges="E18 E8"/>
+            <route cost="261.48" probability="1.00000000" edges="E6"/>
         </routeDistribution>
     </vehicle>
 </routes>
