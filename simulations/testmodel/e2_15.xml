@@ -1,43 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-12 21:41:18 by Eclipse SUMO sumo Version 1.23.1
+<!-- generated on 2025-07-17 08:42:19 by Eclipse SUMO sumo Version 1.23.1
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
     <input>
-        <net-file value="D:\CodingProject\rl-stsc\simulations/testmodel/osm.net.xml.gz"/>
-        <route-files value="D:\CodingProject\rl-stsc\simulations/testmodel/osm.motorcycle.trips.xml,D:\CodingProject\rl-stsc\simulations/testmodel/osm.passenger.trips.xml,D:\CodingProject\rl-stsc\simulations/testmodel/osm.bicycle.trips.xml"/>
-        <additional-files value="D:\CodingProject\rl-stsc\simulations/testmodel/osm.add.xml"/>
+        <net-file value="D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.net.xml.gz"/>
+        <route-files value="D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.res_bike.trips.xml,D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.res_motorcycle.rou.xml,D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.res_ped.rou.xml,D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.res_truck.rou.xml,D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.res_veh.rou.xml"/>
+        <additional-files value="D:\TrafficSimulator\RL\rl-stsc\simulations/testmodel/osm.add.xml"/>
     </input>
 
     <processing>
-        <ignore-route-errors value="true"/>
         <waiting-time-memory value="3600"/>
-        <tls.actuated.jam-threshold value="30"/>
     </processing>
 
-    <routing>
-        <device.rerouting.adaptation-steps value="18"/>
-        <device.rerouting.adaptation-interval value="10"/>
-    </routing>
-
     <report>
-        <verbose value="true"/>
         <no-warnings value="true"/>
         <duration-log.disable value="true"/>
-        <duration-log.statistics value="true"/>
         <no-step-log value="true"/>
     </report>
 
     <traci_server>
-        <remote-port value="64722"/>
+        <remote-port value="63561"/>
     </traci_server>
-
-    <gui_only>
-        <gui-settings-file value="D:\CodingProject\rl-stsc\simulations/testmodel/osm.view.xml"/>
-    </gui_only>
 
 </sumoConfiguration>
 -->
 
 <detector xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/det_e2_file.xsd">
+   <interval begin="0.00" end="300.00" id="e2_15" sampledSeconds="1357.65" nVehEntered="62" nVehLeft="50" nVehSeen="62" meanSpeed="4.16" meanTimeLoss="15.03" meanOccupancy="11.72" maxOccupancy="26.92" meanMaxJamLengthInVehicles="1.99" meanMaxJamLengthInMeters="8.56" maxJamLengthInVehicles="11" maxJamLengthInMeters="48.53" jamLengthInVehiclesSum="609" jamLengthInMetersSum="2600.81" meanHaltingDuration="12.82" maxHaltingDuration="67.00" haltingDurationSum="641.00" meanIntervalHaltingDuration="12.82" maxIntervalHaltingDuration="67.00" intervalHaltingDurationSum="641.00" startedHalts="53.00" meanVehicleNumber="4.72" maxVehicleNumber="12" />
+   <interval begin="300.00" end="600.00" id="e2_15" sampledSeconds="5107.07" nVehEntered="37" nVehLeft="37" nVehSeen="49" meanSpeed="0.57" meanTimeLoss="99.22" meanOccupancy="45.04" maxOccupancy="54.48" meanMaxJamLengthInVehicles="13.21" meanMaxJamLengthInMeters="64.38" maxJamLengthInVehicles="20" maxJamLengthInMeters="100.00" jamLengthInVehiclesSum="4127" jamLengthInMetersSum="19946.01" meanHaltingDuration="23.43" maxHaltingDuration="276.00" haltingDurationSum="4498.00" meanIntervalHaltingDuration="21.91" maxIntervalHaltingDuration="214.00" intervalHaltingDurationSum="4206.00" startedHalts="189.00" meanVehicleNumber="17.14" maxVehicleNumber="20" />
 </detector>

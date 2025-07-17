@@ -51,6 +51,26 @@ def set_train_path(model_name):
     os.makedirs(os.path.dirname(data_path), exist_ok=True)
     return data_path 
 
+def set_load_model_path(model_name):
+    """
+    Create a model path for loading an existing model.
+    Args:
+        model_name (str): Name of the model to load.
+    Returns:
+        str: The model path for loading the existing model.
+    """
+    import os
+
+    models_path = os.path.join(os.getcwd(), model_name, '')
+    os.makedirs(os.path.dirname(models_path), exist_ok=True)
+
+    dir_content = os.listdir(models_path)
+    if dir_content:
+        previous_versions = [int(name.split("_")[1]) for name in dir_content]
+        newest_version = str(max(previous_versions) - 1)
+    data_path = os.path.join(models_path, 'model_'+newest_version, '')
+    return data_path
+
 def set_test_path(model_name):
     """
     Create a new model path with an incremental integer, also considering previously created model paths
@@ -141,8 +161,18 @@ def import_train_configuration(file_path):
         # config['selector_phase_agent']['batch_size'] = content['selector_phase_agent']['model']['batch_size']
         # config['selector_phase_agent']['learning_rate'] = content['selector_phase_agent']['model']['learning_rate']
 
+        # Traffic demand configuration
+        config['vehicle_counts'] = content['vehicle_counts']
+        config['vehicle_counts']['low'] = content['vehicle_counts']['low']
+        config['vehicle_counts']['medium'] = content['vehicle_counts']['medium']
+        config['vehicle_counts']['high'] = content['vehicle_counts']['high']
+
         # Training configuration
         config['training_epochs'] = content['model']['training_epochs']
+        config['save_model_name'] = content['model'].get('save_model_name', 'dqn_model')
+        config['load_model_name'] = content['model'].get('load_model_name', None)
+        config['load_q_table_name'] = content['model'].get('load_q_table_name', None)
+        config['save_interval'] = content['model'].get('save_interval', 10)
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
 

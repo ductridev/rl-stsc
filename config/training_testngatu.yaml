@@ -10,10 +10,14 @@ memory:
 
 model:
   training_epochs: 1000
+  save_model_name: "dqn_testngatu_model"  # Name for saving the model
+  load_model_name: null  # Set to model name to load existing model, null to start fresh
+  load_q_table_name: null  # Set to Q-table filename to load existing Q-table, null to start fresh
+  save_interval: 10  # Save model every N episodes
 
 agent:
   gamma: 0.99
-  num_states: 6 # min_free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time
+  num_states: 4 # min_free_capacity, density, waiting_time, queue_length
   green_duration_deltas: [-2, -1, 0, 1, 2] 
   model:
     num_layers: 8
@@ -27,12 +31,30 @@ agent:
       - huber
       - weighted
   weight:
-    green_time: 0.1
     outflow_rate: 0.3
     travel_speed: 0.2
-    travel_time: 0.2
+    travel_time: 0.3
     density: 0.2
-  
+
+vehicle_counts:
+  low:
+    motorcycle: 1500
+    passenger: 375
+    bicycle: 75
+    truck: 50
+    pedestrian: 100
+  medium:
+    motorcycle: 3000
+    passenger: 750
+    truck: 150
+    bicycle: 100
+    pedestrian: 200
+  high:
+    motorcycle: 6000
+    passenger: 1500
+    truck: 300
+    bicycle: 200
+    pedestrian: 400
 
 dir:
   models_path_name: "models/"
@@ -41,30 +63,29 @@ dir:
 traffic_lights:
   - traffic_light_1:
     id: "Ngatu"
-    phase: # dual ring mechanism
-      - rrrrrGGGGrrrrrrGGGGr # 4, 8
-      - GGGGrrrrrrGGGGrrrrrr # 2, 6
-      - rrrrrGGGGGGrrrrrrrrr # 4, 7
-      - rrrrrrrrrrGGGGGGrrrr # 1, 6
-      - GrrrrrrrrrrrrrrGGGGG # 3, 8
-      - GGGGGGrrrrrrrrrrrrrr # 2, 5
-      - rrrrGGrrrrrrrrGGrrrr # 1, 5
-      - GrrrrrrrrGGrrrrrrrrG # 3, 7
-
+    phase: 
+      - GrrrrGGGGGGrGrrGrGrr
+      - GGGGGGrGrrGrGrrGrrrr
+      - GrGrrGrGrrGrrrrGGGGG
+      - GrGrrGrrrrGGGGGGrGrr
 
     detectors:
       - id: "e2_0"
+        street: "1"
       - id: "e2_1"
-      - id: "e2_2"
-      - id: "e2_3"
+        street: "1"
       - id: "e2_4"
+        street: "2"
       - id: "e2_5"
-      - id: "e2_6"
-      - id: "e2_7"
-      - id: "e2_8"
-      - id: "e2_9"
+        street: "2"
       - id: "e2_10"
-      - id: "e2_11"   
+        street: "3"
+      - id: "e2_11"
+        street: "3"
+      - id: "e2_14"
+        street: "4"
+      - id: "e2_15"
+        street: "4"
 
 accident:
   start_step: 400
