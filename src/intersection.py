@@ -139,7 +139,7 @@ class Intersection:
                     f'python "%SUMO_HOME%/tools/randomTrips.py" '
                     f"-n osm.net.xml.gz "
                     f"-o osm.res_{prefix}.trips.xml "
-                    f"--insertion-rate {count * 4} "
+                    f"--insertion-rate {count * 2} "
                     f"--begin 0 --end {simulation_duration} "
                     f"--validate --remove-loops "
                     f"--vehicle-class {vehicle_class} "

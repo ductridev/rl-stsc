@@ -12,7 +12,6 @@ import datetime
 if __name__ == "__main__":
     # Load configuration
     config = import_train_configuration("config/training_testngatu.yaml")
-    green_duration_deltas = config["agent"]["green_duration_deltas"]
     min_epsilon = config["agent"]["min_epsilon"]
     decay_rate = config["agent"]["decay_rate"]
     epsilon = 1

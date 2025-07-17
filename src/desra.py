@@ -48,7 +48,9 @@ class DESRA(SUMO):
             self.jam_density.get(detector_id, 0.8)
         )
 
-    def select_phase(self, traffic_light):
+    def select_phase_with_desra_hints(self, traffic_light):
+        desra_green_times = []
+        phase_scores = []
         best_phase = traffic_light["phase"][0]
         best_green_time = 0
         best_effective_outflow = -1
@@ -74,37 +76,41 @@ class DESRA(SUMO):
                     continue
 
                 # Estimate parameters
-                (saturation_flow, jam_density, critical_density) = self.get_current_parameters(detector_id)
+                saturation_flow, jam_density, critical_density = self.get_current_parameters(detector_id)
 
                 Gsat = self.estimate_saturated_green_time(
                     x0, q_arr, x0_d, link_length,
                     saturation_flow, jam_density, critical_density
                 )
+
                 if Gsat <= 0:
                     continue
 
                 green_times.append(Gsat)
                 outflows.append(saturation_flow * Gsat)
 
-            # If the entire phase has no activity, skip it
             if phase_total_queue + phase_total_arrival < 1:
-                print(f"Phase {phase_str} has no activity")
+                desra_green_times.append(0)  # Mark as inactive
+                phase_scores.append(0)
                 continue
-            else:
-                print(f"Phase {phase_str} has activity {phase_total_queue + phase_total_arrival}")
 
             if green_times:
                 G_demand = min(green_times)
                 total_outflow = sum(outflows)
                 v_i = total_outflow / (G_demand + self.interphase_duration)
 
+                desra_green_times.append(G_demand)
+                phase_scores.append(v_i)
+
                 if v_i > best_effective_outflow:
                     best_effective_outflow = v_i
                     best_phase = phase_str
                     best_green_time = G_demand
+            else:
+                desra_green_times.append(0)
+                phase_scores.append(0)
 
-        print(f"Best phase: {best_phase}, best green time: {best_green_time}, best effective outflow: {best_effective_outflow}")
-        return best_phase, max(1, int(best_green_time))
+        return best_phase, max(1, int(best_green_time)), desra_green_times
 
     def estimate_saturated_green_time(self, x0, q_arr, x0_d, link_length, saturation_flow, jam_density, critical_density):
         """
