@@ -14,7 +14,7 @@ GREEN_ACTION = 0
 RED_ACTION = 1
 
 def index_to_action(index, actions_map):
-    return actions_map[index]["phase"], actions_map[index]["duration"]
+    return actions_map[index]["phase"]
 
 def phase_to_index(phase, actions_map, duration):
     for i, action in actions_map.items():
@@ -116,19 +116,15 @@ class QSimulation(SUMO):
             self.agent_memory[traffic_light_id] = self.memory
 
             self.green_time[traffic_light_id] = 20
-            self.num_actions[traffic_light_id] = len(
-                self.agent_cfg["green_duration_deltas"]
-            ) * len(traffic_light["phase"])
+            self.num_actions[traffic_light_id] = len(traffic_light["phase"])
             self.actions_map[traffic_light_id] = {}
 
             i = 0
             for phase in traffic_light["phase"]:
-                for green_delta in self.agent_cfg["green_duration_deltas"]:
-                    self.actions_map[traffic_light_id][i] = {
-                        "phase": phase,
-                        "duration": green_delta,
-                    }
-                    i += 1
+                self.actions_map[traffic_light_id][i] = {
+                    "phase": phase,
+                }
+                i += 1
 
             self.agent_reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0
@@ -217,15 +213,12 @@ class QSimulation(SUMO):
                         epsilon,
                     )
 
-                    phase, green_delta = index_to_action(
+                    phase = index_to_action(
                         action_idx,
                         self.actions_map[tl_id],
                     )
 
-                    green_time = max(
-                        base_green_time, self.green_time[tl_id] + green_delta
-                    )
-                    green_time = min(green_time, self.max_steps - self.step)
+                    green_time = min(base_green_time, self.max_steps - self.step)
 
                     if tl_state["phase"] is not None:
                         self.set_yellow_phase(tl_id, tl_state["phase"])
@@ -552,7 +545,7 @@ class QSimulation(SUMO):
                 max_queue_length
             ])
         # DESRA recommended phase and green time
-        phase, green_time = self.desra.select_phase(traffic_light)
+        phase, green_time, desra_green_list = self.desra.select_phase_with_desra_hints(traffic_light)
         desra_phase_idx = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
         # Calculate required input dim: max_phases * features_per_phase + 2
         input_dim = max_phases * features_per_phase + 2
