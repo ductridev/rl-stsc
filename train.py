@@ -1,5 +1,5 @@
 from src.memory import ReplayMemory
-from src.utils import set_train_path, set_sumo, import_train_configuration
+from src.utils import set_train_path, set_sumo, import_train_configuration, set_load_model_path
 from src.model import DQN
 from src.simulation import Simulation
 from src.Qlearning import QSimulation
@@ -50,6 +50,34 @@ if __name__ == "__main__":
         path=path,
     )
 
+    # Load existing model if specified in config
+    start_episode = 0
+    start_epsilon = epsilon
+    
+    if config.get("load_model_name") and config["load_model_name"] is not None:
+        model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + ".pth"
+        checkpoint_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + "_checkpoint.pth"
+
+        # Try to load checkpoint first (for continuing training)
+        try:
+            training_state = simulation_dqn.agent.load_checkpoint(checkpoint_load_path)
+            start_episode = training_state.get('episode', 0)
+            start_epsilon = training_state.get('epsilon', epsilon)
+            print(f"Successfully loaded checkpoint from: {checkpoint_load_path}")
+            print(f"Resuming from episode {start_episode} with epsilon {start_epsilon}")
+        except FileNotFoundError:
+            # If checkpoint not found, try to load just the model weights
+            try:
+                simulation_dqn.agent.load(model_load_path, for_training=True)
+                print(f"Successfully loaded model weights from: {model_load_path}")
+                print("Starting training from episode 0 with fresh optimizer state")
+            except FileNotFoundError:
+                print(f"Model file not found: {model_load_path}. Starting with fresh model.")
+            except Exception as e:
+                print(f"Error loading model: {e}. Starting with fresh model.")
+        except Exception as e:
+            print(f"Error loading checkpoint: {e}. Starting with fresh model.")
+
     simulation = SimulationBase(
         max_steps=config["max_steps"],
         traffic_lights=config["traffic_lights"],
@@ -70,7 +98,14 @@ if __name__ == "__main__":
         epoch=config["training_epochs"],
         path=path,
     )
-    episode = 0
+    
+    # Load existing Q-table if specified in config
+    if config.get("load_q_table_name") and config["load_q_table_name"] is not None:
+        q_table_load_path = set_load_model_path(config["models_path_name"]) + config["load_q_table_name"] + ".pkl"
+        simulation_q.load_q_table(q_table_load_path)
+    
+    episode = start_episode
+    epsilon = start_epsilon
     timestamp_start = datetime.datetime.now()
 
     while episode < config["total_episodes"]:
@@ -131,16 +166,50 @@ if __name__ == "__main__":
                 names=["dqn", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
+        
+        # Save model at specified intervals
+        save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
+        if episode % save_interval == 0 and episode > 0:
+            model_save_name = config.get("save_model_name", "dqn_model")
+            
+            # Save model weights only
+            model_save_path = path + f"{model_save_name}_episode_{episode}.pth"
+            simulation_dqn.agent.save(model_save_path)
+            
+            # Save complete checkpoint for continuing training
+            checkpoint_save_path = path + f"{model_save_name}_episode_{episode}_checkpoint.pth"
+            simulation_dqn.agent.save_checkpoint(checkpoint_save_path, episode=episode, epsilon=epsilon)
+            
+            print(f"DQN model saved at episode {episode}: {model_save_path}")
+            print(f"DQN checkpoint saved at episode {episode}: {checkpoint_save_path}")
+            
+            # Also save Q-learning Q-table
+            q_table_save_path = path + f"q_table_{model_save_name}_episode_{episode}.pkl"
+            simulation_q.save_q_table(path, episode)
+        
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
     print("----- End time:", datetime.datetime.now())
     print("----- Session info saved at:", path)
 
-    print(f"Saving models at {path}...")
-    model_path = path + f"model.pth"
-    simulation_dqn.agent.save(model_path)
-    print("Models saved")
+    print(f"Saving final model at {path}...")
+    model_save_name = config.get("save_model_name", "dqn_model")
+    
+    # Save final model weights
+    model_final_path = path + f"{model_save_name}_final.pth"
+    simulation_dqn.agent.save(model_final_path)
+    
+    # Save final checkpoint
+    checkpoint_final_path = path + f"{model_save_name}_final_checkpoint.pth"
+    simulation_dqn.agent.save_checkpoint(checkpoint_final_path, episode=episode, epsilon=epsilon)
+    
+    print(f"Final DQN model saved: {model_final_path}")
+    print(f"Final DQN checkpoint saved: {checkpoint_final_path}")
+    
+    # Save final Q-table
+    simulation_q.save_q_table(path, episode="final")
+    print(f"Final Q-table saved")
     print("---------------------------------------")
 
     print("Generating plots...")

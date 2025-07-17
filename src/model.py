@@ -268,6 +268,71 @@ class DQN(nn.Module):
         """
         torch.save(self.state_dict(), path)
 
+    def save_checkpoint(self, path, episode=None, epsilon=None):
+        """
+        Save the complete model checkpoint including optimizer state for continuing training.
+
+        Args:
+            path (str): Path to save the checkpoint.
+            episode (int, optional): Current episode number.
+            epsilon (float, optional): Current epsilon value.
+        """
+        checkpoint = {
+            'model_state_dict': self.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'episode': episode,
+            'epsilon': epsilon,
+            'model_config': {
+                'num_layers': self.num_layers,
+                'batch_size': self._batch_size,
+                'learning_rate': self.learning_rate,
+                'input_dim': self._input_dim,
+                'output_dims': self._output_dims,
+                'gamma': self.gamma,
+                'loss_type': self.loss_type,
+                'num_quantiles': self.num_quantiles,
+                'num_atoms': self.num_atoms,
+                'v_min': self.v_min,
+                'v_max': self.v_max
+            }
+        }
+        torch.save(checkpoint, path)
+
+    def load(self, path, for_training=False):
+        """
+        Load the model from the specified path.
+
+        Args:
+            path (str): Path to load the model from.
+            for_training (bool): If True, keep model in training mode. If False, set to eval mode.
+        """
+        self.load_state_dict(torch.load(path, map_location=self.device))
+        if for_training:
+            self.train()  # Set to training mode for continued training
+        else:
+            self.eval()   # Set to evaluation mode for inference
+
+    def load_checkpoint(self, path):
+        """
+        Load the complete model checkpoint including optimizer state for continuing training.
+
+        Args:
+            path (str): Path to load the checkpoint from.
+            
+        Returns:
+            dict: Dictionary containing episode and epsilon if available.
+        """
+        checkpoint = torch.load(path, map_location=self.device)
+        self.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.train()  # Set to training mode
+        
+        # Return training metadata
+        return {
+            'episode': checkpoint.get('episode', 0),
+            'epsilon': checkpoint.get('epsilon', 1.0)
+        }
+
     @property
     def input_dim(self):
         """
