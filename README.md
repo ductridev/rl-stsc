@@ -51,11 +51,37 @@ Then heads = `{ '3': Linear(128 → 3), '5': Linear(128 → 5) }`
 ### Forward Pass Logic
 
 ```python
-def forward(self, x, action_dim):
-    features = self.backbone(x)
-    attn_out = self.attn(features)
-    head = self.heads[str(action_dim)]
-    return head(attn_out)
+def forward(self, x, output_dim=15):
+  """
+  Forward pass through the network.
+
+  Args:
+      x (torch.Tensor): Input tensor.
+      output_dim (int): Dimension of the output.
+
+  Returns:
+      torch.Tensor: Output tensor after passing through the network.
+  """
+  assert output_dim is not None, "output_dim must be specified"
+  assert isinstance(output_dim, int), "output_dim must be an integer"
+  assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
+
+  features = self.backbone(x)  # [B, 256]
+  attn_out = self.attn(features)  # Apply SENet, input shape [B, 256]
+
+  q_head = self.heads[str(output_dim)]
+  green_head = self.green_heads[str(output_dim)]
+
+  q_out = q_head(attn_out)  # Q-values or distributions
+  green_out = green_head(attn_out)  # Green time predictions
+
+  if self.loss_type in ("qr", "wasserstein"):
+      q_out = q_out.view(-1, output_dim, self.num_quantiles)
+
+  elif self.loss_type == "c51":
+      q_out = q_out.view(-1, output_dim, self.num_atoms)
+
+  return q_out, green_out
 ```
 
 Each agent (intersection) will:
@@ -95,7 +121,9 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 
 #### Accident Format
 
+```python
 [start_step, duration, junction_id_list, edge_id_list]
+```
 
 #### Accident Impact
 
