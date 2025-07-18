@@ -35,7 +35,7 @@ This shared backbone enables all intersections to benefit from global learning p
 - The output dimension is determined by:
 
   ```python
-  output_dims = list(dict.fromkeys([len(phases) * len(time_deltas) for intersection in scenario]))
+  output_dims = list(dict.fromkeys([len(phases) for intersection in scenario]))
   ```
 
   which ensures unique heads for unique action sizes.
@@ -44,9 +44,9 @@ This shared backbone enables all intersections to benefit from global learning p
 
 #### Example
 
-If intersection A has 3 phases and 5 time deltas → `action_dim = 15`
-If intersection B has 5 phases and 5 time deltas → `action_dim = 25`
-Then heads = `{ '15': Linear(128 → 15), '25': Linear(128 → 25) }`
+If intersection A has 3 phases → `action_dim = 3`
+If intersection B has 5 phases → `action_dim = 5`
+Then heads = `{ '3': Linear(128 → 3), '5': Linear(128 → 5) }`
 
 ### Forward Pass Logic
 
@@ -79,8 +79,11 @@ We integrate **DESRA** (DEcentralized Spillback Resistant Acyclic) as a rule-bas
 The input to the DQN model becomes:
 
 ```python
-[free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time]
-
+[...per-phase states..., desra_hint, desra_green_time]
+```
+Where per-phase states will be
+```python
+[free_capacity, density, waiting_time, queue_length]
 ```
 
 - This maintains compatibility with the existing architecture while improving spillback awareness and decision robustness.
@@ -113,7 +116,7 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 
 Check [TRAINING.md](TRAINING.md)
 
-### Project Methodlogy Summary
+### Project Methodology Summary
 Check [SUMMARY.md](SUMMARY.md)
 
 ## License
