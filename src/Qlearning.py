@@ -10,6 +10,7 @@ import numpy as np
 import random
 import time
 import pickle
+import pandas as pd
 GREEN_ACTION = 0
 RED_ACTION = 1
 
@@ -467,9 +468,50 @@ class QSimulation(SUMO):
                     data=data,
                     filename=f"q_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
                 )
+            
+            # Save Q-table and metrics DataFrame
             self.save_q_table(episode=episode)
-            print("Plots and Q-table at episode", episode, "generated")
+            self.save_metrics_to_dataframe(episode=episode)
+            
+            print("Plots, Q-table, and metrics DataFrame at episode", episode, "generated")
             print("---------------------------------------")
+
+    def save_metrics_to_dataframe(self, episode=None):
+        """
+        Save metrics per traffic light as pandas DataFrame.
+        Only saves system metrics: density, outflow, queue_length, travel_speed, travel_time, waiting_time
+        
+        Returns:
+            pd.DataFrame: DataFrame with columns [traffic_light_id, metric, time_step, value, episode]
+        """
+        data_records = []
+        
+        # Only collect specified system metrics
+        target_metrics = ['density', 'outflow', 'queue_length', 'travel_speed', 'travel_time', 'waiting_time']
+        
+        for metric, data_per_tls in self.history.items():
+            if metric in target_metrics:
+                for tl_id, data_list in data_per_tls.items():
+                    if len(data_list) > 0:
+                        for time_step, value in enumerate(data_list):
+                            data_records.append({
+                                'traffic_light_id': tl_id,
+                                'metric': metric,
+                                'time_step': time_step,
+                                'value': value,
+                                'episode': episode,
+                                'simulation_type': 'q_learning'
+                            })
+        
+        df = pd.DataFrame(data_records)
+        
+        # Save to CSV if path is provided
+        if hasattr(self, 'path') and self.path:
+            filename = f"{self.path}q_learning_metrics_episode_{episode}.csv" if episode is not None else f"{self.path}q_learning_metrics.csv"
+            df.to_csv(filename, index=False)
+            print(f"Q-learning metrics DataFrame saved to {filename}")
+        
+        return df
 
     def get_yellow_phase(self, green_phase):
         """
