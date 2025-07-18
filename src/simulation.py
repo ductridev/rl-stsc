@@ -610,12 +610,12 @@ class Simulation(SUMO):
             return action_idx, predicted_green
 
         with torch.no_grad():
-            q_values = agent.predict_one(state_t, output_dim=num_actions)
+            q_values, green_times = agent.predict_one(state_t, output_dim=num_actions)
             if agent.loss_type == "qr":
                 q_values = q_values.mean(2)  # [1, A]
 
             best_action_idx = q_values.squeeze(0).argmax().item()
-            predicted_green_time = q_values.squeeze(0)[best_action_idx].item()  # absolute prediction
+            predicted_green_time = green_times.squeeze(0)[best_action_idx].item()
 
             return best_action_idx, predicted_green_time
 
