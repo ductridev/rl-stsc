@@ -1,0 +1,101 @@
+simulation:
+  gui: False
+  total_episodes: 1000
+  max_steps: 3600
+  interphase_duration: 3
+
+memory:
+  memory_size_min: 10
+  memory_size_max: 10000
+
+model:
+  training_epochs: 1000
+  save_model_name: "dqn_testngatu_model"  # Name for saving the model
+  load_model_name: null  # Set to model name to load existing model, null to start fresh
+  load_q_table_name: null  # Set to Q-table filename to load existing Q-table, null to start fresh
+  save_interval: 10  # Save model every N episodes
+
+agent:
+  gamma: 0.99
+  num_states: 4 # min_free_capacity, density, waiting_time, queue_length
+  model:
+    num_layers: 16
+    batch_size: 256
+    learning_rate: 0.0001
+    decay_rate: 0.995
+    min_epsilon: 0.01
+    loss_type:
+      - qr
+      - mse
+      - huber
+      - weighted
+  weight:
+    outflow_rate: 0.3
+    travel_speed: 0.2
+    travel_time: 0.3
+    density: 0.2
+
+vehicle_counts:
+  low:
+    motorcycle: 750
+    passenger: 188
+    bicycle: 38
+    truck: 25
+    pedestrian: 50
+  medium:
+    motorcycle: 1500
+    passenger: 375
+    truck: 75
+    bicycle: 50
+    pedestrian: 100
+  high:
+    motorcycle: 3000
+    passenger: 750
+    truck: 150
+    bicycle: 100
+    pedestrian: 200
+
+dir:
+  models_path_name: "models/"
+  sumocfg_file_name: "simulations/testmodel/osm.sumocfg"
+
+traffic_lights:
+  - traffic_light_1:
+    id: "Ngatu"
+    phase: 
+      - GrrrrGGGGGGrrrrGrrrr
+      - GrrrrGrrrrGGGGGGrrrr
+      - GrrrrGrrrrGrrrrGGGGG
+      - GGGGGGrrrrGrrrrGrrrr
+
+    detectors:
+      - id: "e2_0"
+        street: "1"
+      - id: "e2_1"
+        street: "1"
+      - id: "e2_2"
+        street: "1"
+      - id: "e2_3"
+        street: "2"
+      - id: "e2_4"
+        street: "2"
+      - id: "e2_5"
+        street: "2"
+      - id: "e2_6"
+        street: "3"
+      - id: "e2_10"
+        street: "3"
+      - id: "e2_11"
+        street: "3"
+      - id: "e2_7"
+        street: "4"
+      - id: "e2_14"
+        street: "4"
+      - id: "e2_15"
+        street: "4"
+
+accident:
+  start_step: 400
+  duration: 100
+  junction:
+    - id: "Ngatu"
