@@ -447,13 +447,11 @@ class Simulation(SUMO):
                         done = self.step >= self.max_steps
 
                         self.agent_memory[tl_id].push(
-                            (
-                                tl_state["state"],
-                                tl_state["action_idx"],
-                                tl_state["green_time"],
-                            ),
+                            tl_state["state"],
+                            tl_state["action_idx"],
+                            tl_state["green_time"],
                             reward,
-                            (next_state, None),
+                            next_state,
                             done,
                         )
                         self.history["agent_reward"][tl_id].append(reward)
@@ -525,9 +523,9 @@ class Simulation(SUMO):
                     actions,
                     rewards,
                     next_states,
+                    green_targets=green_times,
                     output_dim=self.num_actions[traffic_light_id],
                     done=dones,
-                    green_targets=green_times,
                     target_net=self.target_net,
                 )
 
