@@ -142,7 +142,6 @@ class Intersection:
                     f"--insertion-rate {count * 2} "
                     f"--begin 0 --end {simulation_duration} "
                     f"--validate --remove-loops "
-                    f"--vehicle-class {vehicle_class} "
                     f"--vclass {vclass} "
                     f'--trip-attributes "departLane=\'best\'" '
                     f'--fringe-start-attributes "departSpeed=\'max\'" '
@@ -150,7 +149,9 @@ class Intersection:
                 )
 
                 if vehicle_class == "pedestrian":
-                    trip_cmd += " --via-edge-types footway,path,sidewalk"
+                    trip_cmd += "--via-edge-types footway,path,sidewalk "
+                else:
+                    f"--vehicle-class {vehicle_class} "
 
                 # 2. Convert trips to routes using duarouter
                 route_cmd = (
