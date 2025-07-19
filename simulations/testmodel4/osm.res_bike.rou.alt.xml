@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-18 12:19:51 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-07-19 11:41:10 by Eclipse SUMO duarouter Version 1.23.1
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -16,189 +16,384 @@
 -->
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vehicle id="res_bike0" depart="0.00" departLane="best">
+        <routeDistribution last="0">
+            <route cost="19.47" probability="1.00000000" edges="E5 E1"/>
+        </routeDistribution>
+    </vehicle>
     <vehicle id="res_bike1" depart="47.37" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="41.07" probability="1.00000000" edges="E16 E5 E6 E13"/>
+            <route cost="37.72" probability="1.00000000" edges="E11 E5 E2 E20"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike2" depart="94.74" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="39.69" probability="1.00000000" edges="E11 E5 E2 E22"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_bike3" depart="142.11" departLane="best">
         <routeDistribution last="0">
-            <route cost="18.64" probability="1.00000000" edges="E7 E1"/>
+            <route cost="9.05" probability="1.00000000" edges="E4"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike5" depart="236.84" departLane="best" departSpeed="max">
+    <vehicle id="res_bike4" depart="189.47" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="36.40" probability="1.00000000" edges="E12 E7 E2 E20"/>
+            <route cost="21.53" probability="1.00000000" edges="E16 E10"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike6" depart="284.21" departLane="best">
-        <routeDistribution last="0">
-            <route cost="30.54" probability="1.00000000" edges="E0 E6 E13"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike8" depart="378.95" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="38.37" probability="1.00000000" edges="E12 E7 E2 E22"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike11" depart="521.05" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="41.69" probability="1.00000000" edges="E18 E0 E4 E10"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike12" depart="568.42" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="21.06" probability="1.00000000" edges="E9 E15"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike13" depart="615.79" departLane="best">
-        <routeDistribution last="0">
-            <route cost="8.21" probability="1.00000000" edges="E1"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike16" depart="757.89" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="34.90" probability="1.00000000" edges="E21 E3 E1 E8"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike17" depart="805.26" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="36.43" probability="1.00000000" edges="E19 E7 E2 E20"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike21" depart="994.74" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="23.07" probability="1.00000000" edges="E12 E14"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike24" depart="1136.84" departLane="best">
-        <routeDistribution last="0">
-            <route cost="27.66" probability="1.00000000" edges="E3 E1 E15"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike25" depart="1184.21" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="41.41" probability="1.00000000" edges="E18 E0 E6 E13"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike29" depart="1373.68" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="21.95" probability="1.00000000" edges="E11 E17"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike31" depart="1468.42" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="14.49" probability="1.00000000" edges="E21 E3"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike34" depart="1610.53" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="40.82" probability="1.00000000" edges="E18 E0 E6 E14"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike35" depart="1657.89" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="38.77" probability="1.00000000" edges="E12 E7 E1 E8"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike36" depart="1705.26" departLane="best">
+    <vehicle id="res_bike5" depart="236.84" departLane="best">
         <routeDistribution last="0">
             <route cost="28.04" probability="1.00000000" edges="E7 E1 E15"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike37" depart="1752.63" departLane="best">
+    <vehicle id="res_bike6" depart="284.21" departLane="best">
         <routeDistribution last="0">
-            <route cost="25.95" probability="1.00000000" edges="E3 E4 E17"/>
+            <route cost="28.28" probability="1.00000000" edges="E5 E2 E22"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike38" depart="1800.00" departLane="best">
+    <vehicle id="res_bike7" depart="331.58" departLane="best">
         <routeDistribution last="0">
-            <route cost="18.52" probability="1.00000000" edges="E7 E2"/>
+            <route cost="9.05" probability="1.00000000" edges="E4"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike39" depart="1847.37" departLane="best" departSpeed="max">
+    <vehicle id="res_bike8" depart="378.95" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="37.11" probability="1.00000000" edges="E16 E5 E2 E20"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike9" depart="426.32" departLane="best">
+        <routeDistribution last="0">
+            <route cost="28.28" probability="1.00000000" edges="E5 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike10" depart="473.68" departLane="best">
+        <routeDistribution last="0">
+            <route cost="28.28" probability="1.00000000" edges="E5 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike11" depart="521.05" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.09" probability="1.00000000" edges="E11 E5 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike12" depart="568.42" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="34.82" probability="1.00000000" edges="E21 E3 E1 E15"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike13" depart="615.79" departLane="best" departSpeed="max">
         <routeDistribution last="0">
             <route cost="41.07" probability="1.00000000" edges="E16 E5 E6 E13"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike40" depart="1894.74" departLane="best" departSpeed="max">
+    <vehicle id="res_bike14" depart="663.16" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="35.82" probability="1.00000000" edges="E21 E3 E6 E14"/>
+            <route cost="19.64" probability="1.00000000" edges="E12 E7"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike42" depart="1989.47" departLane="best" departSpeed="max">
+    <vehicle id="res_bike15" depart="710.53" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="20.70" probability="1.00000000" edges="E19 E13"/>
+            <route cost="18.53" probability="1.00000000" edges="E21 E22"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike43" depart="2036.84" departLane="best" departSpeed="max">
+    <vehicle id="res_bike16" depart="757.89" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="21.95" probability="1.00000000" edges="E11 E17"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike17" depart="805.26" departLane="best">
+        <routeDistribution last="0">
+            <route cost="9.05" probability="1.00000000" edges="E5"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike18" depart="852.63" departLane="best">
+        <routeDistribution last="0">
+            <route cost="8.43" probability="1.00000000" edges="E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike19" depart="900.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="40.35" probability="1.00000000" edges="E11 E5 E1 E8"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike20" depart="947.37" departLane="best">
+        <routeDistribution last="0">
+            <route cost="28.86" probability="1.00000000" edges="E5 E1 E15"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike21" depart="994.74" departLane="best">
+        <routeDistribution last="0">
+            <route cost="19.10" probability="1.00000000" edges="E5 E2"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike22" depart="1042.11" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.68" probability="1.00000000" edges="E11 E5 E6 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike23" depart="1089.47" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="19.66" probability="1.00000000" edges="E19 E7"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike24" depart="1136.84" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.07" probability="1.00000000" edges="E16 E5 E6 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike25" depart="1184.21" departLane="best" departSpeed="max">
         <routeDistribution last="0">
             <route cost="33.72" probability="1.00000000" edges="E9 E0 E2 E20"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike48" depart="2273.68" departLane="best" departSpeed="max">
+    <vehicle id="res_bike26" depart="1231.58" departLane="best">
+        <routeDistribution last="0">
+            <route cost="17.06" probability="1.00000000" edges="E4 E17"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike27" depart="1278.95" departLane="best" departSpeed="max">
         <routeDistribution last="0">
             <route cost="33.72" probability="1.00000000" edges="E9 E0 E2 E20"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike49" depart="2321.05" departLane="best" departSpeed="max">
-        <routeDistribution last="0">
-            <route cost="29.21" probability="1.00000000" edges="E9 E0 E6"/>
-        </routeDistribution>
-    </vehicle>
-    <vehicle id="res_bike50" depart="2368.42" departLane="best">
+    <vehicle id="res_bike28" depart="1326.32" departLane="best">
         <routeDistribution last="0">
             <route cost="19.47" probability="1.00000000" edges="E0 E4"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike56" depart="2652.63" departLane="best" departSpeed="max">
+    <vehicle id="res_bike29" depart="1373.68" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="36.46" probability="1.00000000" edges="E21 E3 E4 E10"/>
+            <route cost="17.58" probability="1.00000000" edges="E23 E20"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike59" depart="2794.74" departLane="best" departSpeed="max">
+    <vehicle id="res_bike30" depart="1421.05" departLane="best">
         <routeDistribution last="0">
-            <route cost="40.22" probability="1.00000000" edges="E23 E3 E4 E10"/>
+            <route cost="29.69" probability="1.00000000" edges="E5 E6 E14"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike60" depart="2842.11" departLane="best">
+    <vehicle id="res_bike31" depart="1468.42" departLane="best">
         <routeDistribution last="0">
-            <route cost="26.32" probability="1.00000000" edges="E5 E2 E20"/>
+            <route cost="19.57" probability="1.00000000" edges="E5 E6"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike61" depart="2889.47" departLane="best">
+    <vehicle id="res_bike32" depart="1515.79" departLane="best">
         <routeDistribution last="0">
-            <route cost="26.32" probability="1.00000000" edges="E5 E2 E20"/>
+            <route cost="19.57" probability="1.00000000" edges="E5 E6"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike66" depart="3126.32" departLane="best">
+    <vehicle id="res_bike33" depart="1563.16" departLane="best">
         <routeDistribution last="0">
-            <route cost="28.12" probability="1.00000000" edges="E7 E1 E8"/>
+            <route cost="28.94" probability="1.00000000" edges="E5 E1 E8"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike70" depart="3315.79" departLane="best">
+    <vehicle id="res_bike34" depart="1610.53" departLane="best">
         <routeDistribution last="0">
-            <route cost="14.54" probability="1.00000000" edges="E2 E20"/>
+            <route cost="20.41" probability="1.00000000" edges="E4 E10"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike71" depart="3363.16" departLane="best" departSpeed="max">
+    <vehicle id="res_bike35" depart="1657.89" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="30.98" probability="1.00000000" edges="E11 E5 E6"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike36" depart="1705.26" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.07" probability="1.00000000" edges="E16 E5 E6 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike37" depart="1752.63" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.09" probability="1.00000000" edges="E11 E5 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike38" depart="1800.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="37.11" probability="1.00000000" edges="E16 E5 E2 E20"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike39" depart="1847.37" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="39.08" probability="1.00000000" edges="E16 E5 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike40" depart="1894.74" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.68" probability="1.00000000" edges="E11 E5 E6 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike41" depart="1942.11" departLane="best">
+        <routeDistribution last="0">
+            <route cost="19.47" probability="1.00000000" edges="E5 E1"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike42" depart="1989.47" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="29.89" probability="1.00000000" edges="E16 E5 E2"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike43" depart="2036.84" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="39.66" probability="1.00000000" edges="E16 E5 E1 E15"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike44" depart="2084.21" departLane="best">
+        <routeDistribution last="0">
+            <route cost="30.27" probability="1.00000000" edges="E5 E6 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike45" depart="2131.58" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="30.50" probability="1.00000000" edges="E11 E5 E2"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike46" depart="2178.95" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="40.48" probability="1.00000000" edges="E16 E5 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike47" depart="2226.32" departLane="best" departSpeed="max">
         <routeDistribution last="0">
             <route cost="30.37" probability="1.00000000" edges="E16 E5 E6"/>
         </routeDistribution>
     </vehicle>
-    <vehicle id="res_bike72" depart="3410.53" departLane="best" departSpeed="max">
+    <vehicle id="res_bike48" depart="2273.68" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="20.70" probability="1.00000000" edges="E19 E13"/>
+            <route cost="29.21" probability="1.00000000" edges="E9 E0 E6"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike49" depart="2321.05" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="39.74" probability="1.00000000" edges="E16 E5 E1 E8"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike50" depart="2368.42" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="20.46" probability="1.00000000" edges="E11 E5"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike51" depart="2415.79" departLane="best">
+        <routeDistribution last="0">
+            <route cost="6.48" probability="1.00000000" edges="E17"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike52" depart="2463.16" departLane="best">
+        <routeDistribution last="0">
+            <route cost="28.12" probability="1.00000000" edges="E7 E1 E8"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike53" depart="2510.53" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="41.09" probability="1.00000000" edges="E11 E5 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike54" depart="2557.89" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="40.35" probability="1.00000000" edges="E11 E5 E1 E8"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike55" depart="2605.26" departLane="best">
+        <routeDistribution last="0">
+            <route cost="10.02" probability="1.00000000" edges="E10"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike56" depart="2652.63" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="30.87" probability="1.00000000" edges="E11 E5 E1"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike57" depart="2700.00" departLane="best">
+        <routeDistribution last="0">
+            <route cost="30.27" probability="1.00000000" edges="E5 E6 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike58" depart="2747.37" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="38.39" probability="1.00000000" edges="E19 E7 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike59" depart="2794.74" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="39.08" probability="1.00000000" edges="E16 E5 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike60" depart="2842.11" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="21.95" probability="1.00000000" edges="E11 E17"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike61" depart="2889.47" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="39.58" probability="1.00000000" edges="E23 E3 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike62" depart="2936.84" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="21.53" probability="1.00000000" edges="E16 E10"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike63" depart="2984.21" departLane="best">
+        <routeDistribution last="0">
+            <route cost="29.69" probability="1.00000000" edges="E5 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike64" depart="3031.58" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="38.37" probability="1.00000000" edges="E12 E7 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike65" depart="3078.95" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="35.82" probability="1.00000000" edges="E21 E3 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike66" depart="3126.32" departLane="best">
+        <routeDistribution last="0">
+            <route cost="19.47" probability="1.00000000" edges="E5 E1"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike67" depart="3173.68" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="40.48" probability="1.00000000" edges="E16 E5 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike68" depart="3221.05" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="35.82" probability="1.00000000" edges="E21 E3 E6 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike69" depart="3268.42" departLane="best">
+        <routeDistribution last="0">
+            <route cost="26.32" probability="1.00000000" edges="E5 E2 E20"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike70" depart="3315.79" departLane="best">
+        <routeDistribution last="0">
+            <route cost="28.28" probability="1.00000000" edges="E5 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike71" depart="3363.16" departLane="best">
+        <routeDistribution last="0">
+            <route cost="10.02" probability="1.00000000" edges="E10"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike72" depart="3410.53" departLane="best">
+        <routeDistribution last="0">
+            <route cost="30.27" probability="1.00000000" edges="E5 E6 E13"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_bike73" depart="3457.89" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="25.11" probability="1.00000000" edges="E21 E3 E4"/>
+            <route cost="30.87" probability="1.00000000" edges="E11 E5 E1"/>
         </routeDistribution>
     </vehicle>
     <vehicle id="res_bike74" depart="3505.26" departLane="best" departSpeed="max">
         <routeDistribution last="0">
-            <route cost="23.07" probability="1.00000000" edges="E12 E14"/>
+            <route cost="39.08" probability="1.00000000" edges="E16 E5 E2 E22"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_bike75" depart="3552.63" departLane="best">
+        <routeDistribution last="0">
+            <route cost="28.94" probability="1.00000000" edges="E5 E1 E8"/>
         </routeDistribution>
     </vehicle>
 </routes>

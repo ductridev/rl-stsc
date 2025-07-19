@@ -146,6 +146,7 @@ class Intersection:
                     f'--trip-attributes "departLane=\'best\'" '
                     f'--fringe-start-attributes "departSpeed=\'max\'" '
                     f"--prefix res_{prefix} "
+                    f"--weights-prefix res_{prefix}_overflow_west"
                 )
 
                 if vehicle_class == "pedestrian":
