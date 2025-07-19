@@ -1,30 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-18 12:21:05 by Eclipse SUMO sumo Version 1.22.0
+<!-- generated on 2025-07-19 18:38:14 by Eclipse SUMO GUI Version 1.22.0
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
     <input>
-        <net-file value="G:\python_learn\AIP\simulations/testmodel4/osm.net.xml.gz"/>
-        <route-files value="G:\python_learn\AIP\simulations/testmodel4/osm.res_motorcycle.trips.xml,G:\python_learn\AIP\simulations/testmodel4/osm.res_bike.rou.xml,G:\python_learn\AIP\simulations/testmodel4/osm.res_truck.rou.xml,G:\python_learn\AIP\simulations/testmodel4/osm.res_veh.rou.xml,G:\python_learn\AIP\simulations/testmodel4/osm.res_ped.rou.xml"/>
-        <additional-files value="G:\python_learn\AIP\simulations/testmodel4/osm.add.xml"/>
+        <net-file value="G:\python_learn\AIP\simulations\testmodel4\osm.net.xml.gz"/>
+        <route-files value="G:\python_learn\AIP\simulations\testmodel4\osm.res_motorcycle.trips.xml,G:\python_learn\AIP\simulations\testmodel4\osm.res_bike.rou.xml,G:\python_learn\AIP\simulations\testmodel4\osm.res_truck.rou.xml,G:\python_learn\AIP\simulations\testmodel4\osm.res_veh.rou.xml,G:\python_learn\AIP\simulations\testmodel4\osm.res_ped.rou.xml"/>
+        <additional-files value="G:\python_learn\AIP\simulations\testmodel4\osm.add.xml"/>
     </input>
-
-    <processing>
-        <waiting-time-memory value="3600"/>
-    </processing>
-
-    <report>
-        <no-warnings value="true"/>
-        <duration-log.disable value="true"/>
-        <no-step-log value="true"/>
-    </report>
-
-    <traci_server>
-        <remote-port value="62323"/>
-    </traci_server>
 
 </sumoConfiguration>
 -->
 
 <detector xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/det_e2_file.xsd">
-   <interval begin="0.00" end="300.00" id="e2_11" sampledSeconds="2237.65" nVehEntered="25" nVehLeft="11" nVehSeen="25" meanSpeed="0.77" meanTimeLoss="84.34" meanOccupancy="10.83" maxOccupancy="20.31" meanMaxJamLengthInVehicles="6.81" meanMaxJamLengthInMeters="48.85" maxJamLengthInVehicles="14" maxJamLengthInMeters="102.52" jamLengthInVehiclesSum="2042" jamLengthInMetersSum="14654.88" meanHaltingDuration="126.62" maxHaltingDuration="266.00" haltingDurationSum="2026.00" meanIntervalHaltingDuration="126.62" maxIntervalHaltingDuration="266.00" intervalHaltingDurationSum="2026.00" startedHalts="18.00" meanVehicleNumber="7.49" maxVehicleNumber="14" />
+</detector>
