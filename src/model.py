@@ -36,7 +36,7 @@ class DQN(nn.Module):
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
-        self._input_dim = max_phases * input_dim + max_phases + 2
+        self._input_dim = max_phases * input_dim + 2
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device

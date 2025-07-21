@@ -51,7 +51,7 @@ if __name__ == "__main__":
             epoch=config["training_epochs"],
             path=path,
         )
-        for loss in ["mse", "huber", "weighted", "qr"]
+        for loss in config["agent"]["model"]["loss_type"]
     }
 
     # Load existing model if specified in config

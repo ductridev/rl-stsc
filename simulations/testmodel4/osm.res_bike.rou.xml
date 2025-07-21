@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-18 12:19:51 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-07-21 09:25:29 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -16,115 +16,218 @@
 -->
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
-    <vehicle id="res_bike1" depart="47.37" departLane="best" departSpeed="max">
-        <route edges="E16 E5 E6 E13"/>
+    <vType id="res_bike_bicycle" vClass="bicycle"/>
+    <vehicle id="res_bike3" type="res_bike_bicycle" depart="71.05" departLane="best">
+        <route edges="E5 E1"/>
     </vehicle>
-    <vehicle id="res_bike3" depart="142.11" departLane="best">
-        <route edges="E7 E1"/>
+    <vehicle id="res_bike5" type="res_bike_bicycle" depart="118.42" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E2 E20"/>
     </vehicle>
-    <vehicle id="res_bike5" depart="236.84" departLane="best" departSpeed="max">
-        <route edges="E12 E7 E2 E20"/>
+    <vehicle id="res_bike8" type="res_bike_bicycle" depart="189.47" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E2 E22"/>
     </vehicle>
-    <vehicle id="res_bike6" depart="284.21" departLane="best">
-        <route edges="E0 E6 E13"/>
+    <vehicle id="res_bike10" type="res_bike_bicycle" depart="236.84" departLane="best">
+        <route edges="E4"/>
     </vehicle>
-    <vehicle id="res_bike8" depart="378.95" departLane="best" departSpeed="max">
-        <route edges="E12 E7 E2 E22"/>
+    <vehicle id="res_bike11" type="res_bike_bicycle" depart="260.53" departLane="best" departSpeed="max">
+        <route edges="E16 E10"/>
     </vehicle>
-    <vehicle id="res_bike11" depart="521.05" departLane="best" departSpeed="max">
-        <route edges="E18 E0 E4 E10"/>
-    </vehicle>
-    <vehicle id="res_bike12" depart="568.42" departLane="best" departSpeed="max">
-        <route edges="E9 E15"/>
-    </vehicle>
-    <vehicle id="res_bike13" depart="615.79" departLane="best">
-        <route edges="E1"/>
-    </vehicle>
-    <vehicle id="res_bike16" depart="757.89" departLane="best" departSpeed="max">
-        <route edges="E21 E3 E1 E8"/>
-    </vehicle>
-    <vehicle id="res_bike17" depart="805.26" departLane="best" departSpeed="max">
-        <route edges="E19 E7 E2 E20"/>
-    </vehicle>
-    <vehicle id="res_bike21" depart="994.74" departLane="best" departSpeed="max">
-        <route edges="E12 E14"/>
-    </vehicle>
-    <vehicle id="res_bike24" depart="1136.84" departLane="best">
-        <route edges="E3 E1 E15"/>
-    </vehicle>
-    <vehicle id="res_bike25" depart="1184.21" departLane="best" departSpeed="max">
-        <route edges="E18 E0 E6 E13"/>
-    </vehicle>
-    <vehicle id="res_bike29" depart="1373.68" departLane="best" departSpeed="max">
-        <route edges="E11 E17"/>
-    </vehicle>
-    <vehicle id="res_bike31" depart="1468.42" departLane="best" departSpeed="max">
-        <route edges="E21 E3"/>
-    </vehicle>
-    <vehicle id="res_bike34" depart="1610.53" departLane="best" departSpeed="max">
-        <route edges="E18 E0 E6 E14"/>
-    </vehicle>
-    <vehicle id="res_bike35" depart="1657.89" departLane="best" departSpeed="max">
-        <route edges="E12 E7 E1 E8"/>
-    </vehicle>
-    <vehicle id="res_bike36" depart="1705.26" departLane="best">
+    <vehicle id="res_bike12" type="res_bike_bicycle" depart="284.21" departLane="best">
         <route edges="E7 E1 E15"/>
     </vehicle>
-    <vehicle id="res_bike37" depart="1752.63" departLane="best">
-        <route edges="E3 E4 E17"/>
+    <vehicle id="res_bike14" type="res_bike_bicycle" depart="331.58" departLane="best">
+        <route edges="E5 E2 E22"/>
     </vehicle>
-    <vehicle id="res_bike38" depart="1800.00" departLane="best">
-        <route edges="E7 E2"/>
+    <vehicle id="res_bike15" type="res_bike_bicycle" depart="355.26" departLane="best">
+        <route edges="E4"/>
     </vehicle>
-    <vehicle id="res_bike39" depart="1847.37" departLane="best" departSpeed="max">
+    <vehicle id="res_bike17" type="res_bike_bicycle" depart="402.63" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E2 E20"/>
+    </vehicle>
+    <vehicle id="res_bike18" type="res_bike_bicycle" depart="426.32" departLane="best">
+        <route edges="E5 E2 E22"/>
+    </vehicle>
+    <vehicle id="res_bike19" type="res_bike_bicycle" depart="450.00" departLane="best">
+        <route edges="E5 E2 E22"/>
+    </vehicle>
+    <vehicle id="res_bike21" type="res_bike_bicycle" depart="497.37" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike24" type="res_bike_bicycle" depart="568.42" departLane="best" departSpeed="max">
+        <route edges="E21 E3 E1 E15"/>
+    </vehicle>
+    <vehicle id="res_bike25" type="res_bike_bicycle" depart="592.11" departLane="best" departSpeed="max">
         <route edges="E16 E5 E6 E13"/>
     </vehicle>
-    <vehicle id="res_bike40" depart="1894.74" departLane="best" departSpeed="max">
-        <route edges="E21 E3 E6 E14"/>
+    <vehicle id="res_bike26" type="res_bike_bicycle" depart="615.79" departLane="best" departSpeed="max">
+        <route edges="E12 E7"/>
     </vehicle>
-    <vehicle id="res_bike42" depart="1989.47" departLane="best" departSpeed="max">
-        <route edges="E19 E13"/>
+    <vehicle id="res_bike27" type="res_bike_bicycle" depart="639.47" departLane="best" departSpeed="max">
+        <route edges="E21 E22"/>
     </vehicle>
-    <vehicle id="res_bike43" depart="2036.84" departLane="best" departSpeed="max">
+    <vehicle id="res_bike29" type="res_bike_bicycle" depart="686.84" departLane="best" departSpeed="max">
+        <route edges="E11 E17"/>
+    </vehicle>
+    <vehicle id="res_bike32" type="res_bike_bicycle" depart="757.89" departLane="best">
+        <route edges="E5"/>
+    </vehicle>
+    <vehicle id="res_bike34" type="res_bike_bicycle" depart="805.26" departLane="best">
+        <route edges="E14"/>
+    </vehicle>
+    <vehicle id="res_bike35" type="res_bike_bicycle" depart="828.95" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E1 E8"/>
+    </vehicle>
+    <vehicle id="res_bike36" type="res_bike_bicycle" depart="852.63" departLane="best">
+        <route edges="E5 E1 E15"/>
+    </vehicle>
+    <vehicle id="res_bike38" type="res_bike_bicycle" depart="900.00" departLane="best">
+        <route edges="E5 E2"/>
+    </vehicle>
+    <vehicle id="res_bike39" type="res_bike_bicycle" depart="923.68" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E6 E13"/>
+    </vehicle>
+    <vehicle id="res_bike41" type="res_bike_bicycle" depart="971.05" departLane="best" departSpeed="max">
+        <route edges="E19 E7"/>
+    </vehicle>
+    <vehicle id="res_bike42" type="res_bike_bicycle" depart="994.74" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E6 E13"/>
+    </vehicle>
+    <vehicle id="res_bike43" type="res_bike_bicycle" depart="1018.42" departLane="best" departSpeed="max">
         <route edges="E9 E0 E2 E20"/>
     </vehicle>
-    <vehicle id="res_bike48" depart="2273.68" departLane="best" departSpeed="max">
+    <vehicle id="res_bike46" type="res_bike_bicycle" depart="1089.47" departLane="best">
+        <route edges="E4 E17"/>
+    </vehicle>
+    <vehicle id="res_bike48" type="res_bike_bicycle" depart="1136.84" departLane="best" departSpeed="max">
         <route edges="E9 E0 E2 E20"/>
     </vehicle>
-    <vehicle id="res_bike49" depart="2321.05" departLane="best" departSpeed="max">
-        <route edges="E9 E0 E6"/>
-    </vehicle>
-    <vehicle id="res_bike50" depart="2368.42" departLane="best">
+    <vehicle id="res_bike50" type="res_bike_bicycle" depart="1184.21" departLane="best">
         <route edges="E0 E4"/>
     </vehicle>
-    <vehicle id="res_bike56" depart="2652.63" departLane="best" departSpeed="max">
-        <route edges="E21 E3 E4 E10"/>
+    <vehicle id="res_bike51" type="res_bike_bicycle" depart="1207.89" departLane="best" departSpeed="max">
+        <route edges="E23 E20"/>
     </vehicle>
-    <vehicle id="res_bike59" depart="2794.74" departLane="best" departSpeed="max">
-        <route edges="E23 E3 E4 E10"/>
+    <vehicle id="res_bike55" type="res_bike_bicycle" depart="1302.63" departLane="best">
+        <route edges="E5 E6 E14"/>
     </vehicle>
-    <vehicle id="res_bike60" depart="2842.11" departLane="best">
-        <route edges="E5 E2 E20"/>
+    <vehicle id="res_bike57" type="res_bike_bicycle" depart="1350.00" departLane="best">
+        <route edges="E5 E6"/>
     </vehicle>
-    <vehicle id="res_bike61" depart="2889.47" departLane="best">
-        <route edges="E5 E2 E20"/>
+    <vehicle id="res_bike64" type="res_bike_bicycle" depart="1515.79" departLane="best">
+        <route edges="E5 E6"/>
     </vehicle>
-    <vehicle id="res_bike66" depart="3126.32" departLane="best">
-        <route edges="E7 E1 E8"/>
+    <vehicle id="res_bike66" type="res_bike_bicycle" depart="1563.16" departLane="best">
+        <route edges="E5 E1 E8"/>
     </vehicle>
-    <vehicle id="res_bike70" depart="3315.79" departLane="best">
-        <route edges="E2 E20"/>
+    <vehicle id="res_bike69" type="res_bike_bicycle" depart="1634.21" departLane="best">
+        <route edges="E4 E10"/>
     </vehicle>
-    <vehicle id="res_bike71" depart="3363.16" departLane="best" departSpeed="max">
+    <vehicle id="res_bike71" type="res_bike_bicycle" depart="1681.58" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E6"/>
+    </vehicle>
+    <vehicle id="res_bike72" type="res_bike_bicycle" depart="1705.26" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E6 E13"/>
+    </vehicle>
+    <vehicle id="res_bike74" type="res_bike_bicycle" depart="1752.63" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike76" type="res_bike_bicycle" depart="1800.00" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E2 E20"/>
+    </vehicle>
+    <vehicle id="res_bike78" type="res_bike_bicycle" depart="1847.37" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E2 E22"/>
+    </vehicle>
+    <vehicle id="res_bike79" type="res_bike_bicycle" depart="1871.05" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E6 E13"/>
+    </vehicle>
+    <vehicle id="res_bike82" type="res_bike_bicycle" depart="1942.11" departLane="best">
+        <route edges="E5 E1"/>
+    </vehicle>
+    <vehicle id="res_bike89" type="res_bike_bicycle" depart="2107.89" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E2"/>
+    </vehicle>
+    <vehicle id="res_bike92" type="res_bike_bicycle" depart="2178.95" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E1 E15"/>
+    </vehicle>
+    <vehicle id="res_bike93" type="res_bike_bicycle" depart="2202.63" departLane="best">
+        <route edges="E5 E6 E13"/>
+    </vehicle>
+    <vehicle id="res_bike94" type="res_bike_bicycle" depart="2226.32" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E2"/>
+    </vehicle>
+    <vehicle id="res_bike95" type="res_bike_bicycle" depart="2250.00" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike97" type="res_bike_bicycle" depart="2297.37" departLane="best" departSpeed="max">
         <route edges="E16 E5 E6"/>
     </vehicle>
-    <vehicle id="res_bike72" depart="3410.53" departLane="best" departSpeed="max">
-        <route edges="E19 E13"/>
+    <vehicle id="res_bike99" type="res_bike_bicycle" depart="2344.74" departLane="best" departSpeed="max">
+        <route edges="E9 E0 E6"/>
     </vehicle>
-    <vehicle id="res_bike73" depart="3457.89" departLane="best" departSpeed="max">
-        <route edges="E21 E3 E4"/>
+    <vehicle id="res_bike104" type="res_bike_bicycle" depart="2463.16" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E1 E8"/>
     </vehicle>
-    <vehicle id="res_bike74" depart="3505.26" departLane="best" departSpeed="max">
-        <route edges="E12 E14"/>
+    <vehicle id="res_bike105" type="res_bike_bicycle" depart="2486.84" departLane="best" departSpeed="max">
+        <route edges="E11 E5"/>
+    </vehicle>
+    <vehicle id="res_bike106" type="res_bike_bicycle" depart="2510.53" departLane="best">
+        <route edges="E17"/>
+    </vehicle>
+    <vehicle id="res_bike107" type="res_bike_bicycle" depart="2534.21" departLane="best">
+        <route edges="E7 E1 E8"/>
+    </vehicle>
+    <vehicle id="res_bike109" type="res_bike_bicycle" depart="2581.58" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike114" type="res_bike_bicycle" depart="2700.00" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E1 E8"/>
+    </vehicle>
+    <vehicle id="res_bike115" type="res_bike_bicycle" depart="2723.68" departLane="best">
+        <route edges="E10"/>
+    </vehicle>
+    <vehicle id="res_bike117" type="res_bike_bicycle" depart="2771.05" departLane="best" departSpeed="max">
+        <route edges="E11 E5 E1"/>
+    </vehicle>
+    <vehicle id="res_bike118" type="res_bike_bicycle" depart="2794.74" departLane="best">
+        <route edges="E5 E6 E13"/>
+    </vehicle>
+    <vehicle id="res_bike119" type="res_bike_bicycle" depart="2818.42" departLane="best" departSpeed="max">
+        <route edges="E19 E7 E2 E22"/>
+    </vehicle>
+    <vehicle id="res_bike120" type="res_bike_bicycle" depart="2842.11" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E2 E22"/>
+    </vehicle>
+    <vehicle id="res_bike123" type="res_bike_bicycle" depart="2913.16" departLane="best" departSpeed="max">
+        <route edges="E11 E17"/>
+    </vehicle>
+    <vehicle id="res_bike124" type="res_bike_bicycle" depart="2936.84" departLane="best" departSpeed="max">
+        <route edges="E23 E3 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike131" type="res_bike_bicycle" depart="3102.63" departLane="best" departSpeed="max">
+        <route edges="E16 E10"/>
+    </vehicle>
+    <vehicle id="res_bike135" type="res_bike_bicycle" depart="3197.37" departLane="best">
+        <route edges="E5 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike139" type="res_bike_bicycle" depart="3292.11" departLane="best" departSpeed="max">
+        <route edges="E12 E7 E2 E22"/>
+    </vehicle>
+    <vehicle id="res_bike141" type="res_bike_bicycle" depart="3339.47" departLane="best" departSpeed="max">
+        <route edges="E21 E3 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike143" type="res_bike_bicycle" depart="3386.84" departLane="best">
+        <route edges="E5 E1"/>
+    </vehicle>
+    <vehicle id="res_bike144" type="res_bike_bicycle" depart="3410.53" departLane="best" departSpeed="max">
+        <route edges="E16 E5 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike146" type="res_bike_bicycle" depart="3457.89" departLane="best" departSpeed="max">
+        <route edges="E21 E3 E6 E14"/>
+    </vehicle>
+    <vehicle id="res_bike150" type="res_bike_bicycle" depart="3552.63" departLane="best">
+        <route edges="E5 E2 E20"/>
+    </vehicle>
+    <vehicle id="res_bike151" type="res_bike_bicycle" depart="3576.32" departLane="best">
+        <route edges="E5 E2 E22"/>
     </vehicle>
 </routes>

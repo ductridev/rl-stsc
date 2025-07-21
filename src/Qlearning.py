@@ -587,7 +587,7 @@ class QSimulation(SUMO):
                 max_queue_length
             ])
         # DESRA recommended phase and green time
-        phase, green_time, desra_green_list = self.desra.select_phase_with_desra_hints(traffic_light)
+        phase, green_time = self.desra.select_phase_with_desra_hints(traffic_light)
         desra_phase_idx = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
         # Calculate required input dim: max_phases * features_per_phase + 2
         input_dim = max_phases * features_per_phase + 2

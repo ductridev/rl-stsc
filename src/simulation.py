@@ -255,12 +255,11 @@ class Simulation(SUMO):
 
                 # If time to choose a new action
                 if tl_state["green_time_remaining"] <= 0:
-                    state, desra_greens = self.get_state(tl)
+                    state = self.get_state(tl)
                     action_idx, predicted_green = self.select_action(
                         tl_id,
                         self.agent,
                         state,
-                        desra_greens,
                         epsilon,
                     )
 
@@ -386,7 +385,6 @@ class Simulation(SUMO):
             traci.simulationStep()
             num_vehicles += traci.simulation.getDepartedNumber()
             self.step += 1
-            self.desra.update_traffic_parameters()
 
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
@@ -444,7 +442,7 @@ class Simulation(SUMO):
                         self.density[tl_id] = tl_state["density_sum"] / green_time
 
                         reward = self.get_reward(tl_id)
-                        next_state, _ = self.get_state(tl)
+                        next_state = self.get_state(tl)
                         done = self.step >= self.max_steps
 
                         self.agent_memory[tl_id].push(
@@ -685,7 +683,6 @@ class Simulation(SUMO):
         traffic_light_id: str,
         agent: DQN,
         base_state: np.ndarray,
-        desra_green_times: list,
         epsilon: float,
     ):
         """
@@ -695,7 +692,6 @@ class Simulation(SUMO):
             traffic_light_id (str): ID of the traffic light
             agent (DQN): The DQN model
             base_state (np.ndarray): Base traffic state (e.g. queue, arrivals)
-            desra_green_times (list[float]): DESRA suggested green times per phase
             epsilon (float): Epsilon-greedy exploration factor
 
         Returns:
@@ -707,9 +703,7 @@ class Simulation(SUMO):
         state_t = torch.from_numpy(base_state).to(self.device, dtype=torch.float32)
 
         if random.random() < epsilon:
-            action_idx = random.randint(0, num_actions - 1)
-            predicted_green = desra_green_times[action_idx]  # fallback to DESRA
-            return action_idx, predicted_green
+            return base_state[-2:-1][0], base_state[-1:][0]
 
         with torch.no_grad():
             q_values, green_times = agent.predict_one(state_t, output_dim=num_actions)
@@ -763,11 +757,11 @@ class Simulation(SUMO):
             )
 
         # DESRA recommended phase and green time
-        best_phase, desra_green, desra_green_list = (
+        best_phase, desra_green = (
             self.desra.select_phase_with_desra_hints(traffic_light)
         )
 
-        padding = self.agent._input_dim - len(state_vector) - len(desra_green_list) - 2
+        padding = self.agent._input_dim - len(state_vector) - 2
         state_vector.extend([0] * padding)
 
         # Convert phase to index
@@ -776,16 +770,15 @@ class Simulation(SUMO):
         )
 
         # Append DESRA guidance
-        state_vector.extend(desra_green_list)
         state_vector.extend([desra_phase_idx, desra_green])
 
-        return np.array(state_vector, dtype=np.float32), desra_green_list
+        return np.array(state_vector, dtype=np.float32)
 
     def get_queue_length(self, detector_id):
         """
         Get the queue length of a lane.
         """
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
+        return traci.lanearea.getLastStepVehicleNumber(detector_id)
 
     def get_free_capacity(self, detector_id):
         """
@@ -847,12 +840,19 @@ class Simulation(SUMO):
         return len(traffic_light["phase"])
 
     def get_movements_from_phase(self, traffic_light, phase_str):
-        detectors = [det["id"] for det in traffic_light["detectors"]]
+        """
+        Get detector IDs whose street is active (green) in the given phase string.
+        """
+        phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
+        active_street = str(phase_index + 1)  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
+
+        # Collect detector IDs belonging to the active street
         active_detectors = [
-            detectors[i]
-            for i, state in enumerate(phase_str)
-            if state.upper() == "G" and i < len(detectors)
+            det["id"]
+            for det in traffic_light["detectors"]
+            if det["street"] == active_street
         ]
+
         return active_detectors
 
     def get_avg_queue_length(self, traffic_light):
@@ -863,7 +863,7 @@ class Simulation(SUMO):
         for detector in traffic_light["detectors"]:
             try:
                 queue_lengths.append(
-                    traci.lanearea.getLastStepHaltingNumber(detector["id"])
+                    traci.lanearea.getLastStepVehicleNumber(detector["id"])
                 )
             except:
                 pass
