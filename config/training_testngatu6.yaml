@@ -37,23 +37,23 @@ agent:
 
 vehicle_counts:
   low:
-    motorcycle: 750
-    passenger: 188
-    bicycle: 38
-    truck: 25
-    pedestrian: 50
-  medium:
     motorcycle: 1500
     passenger: 375
-    truck: 75
-    bicycle: 50
+    bicycle: 75
+    truck: 50
     pedestrian: 100
-  high:
+  medium:
     motorcycle: 3000
     passenger: 750
     truck: 150
     bicycle: 100
     pedestrian: 200
+  high:
+    motorcycle: 6000
+    passenger: 1500
+    truck: 300
+    bicycle: 200
+    pedestrian: 400
 
 dir:
   models_path_name: "models/"
