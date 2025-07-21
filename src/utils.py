@@ -141,6 +141,8 @@ def import_train_configuration(file_path):
         config['agent']['decay_rate'] = content['agent']['model']['decay_rate']
         config['agent']['min_epsilon'] = content['agent']['model']['min_epsilon']
         config['agent']['weight'] = content['agent']['weight']
+        config['agent']['model'] = content['agent']['model']
+        config['agent']['model']['loss_type'] = content['agent']['model']['loss_type']
         # # Green duration agent
         # config['green_duration_agent'] = {}
         # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
