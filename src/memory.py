@@ -25,6 +25,7 @@ class ReplayMemory:
         Args:
             state: current state
             action: action taken
+            green_time: current green time
             reward: reward received
             next_state: next state after the action
             done (bool): whether the episode has ended
