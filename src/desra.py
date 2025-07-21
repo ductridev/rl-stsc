@@ -14,43 +14,14 @@ class DESRA(SUMO):
         self.occupancies = defaultdict(lambda: deque())
 
         # Estimated real-time parameters
-        self.saturation_flow = {}
-        self.critical_density = {}
-        self.jam_density = {}
-
-    def update_traffic_parameters(self):
-        """
-        Update real-time traffic parameters for all active detectors.
-        Call this every simulation step.
-        """
-        for detector_id in traci.lanearea.getIDList():
-            # Collect new values
-            count = traci.lanearea.getLastStepVehicleNumber(detector_id)
-            occ = traci.lanearea.getLastStepOccupancy(detector_id)
-
-            # Append to rolling windows
-            self.vehicle_counts[detector_id].append(count)
-            self.occupancies[detector_id].append(occ)
-
-            # Compute rolling averages
-            avg_count = sum(self.vehicle_counts[detector_id]) / len(self.vehicle_counts[detector_id])
-            avg_density = sum(self.occupancies[detector_id]) / len(self.occupancies[detector_id]) / 100  # convert to 0-1
-
-            # Update parameters
-            self.saturation_flow[detector_id] = min(avg_count, 1)  # veh/s over N seconds
-            self.critical_density[detector_id] = min(avg_density, 0.6)
-            self.jam_density[detector_id] = max(avg_density, 0.8)  # clipped reasonable max
-
-    def get_current_parameters(self, detector_id):
-        return (
-            self.saturation_flow.get(detector_id, 1),
-            self.critical_density.get(detector_id, 0.6),
-            self.jam_density.get(detector_id, 0.8)
-        )
+        self.saturation_flow = 0.5
+        self.critical_density = 0.06
+        self.jam_density = 0.18
 
     def select_phase_with_desra_hints(self, traffic_light):
-        desra_green_times = []
-        phase_scores = []
+        """
+        Select best phase using DESRA hints based on effective outflow.
+        """
         best_phase = traffic_light["phase"][0]
         best_green_time = 0
         best_effective_outflow = -1
@@ -58,10 +29,9 @@ class DESRA(SUMO):
         for phase_str in traffic_light["phase"]:
             movements = self.get_movements_from_phase(traffic_light, phase_str)
 
-            green_times = []
-            outflows = []
-            phase_total_queue = 0
-            phase_total_arrival = 0
+            total_Gsat = 0
+            total_outflow = 0
+            movement_count = 0
 
             for detector_id in movements:
                 x0 = self.get_queue_length(detector_id)
@@ -69,100 +39,95 @@ class DESRA(SUMO):
                 x0_d = self.get_downstream_queue_length(detector_id)
                 link_length = traci.lanearea.getLength(detector_id)
 
-                phase_total_queue += x0
-                phase_total_arrival += q_arr
-
                 if x0 == 0 and q_arr == 0:
                     continue
 
-                # Estimate parameters
-                saturation_flow, jam_density, critical_density = self.get_current_parameters(detector_id)
+                Gsat = self.estimate_saturated_green_time(x0, q_arr, x0_d, link_length)
 
-                Gsat = self.estimate_saturated_green_time(
-                    x0, q_arr, x0_d, link_length,
-                    saturation_flow, jam_density, critical_density
-                )
+                outflow = self.saturation_flow * Gsat
+                total_Gsat += Gsat
+                total_outflow += outflow
+                movement_count += 1
 
-                if Gsat <= 0:
-                    continue
-
-                green_times.append(Gsat)
-                outflows.append(saturation_flow * Gsat)
-
-            if phase_total_queue + phase_total_arrival < 1:
-                desra_green_times.append(0)  # Mark as inactive
-                phase_scores.append(0)
+            if movement_count == 0:
                 continue
 
-            if green_times:
-                G_demand = min(green_times)
-                total_outflow = sum(outflows)
-                v_i = total_outflow / (G_demand + self.interphase_duration)
+            avg_Gsat = total_Gsat / movement_count
+            avg_outflow = total_outflow / movement_count
 
-                desra_green_times.append(G_demand)
-                phase_scores.append(v_i)
+            # Effective outflow: v_i = s * Gsat / (Gsat + τ)
+            v_i = avg_outflow / (avg_Gsat + self.interphase_duration)
 
-                if v_i > best_effective_outflow:
-                    best_effective_outflow = v_i
-                    best_phase = phase_str
-                    best_green_time = G_demand
-            else:
-                desra_green_times.append(0)
-                phase_scores.append(0)
+            if v_i > best_effective_outflow:
+                best_effective_outflow = v_i
+                best_phase = phase_str
+                best_green_time = avg_Gsat
 
-        return best_phase, max(1, int(best_green_time)), desra_green_times
+        return best_phase, max(0, int(best_green_time))
 
-    def estimate_saturated_green_time(self, x0, q_arr, x0_d, link_length, saturation_flow, jam_density, critical_density):
+    def estimate_saturated_green_time(self, x0, q_arr, x0_d, link_length):
         """
-        Estimate saturated green time for a lane using shockwave theory.
-        Parameters:
-            x0: current queue length (vehicles)
-            q_arr: arrival flow (vehicles/s)
-            x0_d: downstream queue length (vehicles)
-            link_length: length of the lane (meters)
-            saturation_flow: estimated saturation flow (vehicles/s)
-            jam_density: estimated jam density (veh/m)
-            critical_density: estimated critical density (veh/m)
+        Estimate saturated green time using shockwave theory (based on the paper).
+
+        Args:
+            x0 (float): Queue length at upstream (vehicles)
+            q_arr (float): Arrival flow rate (vehicles/s)
+            x0_d (float): Downstream queue length (vehicles)
+            link_length (float): Lane length (meters)
+
         Returns:
-            Estimated green time in seconds
+            float: Estimated green time (seconds)
         """
+        s = self.saturation_flow
+        kj = self.jam_density
+        kc = self.critical_density
 
-        # Prevent division by zero
-        if saturation_flow <= 0 or jam_density <= 0:
+        if s <= 0 or kj <= 0 or kc <= 0:
             return 0
 
-        # Compute max backward shockwave length (xM)
-        numerator = x0 * (jam_density * saturation_flow - q_arr * critical_density)
-        denominator = jam_density * (saturation_flow - q_arr)
+        try:
+            w1 = s / kj  # Forward shockwave (discharge)
+            w2 = (q_arr - s) / (kc - kj)  # Backward shockwave
+        except ZeroDivisionError:
+            return 0
 
-        # Fallback to full link length if denominator is too small
-        if abs(denominator) < 1e-6:
-            xM = link_length
-        else:
-            xM = min(numerator / denominator, link_length)
+        if abs(kc - kj) < 1e-6:
+            w2 = 0.01  # prevent division by 0
 
-        # Estimate green time required to discharge queue
-        G_s = xM * jam_density / saturation_flow
+        denom = w1 + w2
+        xM = link_length if abs(denom) < 1e-6 else min(x0 / denom, link_length)
 
-        # Downstream capacity-based green time
-        x_d = max(0, link_length - x0_d)
-        G_d = x_d * jam_density / saturation_flow
+        Gs = xM / w1
+        xd = max(0, link_length - x0_d)
+        Gd = xd / w1
 
-        # Return the smaller of the two
-        return max(0, min(G_s, G_d))
+        green_time = max(0, min(Gs, Gd))  # enforce min green time
+        return green_time
 
     def get_movements_from_phase(self, traffic_light, phase_str):
-        detectors = [det["id"] for det in traffic_light["detectors"]]
-        return [detectors[i] for i, state in enumerate(phase_str) if state.upper() == "G" and i < len(detectors)]
+        """
+        Get detector IDs whose street is active (green) in the given phase string.
+        """
+        phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
+        active_street = str(phase_index + 1)  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
+
+        # Collect detector IDs belonging to the active street
+        active_detectors = [
+            det["id"]
+            for det in traffic_light["detectors"]
+            if det["street"] == active_street
+        ]
+
+        return active_detectors
 
     def get_queue_length(self, detector_id):
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
+        return traci.lanearea.getLastStepVehicleNumber(detector_id)
 
     def get_downstream_queue_length(self, detector_id):
         links = traci.lane.getLinks(traci.lanearea.getLaneID(detector_id))
         if links:
             downstream_lane = links[0][0]
-            return traci.lane.getLastStepHaltingNumber(downstream_lane)
+            return traci.lane.getLastStepVehicleNumber(downstream_lane)
         return 0
 
     def get_arrival_flow(self, detector_id):
@@ -172,8 +137,7 @@ class DESRA(SUMO):
         """
         lane_id = traci.lanearea.getLaneID(detector_id)
         incoming_links = [
-            link[0] for link in traci.lane.getLinks(lane_id)
-            if link[0] != lane_id
+            link[0] for link in traci.lane.getLinks(lane_id) if link[0] != lane_id
         ]
 
         total = 0
