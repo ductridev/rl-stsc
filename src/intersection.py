@@ -1,6 +1,6 @@
 import os
 import traci
-
+import random
 
 class Intersection:
     @staticmethod
@@ -132,6 +132,8 @@ class Intersection:
                 f"Total vehicles for {demand_level} demand: {total_vehicles} vehicles over {simulation_duration} seconds"
             )
 
+            high_demand_side = random.choice(["west", "east", "north", "south"])
+
             for prefix, vclass, vehicle_class, _enabled, count in enabled_types:
 
                 # 1. Generate trips file
@@ -139,20 +141,20 @@ class Intersection:
                     f'python "%SUMO_HOME%/tools/randomTrips.py" '
                     f"-n osm.net.xml.gz "
                     f"-o osm.res_{prefix}.trips.xml "
-                    f"--insertion-rate {count * 2} "
+                    f"--insertion-rate {count * 4} "
                     f"--begin 0 --end {simulation_duration} "
                     f"--validate --remove-loops "
                     f"--vclass {vclass} "
                     f'--trip-attributes "departLane=\'best\'" '
                     f'--fringe-start-attributes "departSpeed=\'max\'" '
                     f"--prefix res_{prefix} "
-                    f"--weights-prefix res_{prefix}_overflow_west"
                 )
 
                 if vehicle_class == "pedestrian":
                     trip_cmd += "--via-edge-types footway,path,sidewalk "
                 else:
-                    f"--vehicle-class {vehicle_class} "
+                    trip_cmd += f"--vehicle-class {vehicle_class} "
+                    trip_cmd += f"--weights-prefix res_{prefix}_overflow_{high_demand_side} "
 
                 # 2. Convert trips to routes using duarouter
                 route_cmd = (
