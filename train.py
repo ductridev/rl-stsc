@@ -7,6 +7,7 @@ from src.base_simulation import SimulationBase
 from src.visualization import Visualization
 from src.intersection import Intersection
 from src.accident_manager import AccidentManager
+from src.comparison_utils import SimulationComparison
 import datetime
 
 if __name__ == "__main__":
@@ -107,6 +108,9 @@ if __name__ == "__main__":
         q_table_load_path = set_load_model_path(config["models_path_name"]) + config["load_q_table_name"] + ".pkl"
         simulation_q.load_q_table(q_table_load_path)
     
+    # Initialize comparison utility
+    comparison = SimulationComparison(path=path)
+    
     episode = start_episode
     epsilon = start_epsilon
     timestamp_start = datetime.datetime.now()
@@ -158,6 +162,16 @@ if __name__ == "__main__":
                 names=["dqn_qr", "dqn_mse","dqn_huber", "dqn_weighted", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
+            
+            # --- Generate traffic light comparison tables ---
+            print("Generating traffic light comparison tables...")
+            try:
+                comparison_results = comparison.save_comparison_tables(episode)
+                comparison.print_comparison_summary(episode)
+                print("Traffic light comparison tables generated successfully")
+            except Exception as e:
+                print(f"Error generating comparison tables: {e}")
+                print("Comparison tables will be generated when CSV files are available")
         
         # Save model at specified intervals
         save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
