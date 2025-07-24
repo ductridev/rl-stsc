@@ -121,13 +121,13 @@ class DESRA(SUMO):
         return active_detectors
 
     def get_queue_length(self, detector_id):
-        return traci.lanearea.getLastStepVehicleNumber(detector_id)
+        return traci.lanearea.getLastStepHaltingNumber(detector_id)
 
     def get_downstream_queue_length(self, detector_id):
         links = traci.lane.getLinks(traci.lanearea.getLaneID(detector_id))
         if links:
             downstream_lane = links[0][0]
-            return traci.lane.getLastStepVehicleNumber(downstream_lane)
+            return traci.lane.getLastStepHaltingNumber(downstream_lane)
         return 0
 
     def get_arrival_flow(self, detector_id):
