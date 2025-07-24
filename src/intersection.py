@@ -134,7 +134,7 @@ class Intersection:
 
                 # 1. Generate trips file
                 trip_cmd = (
-                    f'python randomTrips.py '
+                    f'python {original_path}/randomTrips.py '
                     f"-n osm.net.xml.gz "
                     f"-o osm.res_{prefix}.trips.xml "
                     f"--insertion-rate {count * 4} "
