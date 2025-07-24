@@ -1,5 +1,10 @@
 from src.memory import ReplayMemory
-from src.utils import set_train_path, set_sumo, import_train_configuration, set_load_model_path
+from src.utils import (
+    set_train_path,
+    set_sumo,
+    import_train_configuration,
+    set_load_model_path,
+)
 from src.model import DQN
 from src.simulation import Simulation
 from src.Qlearning import QSimulation
@@ -8,6 +13,10 @@ from src.visualization import Visualization
 from src.intersection import Intersection
 from src.accident_manager import AccidentManager
 from src.comparison_utils import SimulationComparison
+from src.scripts.random_demand_sides import (
+    generate_random_intervals,
+    save_to_same_dir_as_cfg,
+)
 import datetime
 
 if __name__ == "__main__":
@@ -57,7 +66,7 @@ if __name__ == "__main__":
     # Load existing model if specified in config
     start_episode = 0
     start_epsilon = epsilon
-    
+
     # if config.get("load_model_name") and config["load_model_name"] is not None:
     #     model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + ".pth"
     #     checkpoint_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + "_checkpoint.pth"
@@ -102,15 +111,19 @@ if __name__ == "__main__":
         epoch=config["training_epochs"],
         path=path,
     )
-    
+
     # Load existing Q-table if specified in config
     if config.get("load_q_table_name") and config["load_q_table_name"] is not None:
-        q_table_load_path = set_load_model_path(config["models_path_name"]) + config["load_q_table_name"] + ".pkl"
+        q_table_load_path = (
+            set_load_model_path(config["models_path_name"])
+            + config["load_q_table_name"]
+            + ".pkl"
+        )
         simulation_q.load_q_table(q_table_load_path)
-    
+
     # Initialize comparison utility
     comparison = SimulationComparison(path=path)
-    
+
     episode = start_episode
     epsilon = start_epsilon
     timestamp_start = datetime.datetime.now()
@@ -119,6 +132,20 @@ if __name__ == "__main__":
         print("\n----- Episode", str(episode + 1), "of", str(config["total_episodes"]))
         print("Generating routes...")
         # Run the build routes file command
+
+        edge_data = generate_random_intervals(
+            total_duration=3600,
+            min_interval=600,
+            max_interval=1800,
+            base_weight=100.0,
+            high_min=200.0,
+            high_max=500.0,
+            min_active_sides=1,
+            max_active_sides=3,
+            edge_groups=config["edge_groups"],
+        )
+
+        random_demand_name = save_to_same_dir_as_cfg(edge_data, config["sumo_cfg_file"])
 
         Intersection.generate_residential_demand_routes(
             config,
@@ -129,6 +156,7 @@ if __name__ == "__main__":
             enable_truck=True,
             enable_bicycle=True,
             enable_pedestrian=True,
+            random_demand_name=random_demand_name,
         )
         print("Routes generated")
 
@@ -147,8 +175,12 @@ if __name__ == "__main__":
             print(f"Running DQN Simulation (loss: {loss_type})...")
             set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
             simulation_time_dqn, training_time_dqn = sim_dqn.run(epsilon, episode)
-            print(f"Simulation (DQN - {loss_type}) time:", simulation_time_dqn, "Training time:", training_time_dqn)
-
+            print(
+                f"Simulation (DQN - {loss_type}) time:",
+                simulation_time_dqn,
+                "Training time:",
+                training_time_dqn,
+            )
 
         epsilon = max(min_epsilon, epsilon * decay_rate)
 
@@ -158,11 +190,19 @@ if __name__ == "__main__":
             print("Generating plots at episode", episode, "...")
             visualization.save_plot(
                 episode=episode,
-                metrics=["density_avg", "green_time_avg", "travel_time_avg", "outflow_avg", "travel_speed_avg", "waiting_time_avg", "queue_length_avg"],
-                names=["dqn_qr", "dqn_mse","dqn_huber", "dqn_weighted", "q", "base"],
+                metrics=[
+                    "density_avg",
+                    "green_time_avg",
+                    "travel_time_avg",
+                    "outflow_avg",
+                    "travel_speed_avg",
+                    "waiting_time_avg",
+                    "queue_length_avg",
+                ],
+                names=["dqn_qr", "dqn_mse", "dqn_huber", "dqn_weighted", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
-            
+
             # --- Generate traffic light comparison tables ---
             print("Generating traffic light comparison tables...")
             try:
@@ -171,28 +211,32 @@ if __name__ == "__main__":
                 print("Traffic light comparison tables generated successfully")
             except Exception as e:
                 print(f"Error generating comparison tables: {e}")
-                print("Comparison tables will be generated when CSV files are available")
-        
+                print(
+                    "Comparison tables will be generated when CSV files are available"
+                )
+
         # Save model at specified intervals
         save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
         if episode % save_interval == 0 and episode > 0:
             model_save_name = config.get("save_model_name", "dqn_model")
-            
+
             # # Save model weights only
             # model_save_path = path + f"{model_save_name}_episode_{episode}.pth"
             # simulation_dqn.agent.save(model_save_path)
-            
+
             # # Save complete checkpoint for continuing training
             # checkpoint_save_path = path + f"{model_save_name}_episode_{episode}_checkpoint.pth"
             # simulation_dqn.agent.save_checkpoint(checkpoint_save_path, episode=episode, epsilon=epsilon)
-            
+
             # print(f"DQN model saved at episode {episode}: {model_save_path}")
             # print(f"DQN checkpoint saved at episode {episode}: {checkpoint_save_path}")
-            
+
             # Also save Q-learning Q-table
-            q_table_save_path = path + f"q_table_{model_save_name}_episode_{episode}.pkl"
+            q_table_save_path = (
+                path + f"q_table_{model_save_name}_episode_{episode}.pkl"
+            )
             simulation_q.save_q_table(path, episode)
-        
+
         episode += 1
 
     print("\n----- Start time:", timestamp_start)
@@ -201,18 +245,18 @@ if __name__ == "__main__":
 
     print(f"Saving final model at {path}...")
     # model_save_name = config.get("save_model_name", "dqn_model")
-    
+
     # # Save final model weights
     # model_final_path = path + f"{model_save_name}_final.pth"
     # simulation_dqn.agent.save(model_final_path)
-    
+
     # # Save final checkpoint
     # checkpoint_final_path = path + f"{model_save_name}_final_checkpoint.pth"
     # simulation_dqn.agent.save_checkpoint(checkpoint_final_path, episode=episode, epsilon=epsilon)
-    
+
     # print(f"Final DQN model saved: {model_final_path}")
     # print(f"Final DQN checkpoint saved: {checkpoint_final_path}")
-    
+
     # Save final Q-table
     simulation_q.save_q_table(path, episode="final")
     print(f"Final Q-table saved")

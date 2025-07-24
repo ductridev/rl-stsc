@@ -168,6 +168,9 @@ def import_train_configuration(file_path):
         config['vehicle_counts']['medium'] = content['vehicle_counts']['medium']
         config['vehicle_counts']['high'] = content['vehicle_counts']['high']
 
+        # Random demand
+        config["edge_groups"] = content["edge_groups"]
+
         # Training configuration
         config['training_epochs'] = content['model']['training_epochs']
         config['save_model_name'] = content['model'].get('save_model_name', 'dqn_model')

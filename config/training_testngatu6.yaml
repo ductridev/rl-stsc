@@ -26,14 +26,13 @@ agent:
     min_epsilon: 0.01
     loss_type:
       - qr
-      - mse
-      - huber
-      - weighted
   weight:
-    outflow_rate: 0.3
-    travel_speed: 0.2
-    travel_time: 0.3
-    density: 0.2
+    queue_length: -0.25
+    outflow_rate: 1
+    delay: -0.25
+    travel_time: 1
+    waiting_time: -0.25
+    switch_phase: -5
 
 vehicle_counts:
   low:
@@ -54,6 +53,28 @@ vehicle_counts:
     truck: 300
     bicycle: 200
     pedestrian: 400
+
+edge_groups:
+  W:
+    - E17
+    - E11
+    - E10
+    - E16 
+  S: 
+    - E12
+    - E13
+    - E19
+    - E14
+  E: 
+    - E15
+    - E8
+    - E9
+    - E18
+  N: 
+    - E22
+    - E20
+    - E23
+    - E21
 
 dir:
   models_path_name: "models/"
