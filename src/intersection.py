@@ -134,7 +134,7 @@ class Intersection:
 
                 # 1. Generate trips file
                 trip_cmd = (
-                    f'python "%SUMO_HOME%/tools/randomTrips.py" '
+                    f'python randomTrips.py '
                     f"-n osm.net.xml.gz "
                     f"-o osm.res_{prefix}.trips.xml "
                     f"--insertion-rate {count * 4} "
@@ -150,7 +150,9 @@ class Intersection:
                     trip_cmd += "--via-edge-types footway,path,sidewalk "
                 else:
                     trip_cmd += f"--vehicle-class {vehicle_class} "
-                    trip_cmd += f"--weights-prefix {random_demand_name} " if random_demand_name else ""
+
+                if random_demand_name:
+                    trip_cmd += f"--weights-prefix {random_demand_name} "
 
                 # 2. Convert trips to routes using duarouter
                 route_cmd = (
