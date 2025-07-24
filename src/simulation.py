@@ -54,9 +54,10 @@ class Simulation(SUMO):
         self.path = path
         self.weight = agent_cfg["weight"]
         self.outflow_rate_normalizer = Normalizer()
-        self.density_normalizer = Normalizer()
+        self.queue_length_normalizer = Normalizer()
         self.travel_time_normalizer = Normalizer()
         self.travel_speed_normalizer = Normalizer()
+        self.waiting_time_normalizer = Normalizer()
 
         self.step = 0
         self.num_actions = {}
@@ -67,15 +68,12 @@ class Simulation(SUMO):
         self.agent_old_state = {}
         self.agent_memory = {}
 
+        self.queue_length = {}
         self.outflow_rate = {}
-        self.old_outflow_rate = {}
         self.travel_speed = {}
         self.travel_time = {}
-        self.density = {}
-        self.old_travel_speed = {}
-        self.old_travel_time = {}
-        self.old_density = {}
-        self.green_time = {}
+        self.waiting_time = {}
+        self.phase = {}
 
         self.history = {
             "agent_reward": {},
@@ -145,9 +143,6 @@ class Simulation(SUMO):
             traffic_light_id = traffic_light["id"]
             self.agent_memory[traffic_light_id] = self.memory
 
-            # Initialize the green time
-            self.green_time[traffic_light_id] = 20
-
             # Initialize the number of actions
             self.num_actions[traffic_light_id] = len(traffic_light["phase"])
 
@@ -173,29 +168,23 @@ class Simulation(SUMO):
             # Initialize the agent old state
             self.agent_old_state[traffic_light_id] = 0
 
-            # Initialize the old outflow rate
-            self.old_outflow_rate[traffic_light_id] = 0
+            # Initialize the queue length
+            self.queue_length[traffic_light_id] = 0
 
             # Initialize the outflow rate
             self.outflow_rate[traffic_light_id] = 0
 
-            # Initialize the old travel speed
-            self.old_travel_speed[traffic_light_id] = 0
-
             # Initialize the travel speed
             self.travel_speed[traffic_light_id] = 0
-
-            # Initialize the old travel time
-            self.old_travel_time[traffic_light_id] = 0
 
             # Initialize the travel time
             self.travel_time[traffic_light_id] = 0
 
-            # Initialize the old density
-            self.old_density[traffic_light_id] = 0
-
             # Initialize the density
-            self.density[traffic_light_id] = 0
+            self.waiting_time[traffic_light_id] = 0
+
+            # Initialize the phase
+            self.phase[traffic_light_id] = None
 
             # Initialize the history
             for key in self.history:
@@ -230,32 +219,54 @@ class Simulation(SUMO):
                 "green_time_remaining": 0,
                 "travel_speed_sum": 0,
                 "travel_time_sum": 0,
-                "density_sum": 0,
+                "waiting_time": 0,
                 "outflow": 0,
+                "queue_length": 0,
                 "old_vehicle_ids": [],
                 "state": None,
                 "action_idx": None,
                 "phase": None,
-                "green_time": 0,
+                "green_time": 20,
                 "step_travel_speed_sum": 0,
                 "step_travel_time_sum": 0,
-                "step_density_sum": 0,
+                "step_waiting_time": 0,
                 "step_outflow": 0,
+                "step_density_sum": 0,
                 "step_queue_length": 0,
                 "step_waiting_time": 0,
                 "step_old_vehicle_ids": [],
             }
 
         num_vehicles = 0
+        num_vehicles_out = 0
 
         while self.step < self.max_steps:
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
                 tl_state = tl_states[tl_id]
 
-                # If time to choose a new action
-                if tl_state["green_time_remaining"] <= 0:
+                # Update the green time remaining and store state of current phase
+                if tl_state["green_time_remaining"] > 0:
+                    phase = tl_state["phase"]
+                    new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
+                    outflow = sum(
+                        1
+                        for vid in tl_state["old_vehicle_ids"]
+                        if vid not in new_vehicle_ids
+                    )
+                    num_vehicles_out += outflow
+                    tl_state["outflow"] += outflow
+                    tl_state["travel_speed_sum"] += self.get_sum_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_sum_travel_time(tl)
+                    tl_state["waiting_time"] += self.get_sum_waiting_time(tl)
+                    tl_state["old_vehicle_ids"] = new_vehicle_ids
+                    tl_state["queue_length"] += self.get_sum_queue_length(tl)
+
+                    tl_state["green_time_remaining"] -= 1
+                # If time to choose a new action and calculate reward of last action
+                elif tl_state["green_time_remaining"] <= 0:
                     state = self.get_state(tl)
+                    # Select new action
                     action_idx, predicted_green = self.select_action(
                         tl_id,
                         self.agent,
@@ -272,99 +283,6 @@ class Simulation(SUMO):
                         1, min(predicted_green, self.max_steps - self.step)
                     )
 
-                    if tl_state["phase"] is not None:
-                        self.set_yellow_phase(tl_id, tl_state["phase"])
-                        for _ in range(self.interphase_duration):
-                            self.accident_manager.create_accident(
-                                current_step=self.step
-                            )
-                            traci.simulationStep()
-                            self.step += 1
-
-                            # Calculate step metrics during interphase for all traffic lights
-                            for tl_inner in self.traffic_lights:
-                                tl_inner_id = tl_inner["id"]
-                                tl_inner_state = tl_states[tl_inner_id]
-
-                                step_new_vehicle_ids = self.get_vehicles_in_phase(
-                                    tl_inner,
-                                    (
-                                        tl_inner_state["phase"]
-                                        if tl_inner_state["phase"] is not None
-                                        else 0
-                                    ),
-                                )
-                                step_outflow = sum(
-                                    1
-                                    for vid in tl_inner_state["step_old_vehicle_ids"]
-                                    if vid not in step_new_vehicle_ids
-                                )
-                                tl_inner_state[
-                                    "step_travel_speed_sum"
-                                ] += self.get_avg_speed(tl_inner)
-                                tl_inner_state[
-                                    "step_travel_time_sum"
-                                ] += self.get_avg_travel_time(tl_inner)
-                                tl_inner_state[
-                                    "step_density_sum"
-                                ] += self.get_avg_density(tl_inner)
-                                tl_inner_state["step_outflow"] += step_outflow
-                                tl_inner_state[
-                                    "step_queue_length"
-                                ] += self.get_avg_queue_length(tl_inner)
-                                tl_inner_state[
-                                    "step_waiting_time"
-                                ] += self.get_avg_waiting_time(tl_inner)
-                                tl_inner_state["step_old_vehicle_ids"] = (
-                                    step_new_vehicle_ids
-                                )
-
-                                # Check if it's time to save data (dynamic interval for exactly 60 data points)
-                                if self.step % 60 == 0:
-                                    travel_speed_avg = (
-                                        tl_inner_state["step_travel_speed_sum"] / 60
-                                    )
-                                    travel_time_avg = (
-                                        tl_inner_state["step_travel_time_sum"] / 60
-                                    )
-                                    density_avg = (
-                                        tl_inner_state["step_density_sum"] / 60
-                                    )
-                                    outflow_avg = tl_inner_state["step_outflow"]
-                                    queue_length_avg = (
-                                        tl_inner_state["step_queue_length"] / 60
-                                    )
-                                    waiting_time_avg = (
-                                        tl_inner_state["step_waiting_time"] / 60
-                                    )
-
-                                    self.history["travel_speed"][tl_inner_id].append(
-                                        travel_speed_avg
-                                    )
-                                    self.history["travel_time"][tl_inner_id].append(
-                                        travel_time_avg
-                                    )
-                                    self.history["density"][tl_inner_id].append(
-                                        density_avg
-                                    )
-                                    self.history["outflow"][tl_inner_id].append(
-                                        outflow_avg
-                                    )
-                                    self.history["queue_length"][tl_inner_id].append(
-                                        queue_length_avg
-                                    )
-                                    self.history["waiting_time"][tl_inner_id].append(
-                                        waiting_time_avg
-                                    )
-
-                                    # Reset step metrics
-                                    tl_inner_state["step_travel_speed_sum"] = 0
-                                    tl_inner_state["step_travel_time_sum"] = 0
-                                    tl_inner_state["step_density_sum"] = 0
-                                    tl_inner_state["step_outflow"] = 0
-                                    tl_inner_state["step_queue_length"] = 0
-                                    tl_inner_state["step_waiting_time"] = 0
-
                     self.set_green_phase(tl_id, green_time, phase)
 
                     tl_state.update(
@@ -372,8 +290,10 @@ class Simulation(SUMO):
                             "green_time": green_time,
                             "green_time_remaining": green_time,
                             "travel_speed_sum": 0,
-                            "density_sum": 0,
+                            "travel_time_sum": 0,
+                            "waiting_time": 0,
                             "outflow": 0,
+                            "queue_length": 0,
                             "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
                             "state": state,
                             "action_idx": action_idx,
@@ -381,30 +301,43 @@ class Simulation(SUMO):
                         }
                     )
 
+                # Set to yellow phase
+                if tl_state["green_time_remaining"] <= 0:
+                    self.set_yellow_phase(tl_id, tl_state["phase"])
+                    for _ in range(self.interphase_duration):
+                        self.accident_manager.create_accident(current_step=self.step)
+                        traci.simulationStep()
+                        num_vehicles += traci.simulation.getDepartedNumber()
+                        self.step += 1
+
             self.accident_manager.create_accident(current_step=self.step)
             traci.simulationStep()
             num_vehicles += traci.simulation.getDepartedNumber()
             self.step += 1
 
+            # Calculate step metrics during interphase for all traffic lights
             for tl in self.traffic_lights:
-                tl_id = tl["id"]
-                tl_state = tl_states[tl_id]
-
-                # save plot every dynamic interval
+                # Check if it's time to save data (dynamic interval for exactly 60 data points)
                 if self.step % 60 == 0:
-                    travel_speed_avg = tl_state["step_travel_speed_sum"] / 60
-                    travel_time_avg = tl_state["step_travel_time_sum"] / 60
-                    density_avg = tl_state["step_density_sum"] / 60
-                    outflow_avg = tl_state["step_outflow"]
-                    queue_length_avg = tl_state["step_queue_length"] / 60
-                    waiting_time_avg = tl_state["step_waiting_time"] / 60
+                    tl_id = tl["id"]
+                    tl_state = tl_states[tl_id]
 
-                    self.history["travel_speed"][tl_id].append(travel_speed_avg)
-                    self.history["travel_time"][tl_id].append(travel_time_avg)
-                    self.history["density"][tl_id].append(density_avg)
-                    self.history["outflow"][tl_id].append(outflow_avg)
-                    self.history["queue_length"][tl_id].append(queue_length_avg)
-                    self.history["waiting_time"][tl_id].append(waiting_time_avg)
+                    self.history["travel_speed"][tl_id].append(
+                        tl_state["step_travel_speed_sum"] / 60
+                    )
+                    self.history["travel_time"][tl_id].append(
+                        tl_state["step_travel_time_sum"] / 60
+                    )
+                    self.history["density"][tl_id].append(
+                        tl_state["step_density_sum"] / 60
+                    )
+                    self.history["outflow"][tl_id].append(tl_state["step_outflow"] / 60)
+                    self.history["queue_length"][tl_id].append(
+                        tl_state["step_queue_length"] / 60
+                    )
+                    self.history["waiting_time"][tl_id].append(
+                        tl_state["step_waiting_time"] / 60
+                    )
 
                     # Reset step metrics
                     tl_state["step_travel_speed_sum"] = 0
@@ -422,28 +355,33 @@ class Simulation(SUMO):
                         for vid in tl_state["old_vehicle_ids"]
                         if vid not in new_vehicle_ids
                     )
+                    num_vehicles_out += outflow
                     tl_state["outflow"] += outflow
-                    tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
-                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
-                    tl_state["density_sum"] += self.get_avg_density(tl)
+                    tl_state["travel_speed_sum"] += self.get_sum_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_sum_travel_time(tl)
+                    tl_state["waiting_time"] += self.get_sum_waiting_time(tl)
                     tl_state["old_vehicle_ids"] = new_vehicle_ids
+                    tl_state["queue_length"] += self.get_sum_queue_length(tl)
+
                     tl_state["green_time_remaining"] -= 1
 
                     if tl_state["green_time_remaining"] <= 0:
+                        # Calculate reward of last action
                         green_time = tl_state["green_time"]
 
+                        self.queue_length[tl_id] = tl_state["queue_length"]
                         self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
-                        self.travel_speed[tl_id] = (
-                            tl_state["travel_speed_sum"] / green_time
-                        )
+                        self.travel_speed[tl_id] = tl_state["travel_speed_sum"]
                         self.travel_time[tl_id] = (
                             tl_state["travel_time_sum"] / green_time
                         )
-                        self.density[tl_id] = tl_state["density_sum"] / green_time
+                        self.waiting_time[tl_id] = tl_state["waiting_time"]
 
-                        reward = self.get_reward(tl_id)
+                        reward = self.get_reward(tl_id, tl_state["phase"])
                         next_state = self.get_state(tl)
                         done = self.step >= self.max_steps
+
+                        self.phase[tl_id] = tl_state["phase"]
 
                         self.agent_memory[tl_id].push(
                             tl_state["state"],
@@ -454,7 +392,7 @@ class Simulation(SUMO):
                             done,
                         )
                         self.history["agent_reward"][tl_id].append(reward)
-                        self.green_time[tl_id] = green_time
+
                 # step state metrics
                 step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
                 step_outflow = sum(
@@ -462,12 +400,12 @@ class Simulation(SUMO):
                     for vid in tl_state["step_old_vehicle_ids"]
                     if vid not in step_new_vehicle_ids
                 )
-                tl_state["step_travel_speed_sum"] += self.get_avg_speed(tl)
-                tl_state["step_travel_time_sum"] += self.get_avg_travel_time(tl)
-                tl_state["step_density_sum"] += self.get_avg_density(tl)
+                tl_state["step_density_sum"] += self.get_sum_density(tl)
+                tl_state["step_travel_speed_sum"] += self.get_sum_speed(tl)
+                tl_state["step_travel_time_sum"] += self.get_sum_travel_time(tl)
                 tl_state["step_outflow"] += step_outflow
-                tl_state["step_queue_length"] += self.get_avg_queue_length(tl)
-                tl_state["step_waiting_time"] += self.get_avg_waiting_time(tl)
+                tl_state["step_queue_length"] += self.get_sum_queue_length(tl)
+                tl_state["step_waiting_time"] += self.get_sum_waiting_time(tl)
                 tl_state["step_old_vehicle_ids"] = step_new_vehicle_ids
 
         simulation_time = time.time() - start
@@ -476,6 +414,7 @@ class Simulation(SUMO):
 
         print("Simulation ended")
         print("Number of vehicles:", num_vehicles)
+        print("Number of vehicles get through all intersections:", num_vehicles_out)
         print("---------------------------------------")
 
         print("Training...")
@@ -535,31 +474,29 @@ class Simulation(SUMO):
                 self.history["target"][traffic_light_id].append(metrics["avg_target"])
                 self.history["loss"][traffic_light_id].append(metrics["loss"])
 
-    def get_reward(self, traffic_light_id):
+    def get_reward(self, traffic_light_id, phase):
         return (
-            # self.weight["green_time"]
-            # * self.green_time_normalizer.normalize(
-            #     self.green_time_old[traffic_light_id]
-            #     - self.green_time[traffic_light_id]
-            # )
             self.weight["outflow_rate"]
             * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
-                - self.old_outflow_rate[traffic_light_id]
             )
-            + self.weight["travel_speed"]
-            * self.travel_speed_normalizer.normalize(
-                self.travel_speed[traffic_light_id]
-                - self.old_travel_speed[traffic_light_id]
+            + self.weight["delay"]
+            * (
+                1
+                - self.travel_speed_normalizer.normalize(
+                    self.travel_speed[traffic_light_id]
+                )
             )
+            + self.weight["waiting_time"]
+            * self.waiting_time_normalizer.normalize(
+                self.waiting_time[traffic_light_id]
+            )
+            + self.weight["switch_phase"] * (int)(self.phase[traffic_light_id] != phase)
             + self.weight["travel_time"]
-            * self.travel_time_normalizer.normalize(
-                self.old_travel_time[traffic_light_id]
-                - self.travel_time[traffic_light_id]
-            )
-            + self.weight["density"]
-            * self.density_normalizer.normalize(
-                self.old_density[traffic_light_id] - self.density[traffic_light_id]
+            * self.travel_time_normalizer.normalize(self.travel_time[traffic_light_id])
+            + self.weight["queue_length"]
+            * self.queue_length_normalizer.normalize(
+                self.queue_length[traffic_light_id]
             )
         )
 
@@ -586,10 +523,10 @@ class Simulation(SUMO):
                     data=data,
                     filename=f"dqn_{self.loss_type}_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
                 )
-            
+
             # Save metrics as DataFrame
             self.save_metrics_to_dataframe(episode=episode)
-            
+
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
             # Reset history after saving plots
@@ -605,7 +542,14 @@ class Simulation(SUMO):
         data_records = []
 
         # Only collect specified system metrics
-        target_metrics = ['density', 'outflow', 'queue_length', 'travel_speed', 'travel_time', 'waiting_time']
+        target_metrics = [
+            "density",
+            "outflow",
+            "queue_length",
+            "travel_speed",
+            "travel_time",
+            "waiting_time",
+        ]
 
         for metric, data_per_tls in self.history.items():
             if metric in target_metrics:
@@ -757,8 +701,8 @@ class Simulation(SUMO):
             )
 
         # DESRA recommended phase and green time
-        best_phase, desra_green = (
-            self.desra.select_phase_with_desra_hints(traffic_light)
+        best_phase, desra_green = self.desra.select_phase_with_desra_hints(
+            traffic_light
         )
 
         padding = self.agent._input_dim - len(state_vector) - 2
@@ -778,7 +722,7 @@ class Simulation(SUMO):
         """
         Get the queue length of a lane.
         """
-        return traci.lanearea.getLastStepVehicleNumber(detector_id)
+        return traci.lanearea.getLastStepHaltingNumber(detector_id)
 
     def get_free_capacity(self, detector_id):
         """
@@ -808,30 +752,32 @@ class Simulation(SUMO):
             total_waiting_time += traci.vehicle.getWaitingTime(vid)
         return total_waiting_time
 
-    def get_avg_speed(self, traffic_light):
+    def get_sum_speed(self, traffic_light):
         speeds = []
         for detector in traffic_light["detectors"]:
             try:
                 speed = traci.lanearea.getLastStepMeanSpeed(detector["id"])
-                speeds.append(speed)
+                lane = traci.lanearea.getLaneID(detector["id"])
+                max_speed = traci.lane.getMaxSpeed(lane)
+                speeds.append(speed / max_speed)
             except:
                 pass
-        return np.mean(speeds) if speeds else 0.0
+        return np.sum(speeds) if speeds else 0.0
 
-    def get_avg_travel_time(self, traffic_light):
+    def get_sum_travel_time(self, traffic_light):
         travel_times = []
         for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
             travel_times.append(traci.lane.getTraveltime(lane))
-        return np.mean(travel_times) if travel_times else 0.0
+        return np.sum(travel_times) if travel_times else 0.0
 
-    def get_avg_density(self, traffic_light):
+    def get_sum_density(self, traffic_light):
         densities = []
         for detector in traffic_light["detectors"]:
             try:
                 densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
             except:
                 pass
-        return np.mean(densities) / 100 if densities else 0.0
+        return np.sum(densities) / 100 if densities else 0.0
 
     def get_num_phases(self, traffic_light):
         """
@@ -844,7 +790,9 @@ class Simulation(SUMO):
         Get detector IDs whose street is active (green) in the given phase string.
         """
         phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
-        active_street = str(phase_index + 1)  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
+        active_street = str(
+            phase_index + 1
+        )  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
 
         # Collect detector IDs belonging to the active street
         active_detectors = [
@@ -855,7 +803,7 @@ class Simulation(SUMO):
 
         return active_detectors
 
-    def get_avg_queue_length(self, traffic_light):
+    def get_sum_queue_length(self, traffic_light):
         """
         Get the average queue length of a lane.
         """
@@ -867,9 +815,9 @@ class Simulation(SUMO):
                 )
             except:
                 pass
-        return np.mean(queue_lengths) if queue_lengths else 0.0
+        return np.sum(queue_lengths) if queue_lengths else 0.0
 
-    def get_avg_waiting_time(self, traffic_light):
+    def get_sum_waiting_time(self, traffic_light):
         """
         Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
@@ -879,7 +827,7 @@ class Simulation(SUMO):
 
         total_waiting_time = 0.0
         for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+            total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(vid)
         return total_waiting_time
 
     def reset_history(self):
