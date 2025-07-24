@@ -1,7 +1,4 @@
 import os
-import traci
-import random
-
 class Intersection:
     @staticmethod
     def get_all_intersections_with_sumo():
@@ -47,6 +44,7 @@ class Intersection:
         enable_motorcycle=True,
         enable_passenger=True,
         enable_truck=True,
+        random_demand_name=None,
     ):
         """
         Generate residential traffic routes based on demand level using pre-defined vehicle counts from config.
@@ -132,8 +130,6 @@ class Intersection:
                 f"Total vehicles for {demand_level} demand: {total_vehicles} vehicles over {simulation_duration} seconds"
             )
 
-            high_demand_side = random.choice(["west", "east", "north", "south"])
-
             for prefix, vclass, vehicle_class, _enabled, count in enabled_types:
 
                 # 1. Generate trips file
@@ -154,7 +150,7 @@ class Intersection:
                     trip_cmd += "--via-edge-types footway,path,sidewalk "
                 else:
                     trip_cmd += f"--vehicle-class {vehicle_class} "
-                    trip_cmd += f"--weights-prefix res_{prefix}_overflow_{high_demand_side} "
+                    trip_cmd += f"--weights-prefix {random_demand_name} " if random_demand_name else ""
 
                 # 2. Convert trips to routes using duarouter
                 route_cmd = (
