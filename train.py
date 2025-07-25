@@ -24,7 +24,7 @@ if __name__ == "__main__":
     config = import_train_configuration("config/training_testngatu4.yaml")
     min_epsilon = config["agent"]["min_epsilon"]
     decay_rate = config["agent"]["decay_rate"]
-    epsilon = 1
+    start_epsilon = config["agent"]["epsilon"]
 
     # Create replay memory for the agent
     agent_memory_dqn = ReplayMemory(
@@ -65,7 +65,6 @@ if __name__ == "__main__":
 
     # Load existing model if specified in config
     start_episode = 0
-    start_epsilon = epsilon
 
     # if config.get("load_model_name") and config["load_model_name"] is not None:
     #     model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + ".pth"
@@ -161,15 +160,15 @@ if __name__ == "__main__":
         print("Routes generated")
 
         # --- Run all three simulations ---
-        print("Running SimulationBase (static baseline)...")
-        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-        simulation_time_base = simulation.run(episode)
-        print("SimulationBase time:", simulation_time_base)
+        # print("Running SimulationBase (static baseline)...")
+        # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        # simulation_time_base = simulation.run(episode)
+        # print("SimulationBase time:", simulation_time_base)
 
-        print("Running QSimulation (Q-learning)...")
-        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-        simulation_time_q = simulation_q.run(epsilon, episode)
-        print("QSimulation time:", simulation_time_q)
+        # print("Running QSimulation (Q-learning)...")
+        # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        # simulation_time_q = simulation_q.run(epsilon, episode)
+        # print("QSimulation time:", simulation_time_q)
 
         for loss_type, sim_dqn in simulations_dqn.items():
             print(f"Running DQN Simulation (loss: {loss_type})...")

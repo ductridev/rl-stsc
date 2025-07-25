@@ -23,6 +23,7 @@ agent:
     batch_size: 256
     learning_rate: 0.0001
     decay_rate: 0.995
+    epsilon: 0.9
     min_epsilon: 0.01
     loss_type:
       - qr

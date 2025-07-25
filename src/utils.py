@@ -140,6 +140,7 @@ def import_train_configuration(file_path):
         config['agent']['learning_rate'] = content['agent']['model']['learning_rate']
         config['agent']['decay_rate'] = content['agent']['model']['decay_rate']
         config['agent']['min_epsilon'] = content['agent']['model']['min_epsilon']
+        config['agent']['epsilon'] = content['agent']['model']['epsilon']
         config['agent']['weight'] = content['agent']['weight']
         config['agent']['model'] = content['agent']['model']
         config['agent']['model']['loss_type'] = content['agent']['model']['loss_type']
