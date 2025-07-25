@@ -17,7 +17,7 @@ RED_ACTION = 1
 
 
 def index_to_action(index, actions_map):
-    return actions_map[index]["phase"]
+    return actions_map[index]["phase"], actions_map[index]["duration"]
 
 
 def phase_to_index(phase, actions_map, duration):
@@ -54,6 +54,10 @@ class QSimulation(SUMO):
         self.travel_time_normalizer = Normalizer()
         self.travel_speed_normalizer = Normalizer()
         self.waiting_time_normalizer = Normalizer()
+        
+        # Add DQN-style normalizers
+        self.green_time_normalizer = Normalizer()
+        self.density_normalizer = Normalizer()
 
         self.step = 0
         self.num_actions = {}
@@ -64,11 +68,15 @@ class QSimulation(SUMO):
         self.agent_old_state = {}
         self.agent_memory = {}
 
-        self.queue_length = {}
         self.outflow_rate = {}
+        self.old_outflow_rate = {}
         self.travel_speed = {}
         self.travel_time = {}
         self.waiting_time = {}
+        self.density = {}
+        self.old_travel_speed = {}
+        self.old_travel_time = {}
+        self.old_density = {}
         self.phase = {}
 
         self.history = {
@@ -89,7 +97,7 @@ class QSimulation(SUMO):
 
         # Q-learning parameters
         self.q_table = {}  # {(state_tuple, action): value}
-        self.alpha = 0.1  # learning rate
+        self.alpha = 0.01  # Lower learning rate for function approximation
         self.gamma = self.agent_cfg["gamma"]
         self.epsilon = 1.0
         self.epsilon_min = self.agent_cfg.get("min_epsilon", 0.01)
@@ -99,6 +107,12 @@ class QSimulation(SUMO):
         self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
             self.get_longest_phase()
         )
+        
+        # Initialize RBF sampler once for consistent features
+        self.rbf_sampler = None
+        self.rbf_weights = {}
+        self.n_components = 50  # Reduced complexity
+        self.rbf_gamma = 0.1    # Lower gamma for stability
 
     def get_longest_phase(self):
         max_len = -1
@@ -120,23 +134,41 @@ class QSimulation(SUMO):
             traffic_light_id = traffic_light["id"]
             self.agent_memory[traffic_light_id] = self.memory
 
-            self.num_actions[traffic_light_id] = len(traffic_light["phase"])
+            # Initialize the green time
+            self.green_time = {}
+            self.green_time_old = {}
+            self.green_time[traffic_light_id] = 20
+            self.green_time_old[traffic_light_id] = 20
+
+            # Initialize the number of actions like DQN
+            self.num_actions[traffic_light_id] = len(
+                self.agent_cfg.get("green_duration_deltas", [-5, 0, 5])
+            ) * len(traffic_light["phase"])
             self.actions_map[traffic_light_id] = {}
 
+            # Create action map like DQN: phase + duration combinations
             i = 0
             for phase in traffic_light["phase"]:
-                self.actions_map[traffic_light_id][i] = {
-                    "phase": phase,
-                }
-                i += 1
+                for green_delta in self.agent_cfg.get("green_duration_deltas", [-5, 0, 5]):
+                    self.actions_map[traffic_light_id][i] = {
+                        "phase": phase,
+                        "duration": green_delta,
+                    }
+                    i += 1
 
             self.agent_reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0
             self.agent_old_state[traffic_light_id] = 0
-            self.queue_length[traffic_light_id] = 0
+            
+            # Initialize metrics like DQN
+            self.old_outflow_rate[traffic_light_id] = 0
             self.outflow_rate[traffic_light_id] = 0
+            self.old_travel_speed[traffic_light_id] = 0
             self.travel_speed[traffic_light_id] = 0
+            self.old_travel_time[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
+            self.old_density[traffic_light_id] = 0
+            self.density[traffic_light_id] = 0
             self.waiting_time[traffic_light_id] = 0
             self.phase[traffic_light_id] = None
 
@@ -161,21 +193,21 @@ class QSimulation(SUMO):
             return random.randint(0, self.num_actions[traffic_light_id] - 1)
         else:
             q_values = [
-                self.get_q(state, a) for a in range(self.num_actions[traffic_light_id])
+                self.get_q_rbf(state, a) for a in range(self.num_actions[traffic_light_id])
             ]
             return int(np.argmax(q_values))
 
     def qlearn_update(self, state, action, reward, next_state, done, traffic_light_id):
         max_next_q = max(
             [
-                self.get_q(next_state, a)
+                self.get_q_rbf(next_state, a)
                 for a in range(self.num_actions[traffic_light_id])
             ]
         )
-        old_q = self.get_q(state, action)
+        old_q = self.get_q_rbf(state, action)
         target = reward + (0 if done else self.gamma * max_next_q)
-        new_q = old_q + self.alpha * (target - old_q)
-        self.set_q(state, action, new_q)
+        # Use target directly for RBF function approximation
+        self.set_q_rbf(state, action, target)
 
     def run(self, epsilon, episode):
         print("Simulation started")
@@ -195,6 +227,7 @@ class QSimulation(SUMO):
                 "waiting_time": 0,
                 "outflow": 0,
                 "queue_length": 0,
+                "density_sum": 0,  # Add density_sum for DQN compatibility
                 "old_vehicle_ids": [],
                 "state": None,
                 "action_idx": None,
@@ -219,19 +252,22 @@ class QSimulation(SUMO):
 
                 # If time to choose a new action
                 if tl_state["green_time_remaining"] == 0:
-                    state = self.get_state(tl)
+                    state, base_green_time = self.get_state(tl)
                     action_idx = self.select_action(
                         tl_id,
                         state,
                         epsilon,
                     )
 
-                    phase = index_to_action(
+                    phase, green_delta = index_to_action(
                         action_idx,
                         self.actions_map[tl_id],
                     )
 
-                    green_time = tl_state["green_time"]
+                    # Calculate green time like DQN
+                    green_time = max(
+                        base_green_time, self.green_time[tl_id] + green_delta
+                    )
                     green_time = min(green_time, self.max_steps - self.step)
 
                     if tl_state["phase"] is not None:
@@ -387,30 +423,41 @@ class QSimulation(SUMO):
                     )
                     num_vehicles_out += outflow
                     tl_state["outflow"] += outflow
-                    tl_state["travel_speed_sum"] += self.get_sum_speed(tl)
-                    tl_state["travel_time_sum"] += self.get_sum_travel_time(tl)
-                    tl_state["waiting_time"] += self.get_sum_waiting_time(tl)
+                    tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
+                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
+                    tl_state["density_sum"] += self.get_avg_density(tl)
                     tl_state["old_vehicle_ids"] = new_vehicle_ids
-                    tl_state["queue_length"] += self.get_sum_queue_length(tl)
                     tl_state["green_time_remaining"] -= 1
 
                     # When phase ends, store metrics and update Q-table
                     if tl_state["green_time_remaining"] == 0:
                         green_time = tl_state["green_time"]
 
-                        self.queue_length[tl_id] = tl_state["queue_length"]
+                        # Calculate metrics like DQN
                         self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
-                        self.travel_speed[tl_id] = tl_state["travel_speed_sum"]
+                        self.travel_speed[tl_id] = (
+                            tl_state["travel_speed_sum"] / green_time
+                        )
                         self.travel_time[tl_id] = (
                             tl_state["travel_time_sum"] / green_time
                         )
-                        self.waiting_time[tl_id] = tl_state["waiting_time"]
+                        self.density[tl_id] = tl_state["density_sum"] / green_time
 
                         reward = self.get_reward(tl_id, tl_state["phase"])
-                        next_state = self.get_state(tl)
+                        next_state, _ = self.get_state(tl)
                         done = self.step >= self.max_steps
 
                         self.phase[tl_id] = tl_state["phase"]
+                        
+                        # Update green time tracking like DQN
+                        self.green_time_old[tl_id] = self.green_time[tl_id]
+                        self.green_time[tl_id] = green_time
+                        
+                        # Update old values for next reward calculation
+                        self.old_outflow_rate[tl_id] = self.outflow_rate[tl_id]
+                        self.old_travel_speed[tl_id] = self.travel_speed[tl_id]
+                        self.old_travel_time[tl_id] = self.travel_time[tl_id]
+                        self.old_density[tl_id] = self.density[tl_id]
 
                         self.agent_memory[tl_id].push(
                             tl_state["state"],
@@ -437,12 +484,12 @@ class QSimulation(SUMO):
                     for vid in tl_state["step_old_vehicle_ids"]
                     if vid not in step_new_vehicle_ids
                 )
-                tl_state["step_density_sum"] += self.get_sum_density(tl)
-                tl_state["step_travel_speed_sum"] += self.get_sum_speed(tl)
-                tl_state["step_travel_time_sum"] += self.get_sum_travel_time(tl)
+                tl_state["step_travel_speed_sum"] += self.get_avg_speed(tl)
+                tl_state["step_travel_time_sum"] += self.get_avg_travel_time(tl)
+                tl_state["step_density_sum"] += self.get_avg_density(tl)
                 tl_state["step_outflow"] += step_outflow
-                tl_state["step_queue_length"] += self.get_sum_queue_length(tl)
-                tl_state["step_waiting_time"] += self.get_sum_waiting_time(tl)
+                tl_state["step_queue_length"] += self.get_avg_queue_length(tl)
+                tl_state["step_waiting_time"] += self.get_avg_waiting_time(tl)
                 tl_state["step_old_vehicle_ids"] = step_new_vehicle_ids
 
         simulation_time = time.time() - start
@@ -469,28 +516,26 @@ class QSimulation(SUMO):
         return simulation_time, 0
 
     def get_reward(self, traffic_light_id, phase=None):
+        # Use DQN-style reward calculation (difference-based)
         return (
             self.weight["outflow_rate"]
             * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
+                - self.old_outflow_rate[traffic_light_id]
             )
-            + self.weight["delay"]
-            * (
-                1
-                - self.travel_speed_normalizer.normalize(
-                    self.travel_speed[traffic_light_id]
-                )
+            + self.weight["travel_speed"]
+            * self.travel_speed_normalizer.normalize(
+                self.travel_speed[traffic_light_id]
+                - self.old_travel_speed[traffic_light_id]
             )
-            + self.weight["waiting_time"]
-            * self.waiting_time_normalizer.normalize(
-                self.waiting_time[traffic_light_id]
-            )
-            + self.weight["switch_phase"] * (int)(self.phase[traffic_light_id] != phase)
             + self.weight["travel_time"]
-            * self.travel_time_normalizer.normalize(self.travel_time[traffic_light_id])
-            + self.weight["queue_length"]
-            * self.queue_length_normalizer.normalize(
-                self.queue_length[traffic_light_id]
+            * self.travel_time_normalizer.normalize(
+                self.old_travel_time[traffic_light_id]
+                - self.travel_time[traffic_light_id]
+            )
+            + self.weight["density"]
+            * self.density_normalizer.normalize(
+                self.old_density[traffic_light_id] - self.density[traffic_light_id]
             )
         )
 
@@ -502,9 +547,14 @@ class QSimulation(SUMO):
             if episode is not None
             else f"{path}q_table.pkl"
         )
+        save_data = {
+            'q_table': self.q_table,
+            'rbf_weights': getattr(self, 'rbf_weights', {}),
+            'rbf_sampler': getattr(self, 'rbf_sampler', None)
+        }
         with open(filename, "wb") as f:
-            pickle.dump(self.q_table, f)
-        print(f"Q-table saved to {filename}")
+            pickle.dump(save_data, f)
+        print(f"Q-table and RBF weights saved to {filename}")
 
     def load_q_table(self, path):
         """
@@ -515,8 +565,18 @@ class QSimulation(SUMO):
         """
         try:
             with open(path, "rb") as f:
-                self.q_table = pickle.load(f)
-            print(f"Q-table loaded from {path}")
+                data = pickle.load(f)
+                
+            if isinstance(data, dict) and 'q_table' in data:
+                # New format with RBF weights
+                self.q_table = data['q_table']
+                self.rbf_weights = data.get('rbf_weights', {})
+                self.rbf_sampler = data.get('rbf_sampler', None)
+                print(f"Q-table and RBF weights loaded from {path}")
+            else:
+                # Old format - just q_table
+                self.q_table = data
+                print(f"Q-table loaded from {path} (legacy format)")
         except FileNotFoundError:
             print(f"Q-table file not found: {path}. Starting with empty Q-table.")
         except Exception as e:
@@ -642,49 +702,42 @@ class QSimulation(SUMO):
     def get_state(self, traffic_light):
         """
         Get the current state at a specific traffic light in the simulation.
-
+        
         Returns:
             np.ndarray: 1D array representing the full input state
-            int: green time
+            int: green time (like DQN implementation)
         """
-        state_vector = []
-        features_per_phase = 4  # free_capacity, density, waiting_time, queue_length
-        # Compute max_phases from agent_cfg or fallback to number of phases
-        max_phases = self.agent_cfg.get("max_phases", len(traffic_light["phase"]))
+        state = [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]  # free_capacity, density, waiting_time, queue_length, phase_idx, green_time
 
-        for phase_str in traffic_light["phase"]:
-            movements = self.get_movements_from_phase(traffic_light, phase_str)
-            # Skip phases with no movements (safety check)
-            if not movements:
-                continue
-            free_capacity_sum = 0
-            density_sum = 0
-            max_waiting_time = 0
-            max_queue_length = 0
-            for detector_id in movements:
-                free_capacity_sum += self.get_free_capacity(detector_id)
-                density_sum += self.get_density(detector_id)
-                max_waiting_time = max(
-                    max_waiting_time, self.get_waiting_time(detector_id)
-                )
-                max_queue_length = max(
-                    max_queue_length, self.get_queue_length(detector_id)
-                )
-            movement_count = len(movements)
-            avg_free_capacity = free_capacity_sum / movement_count
-            avg_density = density_sum / movement_count
-            # Append per-phase state: [free_capacity, density, waiting_time, queue_length]
-            state_vector.extend(
-                [avg_free_capacity, avg_density, max_waiting_time, max_queue_length]
-            )
-        # Calculate required input dim: max_phases * features_per_phase
-        input_dim = max_phases * features_per_phase
-        # Pad with zeros if needed
-        padding = input_dim - len(state_vector)
-        if padding > 0:
-            state_vector.extend([0] * padding)
+        for detector in traffic_light["detectors"]:
+            detector_id = detector["id"]
+            free_capacity = self.get_free_capacity(detector_id)
+            density = self.get_density(detector_id)
+            waiting_time = self.get_waiting_time(detector_id)
+            queue_length = self.get_queue_length(detector_id)
 
-        return np.array(state_vector, dtype=np.float32)
+            state[0] += free_capacity
+            state[1] += density
+            state[2] = max(state[2], waiting_time)
+            state[3] = max(state[3], queue_length)
+
+        state[0] /= len(traffic_light["detectors"])
+        state[1] /= len(traffic_light["detectors"])
+
+        # Get green times and outflows from DESRA like DQN
+        phase, green_time = self.desra.select_phase(traffic_light)
+
+        state[4] = phase_to_index(phase, self.actions_map[traffic_light["id"]], 0)
+        state[5] = green_time
+
+        return np.array(state, dtype=np.float32), green_time
 
     def get_movements_from_phase(self, traffic_light, phase_str):
         detectors = [det["id"] for det in traffic_light["detectors"]]
@@ -740,11 +793,33 @@ class QSimulation(SUMO):
                 pass
         return np.sum(speeds) if speeds else 0.0
 
+    def get_avg_speed(self, traffic_light):
+        """
+        Get average speed like DQN implementation.
+        """
+        speeds = []
+        for detector in traffic_light["detectors"]:
+            try:
+                speed = traci.lanearea.getLastStepMeanSpeed(detector["id"])
+                speeds.append(speed)
+            except:
+                pass
+        return np.mean(speeds) if speeds else 0.0
+
     def get_sum_travel_time(self, traffic_light):
         travel_times = []
         for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
             travel_times.append(traci.lane.getTraveltime(lane))
         return np.sum(travel_times) if travel_times else 0.0
+
+    def get_avg_travel_time(self, traffic_light):
+        """
+        Get average travel time like DQN implementation.
+        """
+        travel_times = []
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            travel_times.append(traci.lane.getTraveltime(lane))
+        return np.mean(travel_times) if travel_times else 0.0
 
     def get_sum_density(self, traffic_light):
         densities = []
@@ -754,6 +829,18 @@ class QSimulation(SUMO):
             except:
                 pass
         return np.sum(densities) / 100 if densities else 0.0
+
+    def get_avg_density(self, traffic_light):
+        """
+        Get average density like DQN implementation.
+        """
+        densities = []
+        for detector in traffic_light["detectors"]:
+            try:
+                densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
+            except:
+                pass
+        return np.mean(densities) if densities else 0.0
 
     def get_num_phases(self, traffic_light):
         """
@@ -775,6 +862,18 @@ class QSimulation(SUMO):
                 pass
         return np.sum(queue_lengths) if queue_lengths else 0.0
 
+    def get_avg_queue_length(self, traffic_light):
+        """
+        Get the average queue length of a lane.
+        """
+        queue_lengths = []
+        for detector in traffic_light["detectors"]:
+            try:
+                queue_lengths.append(traci.lanearea.getLastStepHaltingNumber(detector["id"]))
+            except:
+                pass
+        return np.mean(queue_lengths) if queue_lengths else 0.0
+
     def get_sum_waiting_time(self, traffic_light):
         """
         Estimate waiting time by summing waiting times of all vehicles in the lane.
@@ -788,7 +887,76 @@ class QSimulation(SUMO):
             total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(vid)
         return total_waiting_time
 
+    def get_avg_waiting_time(self, traffic_light):
+        """
+        Estimate average waiting time like DQN implementation.
+        """
+        vehicle_ids = []
+        for detector in traffic_light["detectors"]:
+            vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(detector["id"]))
+
+        total_waiting_time = 0.0
+        for vid in vehicle_ids:
+            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        return total_waiting_time
+
     def reset_history(self):
         for key in self.history:
             for tl_id in self.history[key]:
                 self.history[key][tl_id] = []
+
+    def state_to_features(self, state, n_components=100, gamma=1.0):
+        """
+        Convert a continuous state vector to RBF features for function approximation.
+        Uses sklearn's RBFSampler for feature mapping with consistent centers.
+
+        Args:
+            state: numpy array of continuous state values
+            n_components: number of RBF features
+            gamma: RBF kernel parameter
+
+        Returns:
+            np.ndarray: RBF feature vector
+        """
+        from sklearn.kernel_approximation import RBFSampler
+
+        state = np.array(state).reshape(1, -1)
+        
+        # Initialize RBF sampler once with consistent centers
+        if self.rbf_sampler is None:
+            self.rbf_sampler = RBFSampler(
+                n_components=self.n_components, 
+                gamma=self.rbf_gamma, 
+                random_state=42
+            )
+            # Fit on first state to establish centers
+            self.rbf_sampler.fit(state)
+        
+        features = self.rbf_sampler.transform(state)
+        return features.flatten()
+
+    def get_q_rbf(self, state, action, n_components=100, gamma=1.0):
+        """
+        Get Q-value for state-action pair using RBF features and linear weights.
+        """
+        features = self.state_to_features(state)
+        if action not in self.rbf_weights:
+            self.rbf_weights[action] = np.zeros_like(features)
+        return np.dot(self.rbf_weights[action], features)
+
+    def set_q_rbf(
+        self, state, action, target, alpha=None, n_components=100, gamma=1.0
+    ):
+        """
+        Update Q-value weights for state-action pair using RBF features.
+        """
+        if alpha is None:
+            alpha = self.alpha  # Use consistent learning rate
+            
+        features = self.state_to_features(state)
+        if action not in self.rbf_weights:
+            self.rbf_weights[action] = np.zeros_like(features)
+        current = np.dot(self.rbf_weights[action], features)
+        error = target - current
+        self.rbf_weights[action] += alpha * error * features
+        return self.rbf_weights[action]
