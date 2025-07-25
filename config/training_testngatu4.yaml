@@ -16,6 +16,8 @@ model:
   save_interval: 10  # Save model every N episodes
 
 agent:
+  rbf_components: 100   
+  rbf_gamma: 0.5 
   gamma: 0.99
   num_states: 4 # min_free_capacity, density, waiting_time, queue_length
   model:

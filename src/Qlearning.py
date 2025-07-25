@@ -100,10 +100,12 @@ class QSimulation(SUMO):
         )
         
         # Initialize RBF sampler once for consistent features
-        self.rbf_sampler = None
+        self.rbf_sampler = {}  # Initialize as empty dict instead of None
         self.rbf_weights = {}
-        self.n_components = 50  # Reduced complexity
-        self.rbf_gamma = 0.1    # Lower gamma for stability
+        self.n_components = self.agent_cfg.get("rbf_components", 100)  # Configurable complexity
+        self.rbf_gamma = self.agent_cfg.get("rbf_gamma", 0.5)    # Configurable gamma for RBF
+        self.state_normalizer = {}  # Separate normalizer for each traffic light
+        self.feature_cache = {}  # Cache RBF features for efficiency
 
     def get_longest_phase(self):
         max_len = -1
@@ -171,24 +173,32 @@ class QSimulation(SUMO):
         self.q_table[(tuple(state), action)] = value
 
     def select_action(self, traffic_light_id, state, epsilon):
+        # Normalize state for better RBF performance
+        normalized_state = self.normalize_state(state, traffic_light_id)
+        
         # Epsilon-greedy for RBF Q-learning
         if random.random() < epsilon:
             return random.randint(0, self.num_actions[traffic_light_id] - 1)
         else:
             q_values = [
-                self.get_q_rbf(state, a) for a in range(self.num_actions[traffic_light_id])
+                self.get_q_rbf(normalized_state, a, traffic_light_id) 
+                for a in range(self.num_actions[traffic_light_id])
             ]
             return int(np.argmax(q_values))
 
     def qlearn_update(self, state, action, reward, next_state, done, traffic_light_id):
+        # Normalize states for RBF
+        normalized_state = self.normalize_state(state, traffic_light_id)
+        normalized_next_state = self.normalize_state(next_state, traffic_light_id)
+        
         max_next_q = max(
             [
-                self.get_q_rbf(next_state, a)
+                self.get_q_rbf(normalized_next_state, a, traffic_light_id)
                 for a in range(self.num_actions[traffic_light_id])
             ]
         )
         target = reward + (0 if done else self.gamma * max_next_q)
-        self.update_q_rbf(state, action, target)
+        self.update_q_rbf(normalized_state, action, target, traffic_light_id)
 
     def run(self, epsilon, episode):
         print("Simulation started")
@@ -478,6 +488,10 @@ class QSimulation(SUMO):
         self.reset_history()
         # Decay epsilon
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
+        
+        # Clear feature cache periodically to prevent memory issues
+        if episode % 50 == 0:
+            self.clear_feature_cache()
 
         return simulation_time, 0
 
@@ -536,7 +550,7 @@ class QSimulation(SUMO):
             print(f"Error loading Q-table: {e}. Starting with empty Q-table.")
 
     def save_rbf_weights(self, path=None, episode=None):
-        """Save RBF weights to file."""
+        """Save RBF weights and normalizers to file."""
         if path is None:
             path = self.path if hasattr(self, "path") else ""
         filename = (
@@ -544,16 +558,36 @@ class QSimulation(SUMO):
             if episode is not None
             else f"{path}rbf_weights.pkl"
         )
+        
+        # Save both weights and state normalizers
+        save_data = {
+            'rbf_weights': self.rbf_weights,
+            'state_normalizer': self.state_normalizer,
+            'n_components': self.n_components,
+            'rbf_gamma': self.rbf_gamma
+        }
+        
         with open(filename, "wb") as f:
-            pickle.dump(self.rbf_weights, f)
-        print(f"RBF weights saved to {filename}")
+            pickle.dump(save_data, f)
+        print(f"RBF weights and normalizers saved to {filename}")
 
     def load_rbf_weights(self, path):
-        """Load RBF weights from file."""
+        """Load RBF weights and normalizers from file."""
         try:
             with open(path, "rb") as f:
-                self.rbf_weights = pickle.load(f)
-            print(f"RBF weights loaded from {path}")
+                save_data = pickle.load(f)
+            
+            # Handle both old and new formats
+            if isinstance(save_data, dict) and 'rbf_weights' in save_data:
+                self.rbf_weights = save_data['rbf_weights']
+                self.state_normalizer = save_data.get('state_normalizer', {})
+                self.n_components = save_data.get('n_components', self.n_components)
+                self.rbf_gamma = save_data.get('rbf_gamma', self.rbf_gamma)
+            else:
+                # Old format - just weights
+                self.rbf_weights = save_data
+                
+            print(f"RBF weights and normalizers loaded from {path}")
         except FileNotFoundError:
             print(f"RBF weights file not found: {path}. Starting with empty weights.")
         except Exception as e:
@@ -585,6 +619,13 @@ class QSimulation(SUMO):
             self.save_q_table(episode=episode)
             self.save_rbf_weights(episode=episode)
             self.save_metrics_to_dataframe(episode=episode)
+            
+            # Print RBF diagnostics
+            rbf_info = self.get_rbf_info()
+            print(f"RBF Info: Components={rbf_info['n_components']}, "
+                  f"Gamma={rbf_info['rbf_gamma']}, "
+                  f"Weight keys={rbf_info['num_weight_keys']}, "
+                  f"Cache size={rbf_info['cache_size']}")
 
             print(
                 "Plots, Q-table, RBF weights, and metrics DataFrame at episode", episode, "generated"
@@ -848,46 +889,144 @@ class QSimulation(SUMO):
             for tl_id in self.history[key]:
                 self.history[key][tl_id] = []
 
-    def initialize_rbf(self, state_dim):
-        """Initialize RBF sampler with a representative state."""
-        if self.rbf_sampler is None:
-            self.rbf_sampler = RBFSampler(
+    def initialize_rbf(self, state_dim, traffic_light_id):
+        """Initialize RBF sampler with a representative state for each traffic light."""
+        if traffic_light_id not in self.rbf_sampler:
+            self.rbf_sampler[traffic_light_id] = RBFSampler(
                 gamma=self.rbf_gamma, 
                 n_components=self.n_components, 
                 random_state=42
             )
-            # Fit with dummy data to initialize
-            dummy_state = np.zeros((1, state_dim))
-            self.rbf_sampler.fit(dummy_state)
-            print(f"RBF sampler initialized with {self.n_components} components")
+            # Fit with dummy data to initialize - use normalized range
+            dummy_state = np.random.normal(0, 1, size=(10, state_dim + 1))  # +1 for action
+            self.rbf_sampler[traffic_light_id].fit(dummy_state)
+            print(f"RBF sampler initialized for {traffic_light_id} with {self.n_components} components")
 
-    def get_rbf_features(self, state, action):
-        """Extract RBF features for state-action pair."""
-        if self.rbf_sampler is None:
-            self.initialize_rbf(len(state))
+    def get_rbf_features(self, state, action, traffic_light_id):
+        """Extract RBF features for state-action pair with caching."""
+        # Create cache key
+        state_tuple = tuple(state)
+        cache_key = (state_tuple, action, traffic_light_id)
+        
+        # Check cache first
+        if cache_key in self.feature_cache:
+            return self.feature_cache[cache_key]
+        
+        if traffic_light_id not in self.rbf_sampler:
+            self.initialize_rbf(len(state), traffic_light_id)
         
         # Combine state and action into feature vector
         state_action = np.concatenate([state, [action]]).reshape(1, -1)
-        return self.rbf_sampler.transform(state_action).flatten()
+        features = self.rbf_sampler[traffic_light_id].transform(state_action).flatten()
+        
+        # Cache the features (limit cache size)
+        if len(self.feature_cache) > 10000:  # Clear cache when it gets too large
+            self.feature_cache.clear()
+        self.feature_cache[cache_key] = features
+        
+        return features
 
-    def get_q_rbf(self, state, action):
+    def get_q_rbf(self, state, action, traffic_light_id):
         """Get Q-value using RBF function approximation."""
-        features = self.get_rbf_features(state, action)
-        key = (action,)  # Use action as key for weights
+        features = self.get_rbf_features(state, action, traffic_light_id)
+        key = (traffic_light_id, action)  # Include traffic light ID in key
         
         if key not in self.rbf_weights:
             self.rbf_weights[key] = np.zeros(len(features))
         
         return np.dot(self.rbf_weights[key], features)
 
-    def update_q_rbf(self, state, action, target):
-        """Update Q-value using RBF function approximation."""
-        features = self.get_rbf_features(state, action)
-        key = (action,)
+    def update_q_rbf(self, state, action, target, traffic_light_id):
+        """Update Q-value using RBF function approximation with adaptive learning rate."""
+        features = self.get_rbf_features(state, action, traffic_light_id)
+        key = (traffic_light_id, action)
         
         if key not in self.rbf_weights:
             self.rbf_weights[key] = np.zeros(len(features))
         
         current_q = np.dot(self.rbf_weights[key], features)
         error = target - current_q
-        self.rbf_weights[key] += self.alpha * error * features
+        
+        # Adaptive learning rate based on feature magnitude
+        feature_norm = np.linalg.norm(features)
+        adaptive_alpha = self.alpha / (1 + feature_norm * 0.1)
+        
+        self.rbf_weights[key] += adaptive_alpha * error * features
+
+    def normalize_state(self, state, traffic_light_id):
+        """
+        Normalize state features for better RBF performance.
+        Each traffic light maintains its own normalization statistics.
+        """
+        if traffic_light_id not in self.state_normalizer:
+            self.state_normalizer[traffic_light_id] = {
+                'mean': np.zeros_like(state),
+                'std': np.ones_like(state),
+                'count': 0
+            }
+        
+        normalizer = self.state_normalizer[traffic_light_id]
+        
+        # Online mean and std update (Welford's algorithm)
+        normalizer['count'] += 1
+        delta = state - normalizer['mean']
+        normalizer['mean'] += delta / normalizer['count']
+        
+        if normalizer['count'] > 1:
+            delta2 = state - normalizer['mean']
+            normalizer['std'] = np.sqrt(
+                ((normalizer['count'] - 2) * normalizer['std']**2 + delta * delta2) / 
+                (normalizer['count'] - 1)
+            )
+            # Avoid division by zero
+            normalizer['std'] = np.maximum(normalizer['std'], 1e-8)
+        
+        # Normalize state
+        normalized_state = (state - normalizer['mean']) / normalizer['std']
+        
+        # Clip to reasonable range to avoid extreme values
+        normalized_state = np.clip(normalized_state, -5, 5)
+        
+        return normalized_state
+
+    def get_state_statistics(self):
+        """Get statistics about state normalization for debugging."""
+        stats = {}
+        for tl_id, normalizer in self.state_normalizer.items():
+            stats[tl_id] = {
+                'count': normalizer['count'],
+                'mean': normalizer['mean'].tolist(),
+                'std': normalizer['std'].tolist()
+            }
+        return stats
+    
+    def clear_feature_cache(self):
+        """Clear the RBF feature cache to free memory."""
+        self.feature_cache.clear()
+        print("RBF feature cache cleared")
+    
+    def get_rbf_info(self):
+        """Get information about RBF configuration and usage."""
+        info = {
+            'n_components': self.n_components,
+            'rbf_gamma': self.rbf_gamma,
+            'num_traffic_lights': len(self.rbf_sampler),
+            'num_weight_keys': len(self.rbf_weights),
+            'cache_size': len(self.feature_cache),
+            'state_normalizers': len(self.state_normalizer)
+        }
+        return info
+    
+    def reset_state_normalizers(self):
+        """Reset state normalization statistics. Useful when starting a new training phase."""
+        self.state_normalizer.clear()
+        print("State normalizers reset")
+    
+    def get_q_values_for_state(self, state, traffic_light_id):
+        """Get Q-values for all actions given a state (useful for analysis)."""
+        normalized_state = self.normalize_state(state, traffic_light_id)
+        q_values = [
+            self.get_q_rbf(normalized_state, a, traffic_light_id) 
+            for a in range(self.num_actions[traffic_light_id])
+        ]
+        return np.array(q_values)
