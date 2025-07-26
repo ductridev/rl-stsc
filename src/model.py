@@ -299,6 +299,11 @@ class DQN(nn.Module):
         green_preds_taken = green_preds[
             torch.arange(green_preds.size(0)), actions
         ]  # [B]
+
+        # Clamp predictions and targets for stability
+        green_preds_taken = green_preds_taken.clamp(min=5.0, max=60.0)
+        green_targets = green_targets.clamp(min=5.0, max=60.0)
+
         green_loss = F.mse_loss(green_preds_taken, green_targets)
 
         # === Total Loss ===
@@ -315,10 +320,9 @@ class DQN(nn.Module):
             "q_loss": q_loss.item(),
             "green_loss": green_loss.item(),
             "total_loss": total_loss.item(),
-            "loss": total_loss.item(),  # Depracated
             "avg_q_value": q_value.mean().item(),
             "avg_max_next_q_value": max_next_q_value.mean().item(),
-            "avg_target": target_q_value.mean().item(),
+            "avg_target": target_q_value.detach().mean().item(),
         }
 
     def save(self, path):
