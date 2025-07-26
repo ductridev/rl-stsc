@@ -15,14 +15,18 @@ class DESRA(SUMO):
         self.occupancies = defaultdict(lambda: deque())
 
         # Estimated real-time parameters
-        self.saturation_flow = 1800
-        self.critical_density = 60
-        self.jam_density = 180
+        self.saturation_flow = 0.5
+        self.critical_density = 0.6
+        self.jam_density = 0.18
 
-        self.last_step = 0
-        self.arrival_buffers = defaultdict(lambda: deque())
-
-    def select_phase_with_desra_hints(self, traffic_light):
+    def select_phase_with_desra_hints(
+        self,
+        traffic_light,
+        q_arrivals: dict,
+        saturation_flow: float,
+        critical_density: float,
+        jam_density: float,
+    ):
         """
         Select best phase using DESRA hints based on effective outflow.
         """
@@ -30,8 +34,19 @@ class DESRA(SUMO):
         best_green_time = 0
         best_effective_outflow = -1.0
 
+        self.saturation_flow = saturation_flow
+        self.critical_density = critical_density
+        self.jam_density = jam_density
+
+        print("=== DESRA Hints ===")
+        print(f"saturation_flow: {saturation_flow}")
+        print(f"critical_density: {critical_density}")
+        print(f"jam_density: {jam_density}")
+
         for phase_str in traffic_light["phase"]:
             movements = self.get_movements_from_phase(traffic_light, phase_str)
+
+            print(f"Phase: {phase_str}")
 
             # 1) Compute the downstream free space for this phase (xd)
             #    i.e. the most restrictive downstream capacity over all movements.
@@ -46,9 +61,12 @@ class DESRA(SUMO):
             sat_times = {}
             for det in movements:
                 x0 = self.get_queue_length(det)  # upstream queue (m)
-                q_arr = self.get_arrival_flow(det)  # veh/s
+                q_arr = q_arrivals.get(det, 0.0)  # veh/s
                 lane_len = traci.lanearea.getLength(det)  # Δ_j
                 Gsat = self.estimate_saturated_green_time(x0, q_arr, xd, lane_len)
+                print(
+                    f"Det: {det}, Gsat: {Gsat} x0: {x0} q_arr: {q_arr} lane_len: {lane_len} xd: {xd}"
+                )
                 if Gsat > 0:
                     Gmin = min(Gmin, Gsat)
                 sat_times[det] = (Gsat, x0, q_arr, lane_len)
@@ -60,11 +78,11 @@ class DESRA(SUMO):
             # 3) For this Gmin, compute total effective outflow F_total
             F_total = 0.0
             for det, (Gsat, x0, q_arr, lane_len) in sat_times.items():
-                s = self.saturation_flow / 3600.0  # veh/s
+                s = self.saturation_flow
                 # three‐case formula from Eq. (9):
                 if Gsat >= Gmin:
                     # full‐capacity discharge
-                    F = s * Gmin
+                    F_total += s * Gmin
                 else:
                     # Gsat < Gmin → two subcases
                     # we need to know if the queue‐extent was upstream‐bounded or downstream‐bounded.
@@ -72,27 +90,31 @@ class DESRA(SUMO):
                     #  - if xM <= xd then we can use the second branch
                     #  - else the third.
                     # we already computed xM inside estimate_saturated — but for clarity:
-                    xM = min(
-                        self.estimate_shockwave_extent(x0, q_arr, lane_len), lane_len
-                    )
+                    xM = self.estimate_shockwave_extent(x0, q_arr, lane_len)
                     if xM <= xd:
                         # Eq. (9) middle case: s*Gsat + q_arr*(Gmin - Gsat)
-                        F = s * Gsat + q_arr * (Gmin - Gsat)
+                        F_total += s * Gsat + q_arr * (Gmin - Gsat)
                     else:
                         # Eq. (9) last case: s*Gsat
-                        F = s * Gsat
-                F_total += F
+                        F_total += s * Gsat
 
             # 4) Compute effective outflow rate v_i
             v_i = F_total / (Gmin + self.interphase_duration)
+
+            print(f"Phase: {phase_str}, Gmin: {Gmin}, F_total: {F_total}, v_i: {v_i}")
 
             # 5) Track the best
             if v_i > best_effective_outflow:
                 best_effective_outflow = v_i
                 best_phase = phase_str
                 best_green_time = Gmin
+            elif v_i == best_effective_outflow and Gmin < best_green_time:
+                best_phase = phase_str
+                best_green_time = Gmin
 
-        self.last_step = traci.simulation.getTime()
+        print(
+            f"Selected phase {best_phase} with effective outflow {best_effective_outflow} vehicles/s and green time {best_green_time} seconds"
+        )
 
         return best_phase, max(0, int(best_green_time))
 
@@ -106,9 +128,9 @@ class DESRA(SUMO):
         Returns:
             float: Shockwave extent (meters)
         """
-        s = self.saturation_flow / 3600.0  # veh/s
-        kc = self.critical_density / 1000.0  # veh/m
-        kj = self.jam_density / 1000.0  # veh/m
+        s = self.saturation_flow
+        kc = self.critical_density
+        kj = self.jam_density
         if s <= 0 or kc <= 0 or kj <= 0:
             return 0.0
 
@@ -130,9 +152,9 @@ class DESRA(SUMO):
             float: Saturated green time (seconds)
         """
         # — Step 1: unit conversion —
-        s = self.saturation_flow / 3600.0  # veh/s
-        kc = self.critical_density / 1000.0  # veh/m
-        kj = self.jam_density / 1000.0  # veh/m
+        s = self.saturation_flow
+        kc = self.critical_density
+        kj = self.jam_density
         if s <= 0 or kc <= 0 or kj <= 0:
             return 0.0
 
@@ -154,6 +176,8 @@ class DESRA(SUMO):
             Gsat = xd * kj / s
         else:
             Gsat = 0.0
+
+        # print(f"DEBUG: x0={x0}, xd={xd}, link_length={link_length}, xM={xM}, q_arr={q_arr}, xM={xM}, Gsat={Gsat}")
 
         return Gsat
 
@@ -193,7 +217,8 @@ class DESRA(SUMO):
 
         for link in links:
             downstream_lane = link[0]
-            length = traci.lane.getLength(downstream_lane)
+            # length = traci.lane.getLength(downstream_lane)
+            length = 100
             occupancy_pct = traci.lane.getLastStepOccupancy(downstream_lane)
             # occupancy_pct is 0–100%, so queue_length_m = length * (occupancy_pct/100)
             queue_m = length * (occupancy_pct / 100.0)
@@ -204,13 +229,3 @@ class DESRA(SUMO):
         else:
             # no downstream links → assume full storage available
             return traci.lanearea.getLength(detector_id)
-
-    def get_arrival_flow(self, detector_id):
-        """
-        Returns the *smoothed* arrival flow (veh/s) by averaging
-        the buffer of raw counts we’ve been recording each step.
-        """
-        buf = self.arrival_buffers[detector_id]
-        if not buf:
-            return 0.0
-        return sum(buf) / len(buf)
