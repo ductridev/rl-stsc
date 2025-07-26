@@ -89,7 +89,7 @@ class QSimulation(SUMO):
 
         # Q-learning parameters
         self.q_table = {}  # {(state_tuple, action): value}
-        self.alpha = 0.01  # Lower learning rate for function approximation
+        self.alpha = 0.1  # Increased learning rate for better convergence
         self.gamma = self.agent_cfg["gamma"]
         self.epsilon = 1.0
         self.epsilon_min = self.agent_cfg.get("min_epsilon", 0.01)
@@ -102,8 +102,8 @@ class QSimulation(SUMO):
         # Initialize RBF sampler once for consistent features
         self.rbf_sampler = {}  # Initialize as empty dict instead of None
         self.rbf_weights = {}
-        self.n_components = self.agent_cfg.get("rbf_components", 100)  # Configurable complexity
-        self.rbf_gamma = self.agent_cfg.get("rbf_gamma", 0.5)    # Configurable gamma for RBF
+        self.n_components = self.agent_cfg.get("rbf_components", 50)  # Reduced complexity for stability
+        self.rbf_gamma = self.agent_cfg.get("rbf_gamma", 1.0)    # Increased gamma for more localized features
         self.state_normalizer = {}  # Separate normalizer for each traffic light
         self.feature_cache = {}  # Cache RBF features for efficiency
 
@@ -186,7 +186,7 @@ class QSimulation(SUMO):
             ]
             return int(np.argmax(q_values))
 
-    def qlearn_update(self, state, action, reward, next_state, done, traffic_light_id):
+    def qlearn_update(self, state, action, reward, next_state, done, traffic_light_id, episode=None):
         # Normalize states for RBF
         normalized_state = self.normalize_state(state, traffic_light_id)
         normalized_next_state = self.normalize_state(next_state, traffic_light_id)
@@ -197,7 +197,21 @@ class QSimulation(SUMO):
                 for a in range(self.num_actions[traffic_light_id])
             ]
         )
+        
+        # Clip max_next_q to prevent explosive targets - tighter bounds for traffic control
+        max_next_q = np.clip(max_next_q, -20, 5)
+        
         target = reward + (0 if done else self.gamma * max_next_q)
+        
+        # Clip target to reasonable range for traffic control
+        target = np.clip(target, -25, 5)
+        
+        current_q = self.get_q_rbf(normalized_state, action, traffic_light_id)
+        
+        # Debug information
+        if episode is not None:
+            self.debug_q_learning(episode, traffic_light_id, normalized_state, action, reward, current_q, target)
+        
         self.update_q_rbf(normalized_state, action, target, traffic_light_id)
 
     def run(self, epsilon, episode):
@@ -450,6 +464,7 @@ class QSimulation(SUMO):
                             next_state,
                             done,
                             tl_id,
+                            episode,
                         )
                         self.history["agent_reward"][tl_id].append(reward)
 
@@ -937,7 +952,7 @@ class QSimulation(SUMO):
         return np.dot(self.rbf_weights[key], features)
 
     def update_q_rbf(self, state, action, target, traffic_light_id):
-        """Update Q-value using RBF function approximation with adaptive learning rate."""
+        """Update Q-value using RBF function approximation with improved learning."""
         features = self.get_rbf_features(state, action, traffic_light_id)
         key = (traffic_light_id, action)
         
@@ -947,11 +962,19 @@ class QSimulation(SUMO):
         current_q = np.dot(self.rbf_weights[key], features)
         error = target - current_q
         
-        # Adaptive learning rate based on feature magnitude
-        feature_norm = np.linalg.norm(features)
-        adaptive_alpha = self.alpha / (1 + feature_norm * 0.1)
+        # Clip error to prevent explosive updates
+        error = np.clip(error, -10, 10)
         
-        self.rbf_weights[key] += adaptive_alpha * error * features
+        # Compute gradient
+        gradient = error * features
+        
+        # Clip gradient norm for stability
+        gradient_norm = np.linalg.norm(gradient)
+        if gradient_norm > 5.0:  # Max gradient norm
+            gradient = gradient * (5.0 / gradient_norm)
+        
+        # Apply update
+        self.rbf_weights[key] += self.alpha * gradient
 
     def normalize_state(self, state, traffic_light_id):
         """
@@ -962,30 +985,33 @@ class QSimulation(SUMO):
             self.state_normalizer[traffic_light_id] = {
                 'mean': np.zeros_like(state),
                 'std': np.ones_like(state),
-                'count': 0
+                'count': 0,
+                'update_count': 0
             }
         
         normalizer = self.state_normalizer[traffic_light_id]
         
-        # Online mean and std update (Welford's algorithm)
-        normalizer['count'] += 1
-        delta = state - normalizer['mean']
-        normalizer['mean'] += delta / normalizer['count']
+        # Only update normalization statistics for first 1000 steps to stabilize
+        if normalizer['update_count'] < 1000:
+            normalizer['count'] += 1
+            normalizer['update_count'] += 1
+            delta = state - normalizer['mean']
+            normalizer['mean'] += delta / normalizer['count']
+            
+            if normalizer['count'] > 1:
+                delta2 = state - normalizer['mean']
+                normalizer['std'] = np.sqrt(
+                    ((normalizer['count'] - 2) * normalizer['std']**2 + delta * delta2) / 
+                    (normalizer['count'] - 1)
+                )
+                # Avoid division by zero
+                normalizer['std'] = np.maximum(normalizer['std'], 1e-8)
         
-        if normalizer['count'] > 1:
-            delta2 = state - normalizer['mean']
-            normalizer['std'] = np.sqrt(
-                ((normalizer['count'] - 2) * normalizer['std']**2 + delta * delta2) / 
-                (normalizer['count'] - 1)
-            )
-            # Avoid division by zero
-            normalizer['std'] = np.maximum(normalizer['std'], 1e-8)
-        
-        # Normalize state
+        # Normalize state using stabilized statistics
         normalized_state = (state - normalizer['mean']) / normalizer['std']
         
         # Clip to reasonable range to avoid extreme values
-        normalized_state = np.clip(normalized_state, -5, 5)
+        normalized_state = np.clip(normalized_state, -3, 3)  # Reduced clipping range
         
         return normalized_state
 
@@ -1030,3 +1056,26 @@ class QSimulation(SUMO):
             for a in range(self.num_actions[traffic_light_id])
         ]
         return np.array(q_values)
+    
+    def debug_q_learning(self, episode, traffic_light_id, state, action, reward, q_value, target):
+        """Debug Q-learning performance"""
+        if episode % 10 == 0 and hasattr(self, '_debug_count'):
+            if not hasattr(self, '_debug_count'):
+                self._debug_count = 0
+            
+            self._debug_count += 1
+            if self._debug_count <= 5:  # Only print first 5 debug messages per 10 episodes
+                print(f"Episode {episode} - TL {traffic_light_id}:")
+                print(f"  State range: [{state.min():.3f}, {state.max():.3f}]")
+                print(f"  Action: {action}, Reward: {reward:.3f}")
+                print(f"  Q-value: {q_value:.3f}, Target: {target:.3f}")
+                print(f"  Error: {abs(target - q_value):.3f}")
+                
+                if hasattr(self, 'state_normalizer') and traffic_light_id in self.state_normalizer:
+                    normalizer = self.state_normalizer[traffic_light_id]
+                    print(f"  Norm stats: count={normalizer.get('update_count', 0)}")
+                print("  ---")
+        
+        # Reset debug count every 10 episodes
+        if episode % 10 == 0:
+            self._debug_count = 0
