@@ -38,15 +38,8 @@ class DESRA(SUMO):
         self.critical_density = critical_density
         self.jam_density = jam_density
 
-        print("=== DESRA Hints ===")
-        print(f"saturation_flow: {saturation_flow}")
-        print(f"critical_density: {critical_density}")
-        print(f"jam_density: {jam_density}")
-
         for phase_str in traffic_light["phase"]:
             movements = self.get_movements_from_phase(traffic_light, phase_str)
-
-            print(f"Phase: {phase_str}")
 
             # 1) Compute the downstream free space for this phase (xd)
             #    i.e. the most restrictive downstream capacity over all movements.
@@ -64,9 +57,7 @@ class DESRA(SUMO):
                 q_arr = q_arrivals.get(det, 0.0)  # veh/s
                 lane_len = traci.lanearea.getLength(det)  # Δ_j
                 Gsat = self.estimate_saturated_green_time(x0, q_arr, xd, lane_len)
-                print(
-                    f"Det: {det}, Gsat: {Gsat} x0: {x0} q_arr: {q_arr} lane_len: {lane_len} xd: {xd}"
-                )
+
                 if Gsat > 0:
                     Gmin = min(Gmin, Gsat)
                 sat_times[det] = (Gsat, x0, q_arr, lane_len)
@@ -101,8 +92,6 @@ class DESRA(SUMO):
             # 4) Compute effective outflow rate v_i
             v_i = F_total / (Gmin + self.interphase_duration)
 
-            print(f"Phase: {phase_str}, Gmin: {Gmin}, F_total: {F_total}, v_i: {v_i}")
-
             # 5) Track the best
             if v_i > best_effective_outflow:
                 best_effective_outflow = v_i
@@ -111,10 +100,6 @@ class DESRA(SUMO):
             elif v_i == best_effective_outflow and Gmin < best_green_time:
                 best_phase = phase_str
                 best_green_time = Gmin
-
-        print(
-            f"Selected phase {best_phase} with effective outflow {best_effective_outflow} vehicles/s and green time {best_green_time} seconds"
-        )
 
         return best_phase, max(0, int(best_green_time))
 

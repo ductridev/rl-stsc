@@ -191,10 +191,9 @@ if __name__ == "__main__":
                 episode=episode,
                 metrics=[
                     "density_avg",
-                    "green_time_avg",
                     "travel_time_avg",
                     "outflow_avg",
-                    "travel_speed_avg",
+                    "travel_delay_avg",
                     "waiting_time_avg",
                     "queue_length_avg",
                 ],
