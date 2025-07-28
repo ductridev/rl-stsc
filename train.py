@@ -14,8 +14,7 @@ from src.intersection import Intersection
 from src.accident_manager import AccidentManager
 from src.comparison_utils import SimulationComparison
 from src.scripts.random_demand_sides import (
-    generate_random_intervals,
-    save_to_same_dir_as_cfg,
+    generate_and_save_random_intervals
 )
 import datetime
 
@@ -132,7 +131,8 @@ if __name__ == "__main__":
         print("Generating routes...")
         # Run the build routes file command
 
-        edge_data = generate_random_intervals(
+        random_demand_name = generate_and_save_random_intervals(
+            sumo_cfg_file=config["sumo_cfg_file"],
             total_duration=3600,
             min_interval=600,
             max_interval=1800,
@@ -143,8 +143,6 @@ if __name__ == "__main__":
             max_active_sides=3,
             edge_groups=config["edge_groups"],
         )
-
-        random_demand_name = save_to_same_dir_as_cfg(edge_data, config["sumo_cfg_file"])
 
         Intersection.generate_residential_demand_routes(
             config,

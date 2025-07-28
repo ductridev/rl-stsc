@@ -1,4 +1,6 @@
 import os
+import xml.etree.ElementTree as ET
+
 class Intersection:
     @staticmethod
     def get_all_intersections_with_sumo():
@@ -33,12 +35,11 @@ class Intersection:
         return os.path.exists(
             os.path.join(os.getcwd(), "simulations", intersection, "osm.sumocfg")
         )
-
     @staticmethod
     def generate_residential_demand_routes(
         config,
         simulation_path,
-        demand_level="low",  # Options: 'low', 'medium', 'high'
+        demand_level="low", # Options: 'low', 'medium', 'high'
         enable_bicycle=True,
         enable_pedestrian=True,
         enable_motorcycle=True,
@@ -62,22 +63,25 @@ class Intersection:
         print(f"Generating residential routes for {demand_level} demand...")
 
         original_path = os.getcwd()
-
         try:
-            intersection_path = os.path.join(
-                os.getcwd(), "simulations", simulation_path
-            )
+            intersection_path = os.path.join(os.getcwd(), "simulations", simulation_path)
             os.chdir(intersection_path)
 
+            # Load weight file
+            weight_file_path = f"{random_demand_name}.src.xml"
+            tree = ET.parse(weight_file_path)
+            root = tree.getroot()
+            intervals = [
+                (float(interval.get("begin")), float(interval.get("end")))
+                for interval in root.findall("interval")
+            ]
+
             if demand_level not in config["vehicle_counts"]:
-                print(
-                    f"Invalid demand level '{demand_level}'. Must be one of {list(config['vehicle_counts'].keys())}."
-                )
+                print(f"Invalid demand level '{demand_level}'. Must be one of {list(config['vehicle_counts'].keys())}.")
                 return
 
             vehicle_counts = config["vehicle_counts"][demand_level]
-            simulation_duration = 3600  # 1 hour in seconds
-
+            simulation_duration = 3600
             vehicle_configs = [
                 (
                     "motorcycle",
@@ -117,55 +121,74 @@ class Intersection:
             ]
 
             enabled_types = [v for v in vehicle_configs if v[3] and v[4] > 0]
-
             if not enabled_types:
-                print(
-                    "No vehicle types enabled or no vehicles specified in this demand level."
-                )
+                print("No vehicle types enabled or specified.")
                 return
 
-            total_vehicles = sum(v[4] for v in enabled_types)
-
-            print(
-                f"Total vehicles for {demand_level} demand: {total_vehicles} vehicles over {simulation_duration} seconds"
-            )
-
             for prefix, vclass, vehicle_class, _enabled, count in enabled_types:
+                print(f"Generating trips for {vehicle_class} (Total: {count})")
+                merged_trip_file = f"osm.res_{prefix}.trips.xml"
 
-                # 1. Generate trips file
-                trip_cmd = (
-                    f'python {original_path}/randomTrips.py '
-                    f"-n osm.net.xml.gz "
-                    f"-o osm.res_{prefix}.trips.xml "
-                    f"--insertion-rate {count * 4} "
-                    f"--begin 0 --end {simulation_duration} "
-                    f"--validate --remove-loops "
-                    f"--vclass {vclass} "
-                    f'--trip-attributes "departLane=\'best\'" '
-                    f'--fringe-start-attributes "departSpeed=\'max\'" '
-                    f"--prefix res_{prefix} "
-                )
+                with open(merged_trip_file, "w") as merged_file:
+                    merged_file.write("<routes>\n")
 
-                if vehicle_class == "pedestrian":
-                    trip_cmd += "--via-edge-types footway,path,sidewalk "
-                else:
-                    trip_cmd += f"--vehicle-class {vehicle_class} "
+                    for interval_id, (begin_time, end_time) in enumerate(intervals):
+                        print(f"  Interval {interval_id}: {begin_time}-{end_time}")
+                        vehicles_in_interval = int(count / len(intervals))
 
-                if random_demand_name:
-                    trip_cmd += f"--weights-prefix {random_demand_name} "
+                        if interval_id == len(intervals) - 1:
+                            vehicles_in_interval = count - ((len(intervals) - 1) * int(count / len(intervals)))
 
-                # 2. Convert trips to routes using duarouter
+                        trip_file = f"osm.res_{prefix}.interval_{interval_id}.trips.xml"
+                        trip_cmd = (
+                            f'python {original_path}/randomTrips.py '
+                            f'-n osm.net.xml.gz '
+                            f'-o {trip_file} '
+                            f'--insertion-rate {vehicles_in_interval * 3600 / (end_time - begin_time)} '
+                            f'--begin {begin_time} --end {end_time} '
+                            f'--validate --remove-loops '
+                            f'--vclass {vclass} '
+                            f'--trip-attributes "departLane=\'best\'" '
+                            f'--fringe-start-attributes "departSpeed=\'max\'" '
+                            f'--prefix res_{prefix}_int{interval_id} '
+                        )
+
+                        if vehicle_class == "pedestrian":
+                            trip_cmd += "--via-edge-types footway,path,sidewalk "
+                        else:
+                            trip_cmd += f"--vehicle-class {vehicle_class} "
+
+                        if random_demand_name:
+                            trip_cmd += f"--weights-prefix {random_demand_name} "
+
+                        # Run randomTrips.py
+                        os.system(trip_cmd)
+
+                        # Merge trips into the combined file
+                        with open(trip_file, "r") as trip_f:
+                            for line in trip_f:
+                                if line.strip().startswith("<?xml"):
+                                    continue  # Skip XML declaration
+                                if "<routes" in line or "</routes" in line:
+                                    continue  # Skip <routes> tags
+                                merged_file.write(line)
+
+                    merged_file.write("</routes>\n")  # Close routes tag
+
+                # Generate .rou.xml using duarouter for each vehicle class
+                route_file = f"osm.res_{prefix}.rou.xml"
+                alt_route_file = f"osm.res_{prefix}.rou.alt.xml"
                 route_cmd = (
                     f'duarouter '
                     f'-n osm.net.xml.gz '
-                    f'--route-files osm.res_{prefix}.trips.xml '
-                    f'-o osm.res_{prefix}.rou.xml'
+                    f'--route-files {merged_trip_file} '
+                    f'-o {route_file} '
                 )
-
-                # Run both commands
-                os.system(trip_cmd)
                 os.system(route_cmd)
 
-                print(f"Generated: {count} {vehicle_class} trips")
+                print(f"Generated route files: {route_file}, {alt_route_file}")
+
+            print("All route files generated.")
+
         finally:
             os.chdir(original_path)
