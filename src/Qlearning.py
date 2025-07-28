@@ -1,8 +1,10 @@
 from src.memory import ReplayMemory
 from src.visualization import Visualization
 from src.normalizer import Normalizer
+from src.desra import DESRA
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
+from src.vehicle_tracker import VehicleTracker
 
 import traci
 import numpy as np
@@ -10,7 +12,6 @@ import random
 import time
 import pickle
 import pandas as pd
-from sklearn.kernel_approximation import RBFSampler
 
 GREEN_ACTION = 0
 RED_ACTION = 1
@@ -54,7 +55,7 @@ class QSimulation(SUMO):
         self.travel_time_normalizer = Normalizer()
         self.travel_delay_normalizer = Normalizer()
         self.waiting_time_normalizer = Normalizer()
-        
+
         self.step = 0
         self.num_actions = {}
         self.actions_map = {}
@@ -95,17 +96,13 @@ class QSimulation(SUMO):
         self.epsilon_min = self.agent_cfg.get("min_epsilon", 0.01)
         self.epsilon_decay = self.agent_cfg.get("decay_rate", 0.995)
 
+        self.desra = DESRA(interphase_duration=self.interphase_duration)
         self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
             self.get_longest_phase()
         )
         
-        # Initialize RBF sampler once for consistent features
-        self.rbf_sampler = {}  # Initialize as empty dict instead of None
-        self.rbf_weights = {}
-        self.n_components = self.agent_cfg.get("rbf_components", 50)  # Reduced complexity for stability
-        self.rbf_gamma = self.agent_cfg.get("rbf_gamma", 1.0)    # Increased gamma for more localized features
-        self.state_normalizer = {}  # Separate normalizer for each traffic light
-        self.feature_cache = {}  # Cache RBF features for efficiency
+        # Initialize vehicle tracker with model path
+        self.vehicle_tracker = VehicleTracker(path=path, output_dir="logs")
 
     def get_longest_phase(self):
         max_len = -1
@@ -127,17 +124,9 @@ class QSimulation(SUMO):
             traffic_light_id = traffic_light["id"]
             self.agent_memory[traffic_light_id] = self.memory
 
-            # Initialize the green time
-            self.green_time = {}
-            self.green_time_old = {}
-            self.green_time[traffic_light_id] = 20
-            self.green_time_old[traffic_light_id] = 20
-
-            # Initialize the number of actions like DQN
             self.num_actions[traffic_light_id] = len(traffic_light["phase"])
             self.actions_map[traffic_light_id] = {}
 
-            # Create action map like DQN: only phases
             i = 0
             for phase in traffic_light["phase"]:
                 self.actions_map[traffic_light_id][i] = {
@@ -154,7 +143,6 @@ class QSimulation(SUMO):
             self.travel_delay[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
             self.waiting_time[traffic_light_id] = 0
-            self.queue_length[traffic_light_id] = 0
             self.phase[traffic_light_id] = None
 
             for key in self.history:
@@ -224,6 +212,9 @@ class QSimulation(SUMO):
         print("---------------------------------------")
 
         start_time = time.time()
+        
+        # Reset vehicle tracker for new episode
+        self.vehicle_tracker.reset()
 
         # Initialize traffic light state tracking
         tl_states = self._init_traffic_light_states()
@@ -292,6 +283,17 @@ class QSimulation(SUMO):
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
+            
+            # Update vehicle statistics
+            self.vehicle_tracker.update_stats(self.step)
+            
+            # Optional: Print vehicle stats every 1000 steps
+            if self.step % 1000 == 0:
+                current_stats = self.vehicle_tracker.get_current_stats()
+                print(f"Step {self.step}: "
+                      f"Running={current_stats['total_running']}, "
+                      f"Total Departed={current_stats['total_departed']}, "
+                      f"Total Arrived={current_stats['total_arrived']}")
 
             # === 3) Per-light update & learning ===
             for tl in self.traffic_lights:
@@ -350,9 +352,20 @@ class QSimulation(SUMO):
         # Post-simulation teardown
         traci.close()
         sim_time = time.time() - start_time
-        print(
-            f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
-        )
+        
+        # Get final vehicle statistics
+        final_vehicle_stats = self.vehicle_tracker.get_current_stats()
+        num_vehicles = final_vehicle_stats['total_departed']
+        num_vehicles_out = final_vehicle_stats['total_arrived']
+        
+        print(f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through.")
+        
+        # Print detailed vehicle statistics
+        self.vehicle_tracker.print_summary("Q-Learning")
+        
+        # Save vehicle logs
+        self.vehicle_tracker.save_logs(episode, "qlearning")
+        
         self.save_plot(episode=episode)
         self.step = 0
 
@@ -498,50 +511,6 @@ class QSimulation(SUMO):
         except Exception as e:
             print(f"Error loading Q-table: {e}. Starting with empty Q-table.")
 
-    def save_rbf_weights(self, path=None, episode=None):
-        """Save RBF weights and normalizers to file."""
-        if path is None:
-            path = self.path if hasattr(self, "path") else ""
-        filename = (
-            f"{path}rbf_weights_episode_{episode}.pkl"
-            if episode is not None
-            else f"{path}rbf_weights.pkl"
-        )
-        
-        # Save both weights and state normalizers
-        save_data = {
-            'rbf_weights': self.rbf_weights,
-            'state_normalizer': self.state_normalizer,
-            'n_components': self.n_components,
-            'rbf_gamma': self.rbf_gamma
-        }
-        
-        with open(filename, "wb") as f:
-            pickle.dump(save_data, f)
-        print(f"RBF weights and normalizers saved to {filename}")
-
-    def load_rbf_weights(self, path):
-        """Load RBF weights and normalizers from file."""
-        try:
-            with open(path, "rb") as f:
-                save_data = pickle.load(f)
-            
-            # Handle both old and new formats
-            if isinstance(save_data, dict) and 'rbf_weights' in save_data:
-                self.rbf_weights = save_data['rbf_weights']
-                self.state_normalizer = save_data.get('state_normalizer', {})
-                self.n_components = save_data.get('n_components', self.n_components)
-                self.rbf_gamma = save_data.get('rbf_gamma', self.rbf_gamma)
-            else:
-                # Old format - just weights
-                self.rbf_weights = save_data
-                
-            print(f"RBF weights and normalizers loaded from {path}")
-        except FileNotFoundError:
-            print(f"RBF weights file not found: {path}. Starting with empty weights.")
-        except Exception as e:
-            print(f"Error loading RBF weights: {e}. Starting with empty weights.")
-
     def save_plot(self, episode):
 
         avg_history = {}
@@ -564,20 +533,12 @@ class QSimulation(SUMO):
                     filename=f"q_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
                 )
 
-            # Save Q-table, RBF weights, and metrics DataFrame
+            # Save Q-table and metrics DataFrame
             self.save_q_table(episode=episode)
-            self.save_rbf_weights(episode=episode)
             self.save_metrics_to_dataframe(episode=episode)
-            
-            # Print RBF diagnostics
-            rbf_info = self.get_rbf_info()
-            print(f"RBF Info: Components={rbf_info['n_components']}, "
-                  f"Gamma={rbf_info['rbf_gamma']}, "
-                  f"Weight keys={rbf_info['num_weight_keys']}, "
-                  f"Cache size={rbf_info['cache_size']}")
 
             print(
-                "Plots, Q-table, RBF weights, and metrics DataFrame at episode", episode, "generated"
+                "Plots, Q-table, and metrics DataFrame at episode", episode, "generated"
             )
             print("---------------------------------------")
 
@@ -670,10 +631,10 @@ class QSimulation(SUMO):
     def get_state(self, traffic_light, current_phase):
         """
         Get the current state at a specific traffic light in the simulation.
-        Simplified version without DESRA hints.
 
         Returns:
             np.ndarray: 1D array representing the full input state
+            int: green time
         """
         state_vector = []
 

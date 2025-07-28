@@ -5,6 +5,7 @@ import pandas as pd
 from src.visualization import Visualization
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
+from src.vehicle_tracker import VehicleTracker
 
 
 class SimulationBase(SUMO):
@@ -23,6 +24,9 @@ class SimulationBase(SUMO):
         self.visualization = visualization
         self.epoch = epoch
         self.path = path
+
+        # Initialize VehicleTracker for logging vehicle statistics
+        self.vehicle_tracker = VehicleTracker(path=self.path)
 
         self.step = 0
 
@@ -149,6 +153,9 @@ class SimulationBase(SUMO):
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
 
+            # Update vehicle tracking statistics
+            self.vehicle_tracker.update_stats(self.step)
+
             # 2b) Collect per‐TL metrics and count outflow
             for tl in self.traffic_lights:
                 self._record_base_step_metrics(tl)
@@ -159,6 +166,11 @@ class SimulationBase(SUMO):
             f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
         )
         print("---------------------------------------")
+
+        # Print and save vehicle statistics
+        self.vehicle_tracker.print_summary("base")
+        self.vehicle_tracker.save_logs(episode, "base")
+        self.vehicle_tracker.reset()
 
         # 4) Save & reset
         self.save_metrics(episode=episode)
