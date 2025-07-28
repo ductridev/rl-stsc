@@ -5,6 +5,7 @@ from src.normalizer import Normalizer
 from src.desra import DESRA
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
+from src.vehicle_tracker import VehicleTracker
 import torch.nn.functional as F
 import traci
 import numpy as np
@@ -59,6 +60,9 @@ class Simulation(SUMO):
         self.travel_time_normalizer = Normalizer()
         self.travel_delay_normalizer = Normalizer()
         self.waiting_time_normalizer = Normalizer()
+
+        # Initialize VehicleTracker for logging vehicle statistics
+        self.vehicle_tracker = VehicleTracker(path=self.path)
 
         self.step = 0
         self.num_actions = {}
@@ -326,6 +330,10 @@ class Simulation(SUMO):
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
+            
+            # Update vehicle tracking statistics
+            self.vehicle_tracker.update_stats(self.step)
+            
             self._record_arrivals()
 
             # === 3) Metric collection for each TL ===
@@ -377,6 +385,12 @@ class Simulation(SUMO):
         print(
             f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
         )
+        
+        # Print and save vehicle statistics
+        self.vehicle_tracker.print_summary("dqn")
+        self.vehicle_tracker.save_logs(episode, "dqn")
+        self.vehicle_tracker.reset()
+        
         return sim_time, self._train_and_plot(epsilon, episode)
 
     def _record_arrivals(self):
