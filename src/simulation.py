@@ -357,17 +357,17 @@ class Simulation(SUMO):
                 # Update metrics for per 60 steps
                 st["step_outflow_sum"] += outflow
                 st["step_travel_delay_sum"] += sum_travel_delay
-                st["step_travel_time_sum"] += sum_travel_time
+                st["step_travel_time_sum"] = sum_travel_time
                 st["step_density_sum"] += sum_density
                 st["step_queue_length_sum"] += sum_queue_length
-                st["step_waiting_time_sum"] += sum_waiting_time
+                st["step_waiting_time_sum"] = sum_waiting_time
 
                 # Update metrics for current phase
                 st["outflow"] += outflow
-                st["travel_delay_sum"] += sum_travel_delay
-                st["travel_time_sum"] += sum_travel_time
-                st["queue_length"] += sum_queue_length
-                st["waiting_time"] += sum_waiting_time
+                st["travel_delay_sum"] = sum_travel_delay
+                st["travel_time_sum"] = sum_travel_time
+                st["queue_length"] = sum_queue_length
+                st["waiting_time"] = sum_waiting_time
 
                 # c) countdown green
                 if st["green_time_remaining"] > 0:
@@ -494,7 +494,6 @@ class Simulation(SUMO):
         for metric in [
             "travel_delay",
             "travel_time",
-            "outflow",
             "density",
             "queue_length",
             "waiting_time",
@@ -502,6 +501,9 @@ class Simulation(SUMO):
             val = avg(metric)
             self.history[metric][tl_id].append(val)
             st[f"step_{metric}_sum"] = 0
+
+        self.history["outflow"][tl_id].append(st[f"step_outflow_sum"])
+        st[f"step_outflow_sum"] = 0
 
     def _finalize_phase(self, tl, tl_id, st):
         """
@@ -603,39 +605,44 @@ class Simulation(SUMO):
         """
         for traffic_light in self.traffic_lights:
             traffic_light_id = traffic_light["id"]
-            batch = self.agent_memory[traffic_light_id].get_samples(
-                self.agent.batch_size
+            batch = self.agent_memory[traffic_light_id].get_balanced_samples(
+                batch_size_per_palace=self.num_actions[traffic_light_id]
             )
 
-            if len(batch) > 0:
-                batch = [
-                    (s_r_ns_d)
-                    for s_r_ns_d in batch
-                    if s_r_ns_d[0][0] is not None  # state not None
-                    and s_r_ns_d[2][0] is not None  # next_state not None
-                ]
+            if not batch:
+                continue
 
-                state_data, rewards, next_state_data, dones = zip(*batch)
-                states, actions, green_times = zip(*state_data)
-                next_states, _ = zip(*next_state_data)
+            batch = [
+                (s_r_ns_d)
+                for s_r_ns_d in batch
+                if s_r_ns_d[0][0] is not None  # state not None
+                and s_r_ns_d[2][0] is not None  # next_state not None
+            ]
 
-                metrics = self.agent.train_batch(
-                    states,
-                    actions,
-                    rewards,
-                    next_states,
-                    green_targets=green_times,
-                    output_dim=self.num_actions[traffic_light_id],
-                    done=dones,
-                    target_net=self.target_net,
-                )
+            if not batch:
+                continue
 
-                self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
-                self.history["max_next_q_value"][traffic_light_id].append(
-                    metrics["avg_max_next_q_value"]
-                )
-                self.history["target"][traffic_light_id].append(metrics["avg_target"])
-                self.history["loss"][traffic_light_id].append(metrics["total_loss"])
+            state_data, rewards, next_state_data, dones = zip(*batch)
+            states, actions, green_times = zip(*state_data)
+            next_states, _ = zip(*next_state_data)
+
+            metrics = self.agent.train_batch(
+                states,
+                actions,
+                rewards,
+                next_states,
+                green_targets=green_times,
+                output_dim=self.num_actions[traffic_light_id],
+                done=dones,
+                target_net=self.target_net,
+            )
+
+            self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
+            self.history["max_next_q_value"][traffic_light_id].append(
+                metrics["avg_max_next_q_value"]
+            )
+            self.history["target"][traffic_light_id].append(metrics["avg_target"])
+            self.history["loss"][traffic_light_id].append(metrics["total_loss"])
 
     def get_reward(self, traffic_light_id, phase):
         return (
@@ -1037,13 +1044,10 @@ class Simulation(SUMO):
         """
         Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
-        vehicle_ids = []
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            vehicle_ids.extend(traci.lane.getLastStepVehicleIDs(lane))
-
         total_waiting_time = 0.0
-        for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            total_waiting_time += traci.lane.getWaitingTime(lane)
+
         return total_waiting_time
 
     def reset_history(self):

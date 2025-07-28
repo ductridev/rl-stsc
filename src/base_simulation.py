@@ -125,13 +125,15 @@ class SimulationBase(SUMO):
                 ("delay", "travel_delay"),
                 ("time", "travel_time"),
                 ("density", "density"),
-                ("outflow", "outflow"),
                 ("queue", "queue_length"),
                 ("waiting", "waiting_time"),
             ]:
                 avg = st["step"][key] / 60.0
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
+
+            self.history["outflow"][tl_id].append(st["step"]["outflow"])
+            st["step"]["outflow"] = 0
 
     def run(self, episode):
         print("Simulation started (Base)")

@@ -100,7 +100,7 @@ class QSimulation(SUMO):
         self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
             self.get_longest_phase()
         )
-        
+
         # Initialize vehicle tracker with model path
         self.vehicle_tracker = VehicleTracker(path=path, output_dir="logs")
 
@@ -137,7 +137,7 @@ class QSimulation(SUMO):
             self.agent_reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0
             self.agent_old_state[traffic_light_id] = 0
-            
+
             # Initialize metrics like DQN
             self.outflow_rate[traffic_light_id] = 0
             self.travel_delay[traffic_light_id] = 0
@@ -212,7 +212,7 @@ class QSimulation(SUMO):
         print("---------------------------------------")
 
         start_time = time.time()
-        
+
         # Reset vehicle tracker for new episode
         self.vehicle_tracker.reset()
 
@@ -283,17 +283,19 @@ class QSimulation(SUMO):
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
-            
+
             # Update vehicle statistics
             self.vehicle_tracker.update_stats(self.step)
-            
+
             # Optional: Print vehicle stats every 1000 steps
             if self.step % 1000 == 0:
                 current_stats = self.vehicle_tracker.get_current_stats()
-                print(f"Step {self.step}: "
-                      f"Running={current_stats['total_running']}, "
-                      f"Total Departed={current_stats['total_departed']}, "
-                      f"Total Arrived={current_stats['total_arrived']}")
+                print(
+                    f"Step {self.step}: "
+                    f"Running={current_stats['total_running']}, "
+                    f"Total Departed={current_stats['total_departed']}, "
+                    f"Total Arrived={current_stats['total_arrived']}"
+                )
 
             # === 3) Per-light update & learning ===
             for tl in self.traffic_lights:
@@ -318,17 +320,17 @@ class QSimulation(SUMO):
                 # Update metrics for per 60 steps
                 state["step_outflow_sum"] += outflow
                 state["step_travel_delay_sum"] += sum_travel_delay
-                state["step_travel_time_sum"] += sum_travel_time
+                state["step_travel_time_sum"] = sum_travel_time
                 state["step_density_sum"] += sum_density
                 state["step_queue_length_sum"] += sum_queue_length
-                state["step_waiting_time_sum"] += sum_waiting_time
+                state["step_waiting_time_sum"] = sum_waiting_time
 
                 # Update metrics for current phase
                 state["outflow"] += outflow
-                state["travel_delay_sum"] += sum_travel_delay
-                state["travel_time_sum"] += sum_travel_time
-                state["queue_length"] += sum_queue_length
-                state["waiting_time"] += sum_waiting_time
+                state["travel_delay_sum"] = sum_travel_delay
+                state["travel_time_sum"] = sum_travel_time
+                state["queue_length"] = sum_queue_length
+                state["waiting_time"] = sum_waiting_time
 
                 # c) countdown green
                 if state["green_time_remaining"] > 0:
@@ -344,20 +346,22 @@ class QSimulation(SUMO):
         # Post-simulation teardown
         traci.close()
         sim_time = time.time() - start_time
-        
+
         # Get final vehicle statistics
         final_vehicle_stats = self.vehicle_tracker.get_current_stats()
-        num_vehicles = final_vehicle_stats['total_departed']
-        num_vehicles_out = final_vehicle_stats['total_arrived']
-        
-        print(f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through.")
-        
+        num_vehicles = final_vehicle_stats["total_departed"]
+        num_vehicles_out = final_vehicle_stats["total_arrived"]
+
+        print(
+            f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
+        )
+
         # Print detailed vehicle statistics
         self.vehicle_tracker.print_summary("Q-Learning")
-        
+
         # Save vehicle logs
         self.vehicle_tracker.save_logs(episode, "qlearning")
-        
+
         self.save_plot(episode=episode)
         self.step = 0
 
@@ -405,7 +409,7 @@ class QSimulation(SUMO):
         self.history["travel_delay"][tl_id].append(avg("travel_delay"))
         self.history["travel_time"][tl_id].append(avg("travel_time"))
         self.history["density"][tl_id].append(avg("density"))
-        self.history["outflow"][tl_id].append(avg("outflow"))
+        self.history["outflow"][tl_id].append(st[f"step_outflow_sum"])
         self.history["queue_length"][tl_id].append(avg("queue_length"))
         self.history["waiting_time"][tl_id].append(avg("waiting_time"))
 
@@ -802,13 +806,10 @@ class QSimulation(SUMO):
         """
         Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
-        vehicle_ids = []
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            vehicle_ids.extend(traci.lane.getLastStepVehicleIDs(lane))
-
         total_waiting_time = 0.0
-        for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            total_waiting_time += traci.lane.getWaitingTime(lane)
+
         return total_waiting_time
 
     def reset_history(self):
