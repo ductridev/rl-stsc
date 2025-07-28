@@ -280,51 +280,43 @@ class QSimulation(SUMO):
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
                 state = tl_states[tl_id]
+                phase = state["phase"]
 
-                # If still in yellow, skip metric‐collection
-                if state["yellow_time_remaining"] > 0:
-                    continue
+                # a) per‐step outflow
+                new_ids = self.get_vehicles_in_phase(tl, phase)
+                outflow = sum(
+                    1 for vid in state["old_vehicle_ids"] if vid not in new_ids
+                )
+                state["old_vehicle_ids"] = new_ids
 
-                # During green
+                sum_travel_delay = self.get_sum_travel_delay(tl)
+                sum_travel_time = self.get_sum_travel_time(tl)
+                sum_density = self.get_sum_density(tl)
+                sum_queue_length = self.get_sum_queue_length(tl)
+                sum_waiting_time = self.get_sum_waiting_time(tl)
+
+                # b) accumulate
+                # Update metrics for per 60 steps
+                state["step_outflow_sum"] += outflow
+                state["step_travel_delay_sum"] += sum_travel_delay
+                state["step_travel_time_sum"] += sum_travel_time
+                state["step_density_sum"] += sum_density
+                state["step_queue_length_sum"] += sum_queue_length
+                state["step_waiting_time_sum"] += sum_waiting_time
+
+                # Update metrics for current phase
+                state["outflow"] += outflow
+                state["travel_delay_sum"] += sum_travel_delay
+                state["travel_time_sum"] += sum_travel_time
+                state["queue_length"] += sum_queue_length
+                state["waiting_time"] += sum_waiting_time
+
+                # c) countdown green
                 if state["green_time_remaining"] > 0:
-                    phase = state["phase"]
-                    new_ids = self.get_vehicles_in_phase(tl, phase)
-                    outflow = sum(
-                        1 for vid in state["old_vehicle_ids"] if vid not in new_ids
-                    )
-                    state["old_vehicle_ids"] = new_ids
-
-                    sum_travel_delay = self.get_sum_travel_delay(tl)
-                    sum_travel_time = self.get_sum_travel_time(tl)
-                    sum_density = self.get_sum_density(tl)
-                    sum_queue_length = self.get_sum_queue_length(tl)
-                    sum_waiting_time = self.get_sum_waiting_time(tl)
-
-                    # b) accumulate
-                    # Update metrics for per 60 steps
-                    state["step_outflow_sum"] += outflow
-                    state["step_travel_delay_sum"] += sum_travel_delay
-                    state["step_travel_time_sum"] += sum_travel_time
-                    state["step_density_sum"] += sum_density
-                    state["step_queue_length_sum"] += sum_queue_length
-                    state["step_waiting_time_sum"] += sum_waiting_time
-
-                    # Update metrics for current phase
-                    state["outflow"] += outflow
-                    state["travel_delay_sum"] += sum_travel_delay
-                    state["travel_time_sum"] += sum_travel_time
-                    state["queue_length"] += sum_queue_length
-                    state["waiting_time"] += sum_waiting_time
-
-                    # c) countdown green
-                    if state["green_time_remaining"] > 0:
-                        state["green_time_remaining"] -= 1
-                    else:
-                        # when it just expired, record overall metrics & push to memory
-                        state["green_time_remaining"] -= 1
-
-                    if state["green_time_remaining"] == 0:
-                        self._finalize_phase_qlearn(tl, tl_id, state)
+                    state["green_time_remaining"] -= 1
+                else:
+                    # when it just expired, record overall metrics & push to memory
+                    self._finalize_phase_qlearn(tl, tl_id, state)
 
                 # flush every 60 steps
                 if self.step % 60 == 0:
@@ -345,8 +337,10 @@ class QSimulation(SUMO):
         )
         print(f"Total reward: {total_reward}  -  Epsilon: {epsilon}")
 
-        self.reset_history()
-        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
+        # Clear agent memory
+        for tl in self.traffic_lights:
+            self.agent_memory[tl["id"]].clean()
+
         return sim_time, 0
 
     def _init_traffic_light_states(self):

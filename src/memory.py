@@ -65,6 +65,9 @@ class ReplayMemory:
             int: current size of the replay buffer
         """
         return len(self.memory)
+    
+    def clean(self):
+        self.memory = []
 
     def __len__(self):
         """Return the current size of the replay buffer."""

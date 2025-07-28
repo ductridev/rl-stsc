@@ -187,7 +187,7 @@ class Simulation(SUMO):
             # Initialize the travel time
             self.travel_time[traffic_light_id] = 0
 
-            # Initialize the density
+            # Initialize the waiting time
             self.waiting_time[traffic_light_id] = 0
 
             # Initialize the phase
@@ -377,6 +377,17 @@ class Simulation(SUMO):
         print(
             f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
         )
+
+        # Total reward logging
+        total_reward = sum(
+            np.sum(self.history["agent_reward"][tl["id"]]) for tl in self.traffic_lights
+        )
+        print(f"Total reward: {total_reward}  -  Epsilon: {epsilon}")
+
+        # Clear agent memory
+        for tl in self.traffic_lights:
+            self.agent_memory[tl["id"]].clean()
+
         return sim_time, self._train_and_plot(epsilon, episode)
 
     def _record_arrivals(self):

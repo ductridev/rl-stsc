@@ -160,15 +160,15 @@ if __name__ == "__main__":
         print("Routes generated")
 
         # --- Run all three simulations ---
-        # print("Running SimulationBase (static baseline)...")
-        # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-        # simulation_time_base = simulation.run(episode)
-        # print("SimulationBase time:", simulation_time_base)
+        print("Running SimulationBase (static baseline)...")
+        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        simulation_time_base = simulation.run(episode)
+        print("SimulationBase time:", simulation_time_base)
 
-        # print("Running QSimulation (Q-learning)...")
-        # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-        # simulation_time_q = simulation_q.run(epsilon, episode)
-        # print("QSimulation time:", simulation_time_q)
+        print("Running QSimulation (Q-learning)...")
+        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        simulation_time_q = simulation_q.run(epsilon, episode)
+        print("QSimulation time:", simulation_time_q)
 
         for loss_type, sim_dqn in simulations_dqn.items():
             print(f"Running DQN Simulation (loss: {loss_type})...")
