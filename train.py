@@ -154,7 +154,6 @@ if __name__ == "__main__":
             enable_truck=True,
             enable_bicycle=True,
             enable_pedestrian=True,
-            random_demand_name=random_demand_name,
         )
         print("Routes generated")
 

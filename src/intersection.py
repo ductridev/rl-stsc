@@ -45,7 +45,6 @@ class Intersection:
         enable_motorcycle=True,
         enable_passenger=True,
         enable_truck=True,
-        random_demand_name=None,
     ):
         """
         Generate residential traffic routes based on demand level using pre-defined vehicle counts from config.
@@ -67,14 +66,25 @@ class Intersection:
             intersection_path = os.path.join(os.getcwd(), "simulations", simulation_path)
             os.chdir(intersection_path)
 
-            # Load weight file
-            weight_file_path = f"{random_demand_name}.src.xml"
-            tree = ET.parse(weight_file_path)
-            root = tree.getroot()
-            intervals = [
-                (float(interval.get("begin")), float(interval.get("end")))
-                for interval in root.findall("interval")
-            ]
+            # Automatically detect all demand files per interval
+            demand_files = sorted([
+                f for f in os.listdir(".")
+                if f.startswith("random_edge_priority_interval_") and f.endswith(".src.xml")
+            ])
+
+            if not demand_files:
+                print("No demand files found matching 'random_edge_priority_interval_*.src.xml'")
+                return
+
+            intervals = []
+            for demand_file in demand_files:
+                tree = ET.parse(demand_file)
+                root = tree.getroot()
+                for interval in root.findall("interval"):
+                    intervals.append((
+                        float(interval.get("begin")),
+                        float(interval.get("end"))
+                    ))
 
             if demand_level not in config["vehicle_counts"]:
                 print(f"Invalid demand level '{demand_level}'. Must be one of {list(config['vehicle_counts'].keys())}.")
@@ -133,6 +143,10 @@ class Intersection:
                     merged_file.write("<routes>\n")
 
                     for interval_id, (begin_time, end_time) in enumerate(intervals):
+                        demand_file_name = f"random_edge_priority_interval_{interval_id}.src.xml"
+                        if not os.path.exists(demand_file_name):
+                            print(f"Demand file not found: {demand_file_name}")
+                            continue  # Skip if demand file is missing
                         print(f"  Interval {interval_id}: {begin_time}-{end_time}")
                         vehicles_in_interval = int(count / len(intervals))
 
@@ -151,6 +165,7 @@ class Intersection:
                             f'--trip-attributes "departLane=\'best\'" '
                             f'--fringe-start-attributes "departSpeed=\'max\'" '
                             f'--prefix res_{prefix}_int{interval_id} '
+                            f'--weights-prefix random_edge_priority_interval_{interval_id} '
                         )
 
                         if vehicle_class == "pedestrian":
@@ -158,8 +173,6 @@ class Intersection:
                         else:
                             trip_cmd += f"--vehicle-class {vehicle_class} "
 
-                        if random_demand_name:
-                            trip_cmd += f"--weights-prefix {random_demand_name} "
 
                         # Run randomTrips.py
                         os.system(trip_cmd)
