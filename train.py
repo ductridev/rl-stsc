@@ -1,4 +1,5 @@
 from src.memory import ReplayMemory
+from src.memory_palace import MemoryPalace
 from src.utils import (
     set_train_path,
     set_sumo,
@@ -27,12 +28,12 @@ if __name__ == "__main__":
     start_epsilon = config["agent"]["epsilon"]
 
     # Create replay memory for the agent
-    agent_memory_dqn = ReplayMemory(
-        max_size=config["memory_size_max"], min_size=config["memory_size_min"]
+    agent_memory_dqn = MemoryPalace(
+        max_size_per_palace=config["memory_size_max"], min_size_to_sample=config["memory_size_min"]
     )
 
-    agent_memory_q = ReplayMemory(
-        max_size=config["memory_size_max"], min_size=config["memory_size_min"]
+    agent_memory_q = MemoryPalace(
+        max_size_per_palace=config["memory_size_max"], min_size_to_sample=config["memory_size_min"]
     )
 
     # Set model save path
