@@ -3,7 +3,8 @@ from src.sumo import SUMO
 import traci
 import numpy as np
 from collections import defaultdict, deque
-import random
+import math
+
 
 class DESRA(SUMO):
     def __init__(self, interphase_duration=3):
@@ -15,101 +16,164 @@ class DESRA(SUMO):
 
         # Estimated real-time parameters
         self.saturation_flow = 0.5
-        self.critical_density = 0.06
+        self.critical_density = 0.6
         self.jam_density = 0.18
 
-    def select_phase_with_desra_hints(self, traffic_light):
+    def select_phase_with_desra_hints(
+        self,
+        traffic_light,
+        q_arrivals: dict,
+        saturation_flow: float,
+        critical_density: float,
+        jam_density: float,
+    ):
         """
         Select best phase using DESRA hints based on effective outflow.
         """
         best_phase = traffic_light["phase"][0]
         best_green_time = 0
-        best_effective_outflow = -1
+        best_effective_outflow = -1.0
+
+        self.saturation_flow = saturation_flow
+        self.critical_density = critical_density
+        self.jam_density = jam_density
 
         for phase_str in traffic_light["phase"]:
             movements = self.get_movements_from_phase(traffic_light, phase_str)
 
-            total_Gsat = 0
-            total_outflow = 0
-            movement_count = 0
+            # 1) Compute the downstream free space for this phase (xd)
+            #    i.e. the most restrictive downstream capacity over all movements.
+            xd = float("inf")
+            for det in movements:
+                lane_len = traci.lanearea.getLength(det)
+                free_down = self.get_downstream_queue_length(det)  # in meters
+                xd = min(xd, free_down)
 
-            for detector_id in movements:
-                x0 = self.get_queue_length(detector_id)
-                q_arr = self.get_arrival_flow(detector_id)
-                x0_d = self.get_downstream_queue_length(detector_id)
-                link_length = traci.lanearea.getLength(detector_id)
+            # 2) Find Gsat for each movement, then take the MIN positive → Gmin
+            Gmin = float("inf")
+            sat_times = {}
+            for det in movements:
+                x0 = self.get_queue_length(det)  # upstream queue (m)
+                q_arr = q_arrivals.get(det, 0.0)  # veh/s
+                lane_len = traci.lanearea.getLength(det)  # Δ_j
+                Gsat = self.estimate_saturated_green_time(x0, q_arr, xd, lane_len)
 
-                if x0 == 0 and q_arr == 0:
-                    continue
+                if Gsat > 0:
+                    Gmin = min(Gmin, Gsat)
+                sat_times[det] = (Gsat, x0, q_arr, lane_len)
 
-                Gsat = self.estimate_saturated_green_time(x0, q_arr, x0_d, link_length)
-
-                outflow = self.saturation_flow * Gsat
-                total_Gsat += Gsat
-                total_outflow += outflow
-                movement_count += 1
-
-            if movement_count == 0:
+            # if no movement had Gsat>0, skip
+            if Gmin == float("inf"):
                 continue
 
-            avg_Gsat = total_Gsat / movement_count
-            avg_outflow = total_outflow / movement_count
+            # 3) For this Gmin, compute total effective outflow F_total
+            F_total = 0.0
+            for det, (Gsat, x0, q_arr, lane_len) in sat_times.items():
+                s = self.saturation_flow
+                # three‐case formula from Eq. (9):
+                if Gsat >= Gmin:
+                    # full‐capacity discharge
+                    F_total += s * Gmin
+                else:
+                    # Gsat < Gmin → two subcases
+                    # we need to know if the queue‐extent was upstream‐bounded or downstream‐bounded.
+                    # but the paper simplifies it to:
+                    #  - if xM <= xd then we can use the second branch
+                    #  - else the third.
+                    # we already computed xM inside estimate_saturated — but for clarity:
+                    xM = self.estimate_shockwave_extent(x0, q_arr, lane_len)
+                    if xM <= xd:
+                        # Eq. (9) middle case: s*Gsat + q_arr*(Gmin - Gsat)
+                        F_total += s * Gsat + q_arr * (Gmin - Gsat)
+                    else:
+                        # Eq. (9) last case: s*Gsat
+                        F_total += s * Gsat
 
-            # Effective outflow: v_i = s * Gsat / (Gsat + τ)
-            v_i = avg_outflow / (avg_Gsat + self.interphase_duration)
+            # 4) Compute effective outflow rate v_i
+            v_i = F_total / (Gmin + self.interphase_duration)
 
+            # 5) Track the best
             if v_i > best_effective_outflow:
                 best_effective_outflow = v_i
                 best_phase = phase_str
-                best_green_time = avg_Gsat
+                best_green_time = Gmin
+            elif v_i == best_effective_outflow and Gmin < best_green_time:
+                best_phase = phase_str
+                best_green_time = Gmin
 
         return best_phase, max(0, int(best_green_time))
 
-    def estimate_saturated_green_time(self, x0, q_arr, x0_d, link_length):
+    def estimate_shockwave_extent(self, x0, q_arr, link_length):
         """
-        Estimate saturated green time using shockwave theory (based on the paper).
-
+        Estimate the extent of the shockwave using the shockwave theory.
         Args:
-            x0 (float): Queue length at upstream (vehicles)
-            q_arr (float): Arrival flow rate (vehicles/s)
-            x0_d (float): Downstream queue length (vehicles)
-            link_length (float): Lane length (meters)
-
+            x0 (float): Upstream queue length **in meters**
+            q_arr (float): Arrival flow rate (veh/s)
+            link_length (float): Length of upstream link (m)
         Returns:
-            float: Estimated green time (seconds)
+            float: Shockwave extent (meters)
         """
         s = self.saturation_flow
-        kj = self.jam_density
         kc = self.critical_density
+        kj = self.jam_density
+        if s <= 0 or kc <= 0 or kj <= 0:
+            return 0.0
 
-        if s <= 0 or kj <= 0 or kc <= 0:
-            return 0
+        denom = kj * (s - q_arr)
+        if abs(denom) < 1e-6:
+            return link_length
 
-        try:
-            w1 = s / kj  # Forward shockwave (discharge)
-            w2 = (q_arr - s) / (kc - kj)  # Backward shockwave
-        except ZeroDivisionError:
-            return 0
+        return x0 * (kj * s - q_arr * kc) / denom
 
-        if abs(kc - kj) < 1e-6:
-            w2 = 0.01  # prevent division by 0
+    def estimate_saturated_green_time(self, x0, q_arr, xd, link_length):
+        """
+        Estimate saturated green time using spillback-aware shockwave theory.
+        Args:
+            x0 (float): Upstream queue length **in meters**
+            q_arr (float): Arrival flow rate (veh/s)
+            xd (float): **Min** downstream **free space** in meters
+            link_length (float): Length of upstream link (m)
+        Returns:
+            float: Saturated green time (seconds)
+        """
+        # — Step 1: unit conversion —
+        s = self.saturation_flow
+        kc = self.critical_density
+        kj = self.jam_density
+        if s <= 0 or kc <= 0 or kj <= 0:
+            return 0.0
 
-        denom = w1 + w2
-        xM = link_length if abs(denom) < 1e-6 else min(x0 / denom, link_length)
+        # — Step 2: x_M per Eq. 3 —
+        denom = kj * (s - q_arr)
+        if abs(denom) < 1e-6:
+            xM = link_length
+        else:
+            xM = x0 * (kj * s - q_arr * kc) / denom
+        xM = max(0.0, min(xM, link_length))
 
-        Gs = xM / w1
-        xd = max(0, link_length - x0_d)
-        Gd = xd / w1
+        # — Step 3: the three‐case piecewise green time (Eq. 7):
+        #    (remember: Δ ≡ link_length)
+        if (xM <= xd) and (xM <= link_length):
+            Gsat = xM * kj / s
+        elif (link_length <= xM) and (link_length <= xd):
+            Gsat = link_length * kj / s
+        elif (xd <= xM) and (xd <= link_length):
+            Gsat = xd * kj / s
+        else:
+            Gsat = 0.0
 
-        green_time = max(0, min(Gs, Gd))  # enforce min green time
-        return green_time
+        # print(f"DEBUG: x0={x0}, xd={xd}, link_length={link_length}, xM={xM}, q_arr={q_arr}, xM={xM}, Gsat={Gsat}")
+
+        return Gsat
 
     def get_movements_from_phase(self, traffic_light, phase_str):
         """
         Get detector IDs whose street is active (green) in the given phase string.
         """
         phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
-        active_street = str(phase_index + 1)  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
+        active_street = str(
+            phase_index + 1
+        )  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
 
         # Collect detector IDs belonging to the active street
         active_detectors = [
@@ -121,27 +185,32 @@ class DESRA(SUMO):
         return active_detectors
 
     def get_queue_length(self, detector_id):
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
+        return (
+            traci.lanearea.getLastStepOccupancy(detector_id)
+            / 100
+            * traci.lanearea.getLength(detector_id)
+        )
 
     def get_downstream_queue_length(self, detector_id):
-        links = traci.lane.getLinks(traci.lanearea.getLaneID(detector_id))
-        if links:
-            downstream_lane = links[0][0]
-            return traci.lane.getLastStepHaltingNumber(downstream_lane)
-        return 0
-
-    def get_arrival_flow(self, detector_id):
         """
-        Estimate the arrival flow by analyzing upstream connections.
-        This is a best-effort approximation due to SUMO's real-time limits.
+        Returns the available storage (free space in meters) of the downstream link(s)
+        for the given area‑detector. Uses the minimum over all downstream lanes.
         """
         lane_id = traci.lanearea.getLaneID(detector_id)
-        incoming_links = [
-            link[0] for link in traci.lane.getLinks(lane_id) if link[0] != lane_id
-        ]
+        links = traci.lane.getLinks(lane_id)  # list of (toLane, viaEdge, ...)
+        free_spaces = []
 
-        total = 0
-        for upstream_lane in incoming_links:
-            total += traci.lane.getLastStepVehicleNumber(upstream_lane)
+        for link in links:
+            downstream_lane = link[0]
+            # length = traci.lane.getLength(downstream_lane)
+            length = 100
+            occupancy_pct = traci.lane.getLastStepOccupancy(downstream_lane)
+            # occupancy_pct is 0–100%, so queue_length_m = length * (occupancy_pct/100)
+            queue_m = length * (occupancy_pct / 100.0)
+            free_spaces.append(max(0.0, length - queue_m))
 
-        return total / len(incoming_links) if incoming_links else 0
+        if free_spaces:
+            return min(free_spaces)
+        else:
+            # no downstream links → assume full storage available
+            return traci.lanearea.getLength(detector_id)

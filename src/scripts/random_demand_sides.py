@@ -52,10 +52,11 @@ def generate_random_intervals(
         }
 
         for side, edges in edge_groups.items():
-            for edge_id in edges:
-                ET.SubElement(
-                    interval, "edge", {"id": edge_id, "value": f"{weights[side]:.2f}"}
-                )
+            if edges is not None:
+                for edge_id in edges:
+                    ET.SubElement(
+                        interval, "edge", {"id": edge_id, "value": f"{weights[side]:.2f}"}
+                    )
 
         current_time = end
         interval_id += 1

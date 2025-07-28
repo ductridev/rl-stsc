@@ -36,7 +36,7 @@ class DQN(nn.Module):
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
-        self._input_dim = max_phases * input_dim + 2
+        self._input_dim = max_phases * input_dim + 2 + 1 # 2 for DESRA and 1 for current phase
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
@@ -299,6 +299,11 @@ class DQN(nn.Module):
         green_preds_taken = green_preds[
             torch.arange(green_preds.size(0)), actions
         ]  # [B]
+
+        # Clamp predictions and targets for stability
+        green_preds_taken = green_preds_taken.clamp(min=5.0, max=60.0)
+        green_targets = green_targets.clamp(min=5.0, max=60.0)
+
         green_loss = F.mse_loss(green_preds_taken, green_targets)
 
         # === Total Loss ===
@@ -315,10 +320,9 @@ class DQN(nn.Module):
             "q_loss": q_loss.item(),
             "green_loss": green_loss.item(),
             "total_loss": total_loss.item(),
-            "loss": total_loss.item(),  # Depracated
             "avg_q_value": q_value.mean().item(),
             "avg_max_next_q_value": max_next_q_value.mean().item(),
-            "avg_target": target_q_value.mean().item(),
+            "avg_target": target_q_value.detach().mean().item(),
         }
 
     def save(self, path):

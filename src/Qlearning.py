@@ -52,7 +52,7 @@ class QSimulation(SUMO):
         self.outflow_rate_normalizer = Normalizer()
         self.queue_length_normalizer = Normalizer()
         self.travel_time_normalizer = Normalizer()
-        self.travel_speed_normalizer = Normalizer()
+        self.travel_delay_normalizer = Normalizer()
         self.waiting_time_normalizer = Normalizer()
         
         self.step = 0
@@ -66,14 +66,14 @@ class QSimulation(SUMO):
 
         self.queue_length = {}
         self.outflow_rate = {}
-        self.travel_speed = {}
+        self.travel_delay = {}
         self.travel_time = {}
         self.waiting_time = {}
         self.phase = {}
 
         self.history = {
             "agent_reward": {},
-            "travel_speed": {},
+            "travel_delay": {},
             "travel_time": {},
             "density": {},
             "outflow": {},
@@ -88,8 +88,8 @@ class QSimulation(SUMO):
         self.initState()
 
         # Q-learning parameters
-        self.q_table = {}  # {(state_tuple, action): value}
-        self.alpha = 0.1  # Increased learning rate for better convergence
+        self.q_tables = {tl["id"]: {} for tl in self.traffic_lights}
+        self.alpha = 0.1  # learning rate
         self.gamma = self.agent_cfg["gamma"]
         self.epsilon = 1.0
         self.epsilon_min = self.agent_cfg.get("min_epsilon", 0.01)
@@ -151,7 +151,7 @@ class QSimulation(SUMO):
             
             # Initialize metrics like DQN
             self.outflow_rate[traffic_light_id] = 0
-            self.travel_speed[traffic_light_id] = 0
+            self.travel_delay[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
             self.waiting_time[traffic_light_id] = 0
             self.queue_length[traffic_light_id] = 0
@@ -166,68 +166,213 @@ class QSimulation(SUMO):
             output_dims.append(self.num_actions[traffic_light["id"]])
         return output_dims
 
-    def get_q(self, state, action):
-        return self.q_table.get((tuple(state), action), 0.0)
+    def discretize_state(self, state, precision=2):
+        """Round each continuous feature so state tuples reuse similar values."""
+        return tuple(np.round(state, precision).tolist())
 
-    def set_q(self, state, action, value):
-        self.q_table[(tuple(state), action)] = value
+    def get_q(self, state, action, tl_id):
+        """Fetch Q[s,a], initializing the row if needed."""
+        s_key = self.discretize_state(state)
+        table = self.q_tables[tl_id]
+        if s_key not in table:
+            # initialize Q-values array for this new discretized state
+            table[s_key] = np.zeros(self.num_actions[tl_id], dtype=np.float32)
+        return table[s_key][action]
 
-    def select_action(self, traffic_light_id, state, epsilon):
-        # Normalize state for better RBF performance
-        normalized_state = self.normalize_state(state, traffic_light_id)
-        
-        # Epsilon-greedy for RBF Q-learning
+    def set_q(self, state, action, value, tl_id):
+        """Set Q[s,a] after ensuring the row exists."""
+        s_key = self.discretize_state(state)
+        table = self.q_tables[tl_id]
+        if s_key not in table:
+            table[s_key] = np.zeros(self.num_actions[tl_id], dtype=np.float32)
+        table[s_key][action] = value
+
+    def select_action(self, tl_id, state, epsilon):
+        """Epsilon-greedy using per-TL Q-table."""
+        s_key = self.discretize_state(state)
+        table = self.q_tables[tl_id]
+        if s_key not in table:
+            # unseen state: initialize and pick random
+            table[s_key] = np.zeros(self.num_actions[tl_id], dtype=np.float32)
         if random.random() < epsilon:
-            return random.randint(0, self.num_actions[traffic_light_id] - 1)
-        else:
-            q_values = [
-                self.get_q_rbf(normalized_state, a, traffic_light_id) 
-                for a in range(self.num_actions[traffic_light_id])
-            ]
-            return int(np.argmax(q_values))
+            return random.randrange(self.num_actions[tl_id])
+        return int(np.argmax(table[s_key]))
 
-    def qlearn_update(self, state, action, reward, next_state, done, traffic_light_id, episode=None):
-        # Normalize states for RBF
-        normalized_state = self.normalize_state(state, traffic_light_id)
-        normalized_next_state = self.normalize_state(next_state, traffic_light_id)
-        
-        max_next_q = max(
-            [
-                self.get_q_rbf(normalized_next_state, a, traffic_light_id)
-                for a in range(self.num_actions[traffic_light_id])
-            ]
-        )
-        
-        # Clip max_next_q to prevent explosive targets - tighter bounds for traffic control
-        max_next_q = np.clip(max_next_q, -20, 5)
-        
-        target = reward + (0 if done else self.gamma * max_next_q)
-        
-        # Clip target to reasonable range for traffic control
-        target = np.clip(target, -25, 5)
-        
-        current_q = self.get_q_rbf(normalized_state, action, traffic_light_id)
-        
-        # Debug information
-        if episode is not None:
-            self.debug_q_learning(episode, traffic_light_id, normalized_state, action, reward, current_q, target)
-        
-        self.update_q_rbf(normalized_state, action, target, traffic_light_id)
+    def qlearn_update(self, state, action, reward, next_state, done, tl_id):
+        """Standard Q-learning update, using discretized keys."""
+        # get current Q
+        old_q = self.get_q(state, action, tl_id)
+
+        # compute max next Q
+        if next_state is None or done:
+            max_next = 0.0
+        else:
+            next_key = self.discretize_state(next_state)
+            table = self.q_tables[tl_id]
+            if next_key not in table:
+                table[next_key] = np.zeros(self.num_actions[tl_id], dtype=np.float32)
+            max_next = float(np.max(table[next_key]))
+
+        # target and update
+        target = reward + self.gamma * max_next
+        new_q = old_q + self.alpha * (target - old_q)
+        self.set_q(state, action, new_q, tl_id)
 
     def run(self, epsilon, episode):
         print("Simulation started")
         print("Simulating...")
         print("---------------------------------------")
 
-        start = time.time()
+        start_time = time.time()
 
-        # Initialize per-light state tracking
-        tl_states = {}
+        # Initialize traffic light state tracking
+        tl_states = self._init_traffic_light_states()
+        for state in tl_states.values():
+            state["yellow_time_remaining"] = 0
+            state["interphase"] = False
+
+        num_vehicles = 0
+        num_vehicles_out = 0
+
+        while self.step < self.max_steps:
+            # === 1) Action selection / phase transitions ===
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                state = tl_states[tl_id]
+
+                # 1a) yellow is active → just tick it down
+                if state["yellow_time_remaining"] > 0:
+                    state["yellow_time_remaining"] -= 1
+                    continue
+
+                # 1b) green is still running → nothing to do
+                if state["green_time_remaining"] > 0:
+                    continue
+
+                # 1c) green just ended & interphase not yet started → start yellow
+                if not state["interphase"]:
+                    self.set_yellow_phase(tl_id, state["phase"])
+                    state["yellow_time_remaining"] = self.interphase_duration
+                    state["interphase"] = True
+                    continue
+
+                # 1d) yellow just finished (interphase==True & yellow==0) → new green
+                state["interphase"] = False
+
+                # Get state
+                s = self.get_state(tl, state["phase"])
+
+                # Select action
+                action_idx = self.select_action(tl_id, s, epsilon)
+
+                # Convert action to phase
+                phase = index_to_action(action_idx, self.actions_map[tl_id])
+
+                # Get green time to not exceed max_steps
+                green_time = min(state["green_time"], self.max_steps - self.step)
+
+                # switch to new green
+                self.set_green_phase(tl_id, green_time, phase)
+
+                # Update state
+                state.update(
+                    {
+                        "phase": phase,
+                        "green_time": green_time,
+                        "green_time_remaining": green_time,
+                        "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
+                        "state": s,
+                        "action_idx": action_idx,
+                    }
+                )
+
+            # === 2) Global simulation step ===
+            self.accident_manager.create_accident(current_step=self.step)
+            traci.simulationStep()
+            num_vehicles += traci.simulation.getDepartedNumber()
+            num_vehicles_out += traci.simulation.getArrivedNumber()
+            self.step += 1
+
+            # === 3) Per-light update & learning ===
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                state = tl_states[tl_id]
+
+                # If still in yellow, skip metric‐collection
+                if state["yellow_time_remaining"] > 0:
+                    continue
+
+                # During green
+                if state["green_time_remaining"] > 0:
+                    phase = state["phase"]
+                    new_ids = self.get_vehicles_in_phase(tl, phase)
+                    outflow = sum(
+                        1 for vid in state["old_vehicle_ids"] if vid not in new_ids
+                    )
+                    state["old_vehicle_ids"] = new_ids
+
+                    sum_travel_delay = self.get_sum_travel_delay(tl)
+                    sum_travel_time = self.get_sum_travel_time(tl)
+                    sum_density = self.get_sum_density(tl)
+                    sum_queue_length = self.get_sum_queue_length(tl)
+                    sum_waiting_time = self.get_sum_waiting_time(tl)
+
+                    # b) accumulate
+                    # Update metrics for per 60 steps
+                    state["step_outflow_sum"] += outflow
+                    state["step_travel_delay_sum"] += sum_travel_delay
+                    state["step_travel_time_sum"] += sum_travel_time
+                    state["step_density_sum"] += sum_density
+                    state["step_queue_length_sum"] += sum_queue_length
+                    state["step_waiting_time_sum"] += sum_waiting_time
+
+                    # Update metrics for current phase
+                    state["outflow"] += outflow
+                    state["travel_delay_sum"] += sum_travel_delay
+                    state["travel_time_sum"] += sum_travel_time
+                    state["queue_length"] += sum_queue_length
+                    state["waiting_time"] += sum_waiting_time
+
+                    # c) countdown green
+                    if state["green_time_remaining"] > 0:
+                        state["green_time_remaining"] -= 1
+                    else:
+                        # when it just expired, record overall metrics & push to memory
+                        state["green_time_remaining"] -= 1
+
+                    if state["green_time_remaining"] == 0:
+                        self._finalize_phase_qlearn(tl, tl_id, state)
+
+                # flush every 60 steps
+                if self.step % 60 == 0:
+                    self._flush_step_metrics_qlearn(tl, tl_id, state)
+
+        # Post-simulation teardown
+        traci.close()
+        sim_time = time.time() - start_time
+        print(
+            f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
+        )
+        self.save_plot(episode=episode)
+        self.step = 0
+
+        # Total reward logging
+        total_reward = sum(
+            np.sum(self.history["agent_reward"][tl["id"]]) for tl in self.traffic_lights
+        )
+        print(f"Total reward: {total_reward}  -  Epsilon: {epsilon}")
+
+        self.reset_history()
+        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
+        return sim_time, 0
+
+    def _init_traffic_light_states(self):
+        states = {}
         for tl in self.traffic_lights:
             tl_id = tl["id"]
-            tl_states[tl_id] = {
-                "green_time_remaining": 0,
-                "travel_speed_sum": 0,
+            states[tl_id] = {
+                "green_time_remaining": 20,
+                "travel_delay_sum": 0,
                 "travel_time_sum": 0,
                 "waiting_time": 0,
                 "outflow": 0,
@@ -235,293 +380,82 @@ class QSimulation(SUMO):
                 "old_vehicle_ids": [],
                 "state": None,
                 "action_idx": None,
-                "phase": None,
+                "phase": tl["phase"][0],
                 "green_time": 20,
-                "step_travel_speed_sum": 0,
+                "step_travel_delay_sum": 0,
                 "step_travel_time_sum": 0,
                 "step_density_sum": 0,
-                "step_outflow": 0,
-                "step_queue_length": 0,
-                "step_waiting_time": 0,
+                "step_outflow_sum": 0,
+                "step_queue_length_sum": 0,
+                "step_waiting_time_sum": 0,
                 "step_old_vehicle_ids": [],
             }
+        return states
 
-        num_vehicles = 0
-        num_vehicles_out = 0
+    def _flush_step_metrics_qlearn(self, tl, tl_id, st):
+        avg = lambda key: st[f"step_{key}_sum"] / 60
 
-        while self.step < self.max_steps:
-            for tl in self.traffic_lights:
-                tl_id = tl["id"]
-                tl_state = tl_states[tl_id]
+        self.history["travel_delay"][tl_id].append(avg("travel_delay"))
+        self.history["travel_time"][tl_id].append(avg("travel_time"))
+        self.history["density"][tl_id].append(avg("density"))
+        self.history["outflow"][tl_id].append(avg("outflow"))
+        self.history["queue_length"][tl_id].append(avg("queue_length"))
+        self.history["waiting_time"][tl_id].append(avg("waiting_time"))
 
-                # If time to choose a new action
-                if tl_state["green_time_remaining"] == 0:
-                    state = self.get_state(tl)
-                    action_idx = self.select_action(
-                        tl_id,
-                        state,
-                        epsilon,
-                    )
+        for k in [
+            "step_travel_delay_sum",
+            "step_travel_time_sum",
+            "step_density_sum",
+            "step_outflow_sum",
+            "step_queue_length_sum",
+            "step_waiting_time_sum",
+        ]:
+            st[k] = 0
 
-                    phase = index_to_action(
-                        action_idx,
-                        self.actions_map[tl_id],
-                    )
+    def _finalize_phase_qlearn(self, tl, tl_id, st):
+        g = st["green_time"]
+        self.queue_length[tl_id] = st["queue_length"]
+        self.outflow_rate[tl_id] = st["outflow"]
+        self.travel_delay[tl_id] = st["travel_delay_sum"]
+        self.travel_time[tl_id] = st["travel_time_sum"]
+        self.waiting_time[tl_id] = st["waiting_time"]
 
-                    green_time = tl_state["green_time"]
-                    green_time = min(green_time, self.max_steps - self.step)
+        reward = self.get_reward(tl_id, st["phase"])
+        next_state = self.get_state(tl, st["phase"])
+        done = self.step >= self.max_steps
+        self.phase[tl_id] = st["phase"]
 
-                    if tl_state["phase"] is not None:
-                        self.set_yellow_phase(tl_id, tl_state["phase"])
-                        for _ in range(self.interphase_duration):
-                            self.accident_manager.create_accident(
-                                current_step=self.step
-                            )
-                            traci.simulationStep()
-                            num_vehicles += traci.simulation.getDepartedNumber()
-                            self.step += 1
+        if st["state"] is None:
+            # first green phase: nothing to learn yet
+            return
 
-                            # Calculate step metrics during interphase for all traffic lights
-                            for tl_inner in self.traffic_lights:
-                                tl_inner_id = tl_inner["id"]
-                                tl_inner_state = tl_states[tl_inner_id]
+        self.agent_memory[tl_id].push(
+            st["state"], st["action_idx"], reward, next_state, done
+        )
+        self.qlearn_update(
+            st["state"], st["action_idx"], reward, next_state, done, tl_id
+        )
+        self.history["agent_reward"][tl_id].append(reward)
 
-                                step_new_vehicle_ids = self.get_vehicles_in_phase(
-                                    tl_inner,
-                                    (
-                                        tl_inner_state["phase"]
-                                        if tl_inner_state["phase"] is not None
-                                        else 0
-                                    ),
-                                )
-                                step_outflow = sum(
-                                    1
-                                    for vid in tl_inner_state["step_old_vehicle_ids"]
-                                    if vid not in step_new_vehicle_ids
-                                )
-                                tl_inner_state[
-                                    "step_travel_speed_sum"
-                                ] += self.get_sum_speed(tl_inner)
-                                tl_inner_state[
-                                    "step_travel_time_sum"
-                                ] += self.get_sum_travel_time(tl_inner)
-                                tl_inner_state[
-                                    "step_density_sum"
-                                ] += self.get_sum_density(tl_inner)
-                                tl_inner_state["step_outflow"] += step_outflow
-                                tl_inner_state[
-                                    "step_queue_length"
-                                ] += self.get_sum_queue_length(tl_inner)
-                                tl_inner_state[
-                                    "step_waiting_time"
-                                ] += self.get_sum_waiting_time(tl_inner)
-                                tl_inner_state["step_old_vehicle_ids"] = (
-                                    step_new_vehicle_ids
-                                )
+        # Reset counters
+        for key in [
+            "travel_delay_sum",
+            "travel_time_sum",
+            "outflow",
+            "queue_length",
+            "waiting_time",
+        ]:
+            st[key] = 0
 
-                                # Check if it's time to save data (dynamic interval for exactly 60 data points)
-                                if self.step % 60 == 0:
-                                    travel_speed_avg = (
-                                        tl_inner_state["step_travel_speed_sum"] / 60
-                                    )
-                                    travel_time_avg = (
-                                        tl_inner_state["step_travel_time_sum"] / 60
-                                    )
-                                    density_avg = (
-                                        tl_inner_state["step_density_sum"] / 60
-                                    )
-                                    outflow_avg = tl_inner_state["step_outflow"] / 60
-                                    queue_length_avg = (
-                                        tl_inner_state["step_queue_length"] / 60
-                                    )
-                                    waiting_time_avg = (
-                                        tl_inner_state["step_waiting_time"] / 60
-                                    )
-
-                                    self.history["travel_speed"][tl_inner_id].append(
-                                        travel_speed_avg
-                                    )
-                                    self.history["travel_time"][tl_inner_id].append(
-                                        travel_time_avg
-                                    )
-                                    self.history["density"][tl_inner_id].append(
-                                        density_avg
-                                    )
-                                    self.history["outflow"][tl_inner_id].append(
-                                        outflow_avg
-                                    )
-                                    self.history["queue_length"][tl_inner_id].append(
-                                        queue_length_avg
-                                    )
-                                    self.history["waiting_time"][tl_inner_id].append(
-                                        waiting_time_avg
-                                    )
-
-                                    # Reset step metrics
-                                    tl_inner_state["step_travel_speed_sum"] = 0
-                                    tl_inner_state["step_travel_time_sum"] = 0
-                                    tl_inner_state["step_density_sum"] = 0
-                                    tl_inner_state["step_outflow"] = 0
-                                    tl_inner_state["step_queue_length"] = 0
-                                    tl_inner_state["step_waiting_time"] = 0
-
-                    self.set_green_phase(tl_id, green_time, phase)
-
-                    tl_state.update(
-                        {
-                            "green_time": green_time,
-                            "green_time_remaining": green_time,
-                            "travel_speed_sum": 0,
-                            "travel_time_sum": 0,
-                            "density_sum": 0,
-                            "outflow": 0,
-                            "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
-                            "state": state,
-                            "action_idx": action_idx,
-                            "phase": phase,
-                        }
-                    )
-
-            self.accident_manager.create_accident(current_step=self.step)
-            traci.simulationStep()
-            num_vehicles += traci.simulation.getDepartedNumber()
-            self.step += 1
-
-            for tl in self.traffic_lights:
-                if self.step % 60 == 0:
-                    tl_id = tl["id"]
-                    tl_state = tl_states[tl_id]
-
-                    travel_speed_avg = tl_state["step_travel_speed_sum"] / 60
-                    travel_time_avg = tl_state["step_travel_time_sum"] / 60
-                    density_avg = tl_state["step_density_sum"] / 60
-                    outflow_avg = tl_state["step_outflow"] / 60
-                    queue_length_avg = tl_state["step_queue_length"] / 60
-                    waiting_time_avg = tl_state["step_waiting_time"] / 60
-
-                    self.history["travel_speed"][tl_id].append(travel_speed_avg)
-                    self.history["travel_time"][tl_id].append(travel_time_avg)
-                    self.history["density"][tl_id].append(density_avg)
-                    self.history["outflow"][tl_id].append(outflow_avg)
-                    self.history["queue_length"][tl_id].append(queue_length_avg)
-                    self.history["waiting_time"][tl_id].append(waiting_time_avg)
-
-                    # Reset step metrics
-                    tl_state["step_travel_speed_sum"] = 0
-                    tl_state["step_travel_time_sum"] = 0
-                    tl_state["step_density_sum"] = 0
-                    tl_state["step_outflow"] = 0
-                    tl_state["step_queue_length"] = 0
-                    tl_state["step_waiting_time"] = 0
-
-                if tl_state["green_time_remaining"] > 0:
-                    phase = tl_state["phase"]
-                    new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
-                    outflow = sum(
-                        1
-                        for vid in tl_state["old_vehicle_ids"]
-                        if vid not in new_vehicle_ids
-                    )
-                    num_vehicles_out += outflow
-                    tl_state["outflow"] += outflow
-                    tl_state["travel_speed_sum"] += self.get_sum_speed(tl)
-                    tl_state["travel_time_sum"] += self.get_sum_travel_time(tl)
-                    tl_state["waiting_time"] += self.get_sum_waiting_time(tl)
-                    tl_state["old_vehicle_ids"] = new_vehicle_ids
-                    tl_state["queue_length"] += self.get_sum_queue_length(tl)
-                    tl_state["green_time_remaining"] -= 1
-
-                    # When phase ends, store metrics and update Q-table
-                    if tl_state["green_time_remaining"] == 0:
-                        green_time = tl_state["green_time"]
-
-                        self.queue_length[tl_id] = tl_state["queue_length"]
-                        self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
-                        self.travel_speed[tl_id] = tl_state["travel_speed_sum"]
-                        self.travel_time[tl_id] = (
-                            tl_state["travel_time_sum"] / green_time
-                        )
-                        self.waiting_time[tl_id] = tl_state["waiting_time"]
-
-                        reward = self.get_reward(tl_id, tl_state["phase"])
-                        next_state = self.get_state(tl)
-                        done = self.step >= self.max_steps
-
-                        self.phase[tl_id] = tl_state["phase"]
-
-                        self.agent_memory[tl_id].push(
-                            tl_state["state"],
-                            tl_state["action_idx"],
-                            reward,
-                            next_state,
-                            done,
-                        )
-
-                        self.qlearn_update(
-                            tl_state["state"],
-                            tl_state["action_idx"],
-                            reward,
-                            next_state,
-                            done,
-                            tl_id,
-                            episode,
-                        )
-                        self.history["agent_reward"][tl_id].append(reward)
-
-                # step state metrics
-                step_new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
-                step_outflow = sum(
-                    1
-                    for vid in tl_state["step_old_vehicle_ids"]
-                    if vid not in step_new_vehicle_ids
-                )
-                tl_state["step_density_sum"] += self.get_sum_density(tl)
-                tl_state["step_travel_speed_sum"] += self.get_sum_speed(tl)
-                tl_state["step_travel_time_sum"] += self.get_sum_travel_time(tl)
-                tl_state["step_outflow"] += step_outflow
-                tl_state["step_queue_length"] += self.get_sum_queue_length(tl)
-                tl_state["step_waiting_time"] += self.get_sum_waiting_time(tl)
-                tl_state["step_old_vehicle_ids"] = step_new_vehicle_ids
-
-        simulation_time = time.time() - start
-
-        traci.close()
-
-        print("Simulation ended")
-        print("Number of vehicles:", num_vehicles)
-        print("Number of vehicles get through all intersections:", num_vehicles_out)
-        print("---------------------------------------")
-
-        self.save_plot(episode=episode)
-        self.step = 0
-
-        total_reward = 0
-        for traffic_light in self.traffic_lights:
-            total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
-
-        print("Total reward:", total_reward, "- Epsilon:", epsilon)
-        self.reset_history()
-        # Decay epsilon
-        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
-        
-        # Clear feature cache periodically to prevent memory issues
-        if episode % 50 == 0:
-            self.clear_feature_cache()
-
-        return simulation_time, 0
-
-    def get_reward(self, traffic_light_id, phase=None):
+    def get_reward(self, traffic_light_id, phase):
         return (
             self.weight["outflow_rate"]
             * self.outflow_rate_normalizer.normalize(
                 self.outflow_rate[traffic_light_id]
             )
             + self.weight["delay"]
-            * (
-                1
-                - self.travel_speed_normalizer.normalize(
-                    self.travel_speed[traffic_light_id]
-                )
+            * self.travel_delay_normalizer.normalize(
+                self.travel_delay[traffic_light_id]
             )
             + self.weight["waiting_time"]
             * self.waiting_time_normalizer.normalize(
@@ -545,7 +479,7 @@ class QSimulation(SUMO):
             else f"{path}q_table.pkl"
         )
         with open(filename, "wb") as f:
-            pickle.dump(self.q_table, f)
+            pickle.dump(self.q_tables, f)
         print(f"Q-table saved to {filename}")
 
     def load_q_table(self, path):
@@ -557,7 +491,7 @@ class QSimulation(SUMO):
         """
         try:
             with open(path, "rb") as f:
-                self.q_table = pickle.load(f)
+                self.q_tables = pickle.load(f)
             print(f"Q-table loaded from {path}")
         except FileNotFoundError:
             print(f"Q-table file not found: {path}. Starting with empty Q-table.")
@@ -650,7 +584,7 @@ class QSimulation(SUMO):
     def save_metrics_to_dataframe(self, episode=None):
         """
         Save metrics per traffic light as pandas DataFrame.
-        Only saves system metrics: density, outflow, queue_length, travel_speed, travel_time, waiting_time
+        Only saves system metrics: density, outflow, queue_length, travel_delay, travel_time, waiting_time
 
         Returns:
             pd.DataFrame: DataFrame with columns [traffic_light_id, metric, time_step, value, episode]
@@ -662,7 +596,7 @@ class QSimulation(SUMO):
             "density",
             "outflow",
             "queue_length",
-            "travel_speed",
+            "travel_delay",
             "travel_time",
             "waiting_time",
         ]
@@ -733,7 +667,7 @@ class QSimulation(SUMO):
 
         return "".join(s_list)
 
-    def get_state(self, traffic_light):
+    def get_state(self, traffic_light, current_phase):
         """
         Get the current state at a specific traffic light in the simulation.
         Simplified version without DESRA hints.
@@ -743,10 +677,6 @@ class QSimulation(SUMO):
         """
         state_vector = []
 
-        features_per_phase = 4  # free_capacity, density, waiting_time, queue_length
-        # Compute max_phases from agent_cfg or fallback to number of phases
-        max_phases = self.agent_cfg.get("max_phases", len(traffic_light["phase"]))
-
         for phase_str in traffic_light["phase"]:
             movements = self.get_movements_from_phase(traffic_light, phase_str)
 
@@ -754,63 +684,44 @@ class QSimulation(SUMO):
             if not movements:
                 continue
 
-            free_capacity_sum = 0
-            density_sum = 0
-            max_waiting_time = 0
-            max_queue_length = 0
+            waiting_time = 0
+            queue_length = 0
+            num_vehicles = 0
 
             for detector_id in movements:
-                free_capacity_sum += self.get_free_capacity(detector_id)
-                density_sum += self.get_density(detector_id)
-                max_waiting_time = max(
-                    max_waiting_time, self.get_waiting_time(detector_id)
-                )
-                max_queue_length = max(
-                    max_queue_length, self.get_queue_length(detector_id)
-                )
+                waiting_time += self.get_waiting_time(detector_id)
+                queue_length += self.get_queue_length(detector_id)
+                num_vehicles += self.get_num_vehicles(detector_id)
 
-            movement_count = len(movements)
-            avg_free_capacity = free_capacity_sum / movement_count
-            avg_density = density_sum / movement_count
-
-            # Append per-phase state: [free_capacity, density, waiting_time, queue_length]
-            state_vector.extend(
-                [avg_free_capacity, avg_density, max_waiting_time, max_queue_length]
-            )
+            # Append per-phase state: [waiting_time, queue_length, num_vehicles]
+            state_vector.extend([waiting_time, queue_length, num_vehicles])
 
         # Calculate required input dim: max_phases * features_per_phase
-        input_dim = max_phases * features_per_phase
-        # Pad with zeros if needed
+        input_dim = self.agent_cfg["num_states"] * 10
+
+        # Append current phase
+        current_phase_idx = phase_to_index(
+            current_phase, self.actions_map[traffic_light["id"]], 0
+        )
+        state_vector.extend([current_phase_idx])
+
         padding = input_dim - len(state_vector)
-        if padding > 0:
-            state_vector.extend([0] * padding)
+        state_vector.extend([0] * padding)
+
+        assert (
+            len(state_vector) == input_dim
+        ), f"State vector length {len(state_vector)} does not match input_dim {input_dim}"
 
         return np.array(state_vector, dtype=np.float32)
-
-    def get_movements_from_phase(self, traffic_light, phase_str):
-        """
-        Get detector IDs whose street is active (green) in the given phase string.
-        Updated to match DQN implementation.
-        """
-        phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
-        active_street = str(
-            phase_index + 1
-        )  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
-
-        # Collect detector IDs belonging to the active street
-        active_detectors = [
-            det["id"]
-            for det in traffic_light["detectors"]
-            if det["street"] == active_street
-        ]
-
-        return active_detectors
 
     def get_queue_length(self, detector_id):
         """
         Get the queue length of a lane.
         """
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
+        length = traci.lanearea.getLength(detector_id)
+        if length <= 0:
+            return 0.0
+        return traci.lanearea.getLastStepOccupancy(detector_id) / 100 * length
 
     def get_free_capacity(self, detector_id):
         """
@@ -820,6 +731,7 @@ class QSimulation(SUMO):
         occupied_length = (
             traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
         )
+
         return (lane_length - occupied_length) / lane_length
 
     def get_density(self, detector_id):
@@ -839,17 +751,30 @@ class QSimulation(SUMO):
             total_waiting_time += traci.vehicle.getWaitingTime(vid)
         return total_waiting_time
 
-    def get_sum_speed(self, traffic_light):
-        speeds = []
-        for detector in traffic_light["detectors"]:
-            try:
-                speed = traci.lanearea.getLastStepMeanSpeed(detector["id"])
-                lane = traci.lanearea.getLaneID(detector["id"])
-                max_speed = traci.lane.getMaxSpeed(lane)
-                speeds.append(speed / max_speed)
-            except:
-                pass
-        return np.sum(speeds) if speeds else 0.0
+    def get_sum_travel_delay(self, traffic_light) -> float:
+        """
+        Compute the total travel delay over all approaching lanes for a given traffic light.
+
+        Delay for lane i: D_i = 1 - (average speed / speed limit)
+        Total delay: sum of D_i for all lanes.
+
+        Args:
+            traffic_light: dict containing traffic light information.
+
+        Returns:
+            float: Total delay across all relevant lanes.
+        """
+        delay_sum = 0.0
+
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            speed_limit = traci.lane.getMaxSpeed(lane)
+            mean_speed = traci.lane.getLastStepMeanSpeed(lane)
+
+            if speed_limit > 0:
+                delay = 1.0 - (mean_speed / speed_limit)
+                delay_sum += max(0.0, delay)  # avoid negative delay from noisy data
+
+        return delay_sum
 
     def get_sum_travel_time(self, traffic_light):
         travel_times = []
@@ -858,13 +783,26 @@ class QSimulation(SUMO):
         return np.sum(travel_times) if travel_times else 0.0
 
     def get_sum_density(self, traffic_light):
-        densities = []
-        for detector in traffic_light["detectors"]:
+        """
+        Compute density as total vehicles / total lane length (veh/m),
+        using true vehicle counts from each lane.
+        """
+        total_veh = 0
+        total_length = 0.0
+
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
             try:
-                densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
-            except:
+                count = traci.lane.getLastStepVehicleNumber(lane)
+                lane_len = traci.lane.getLength(lane)
+                total_veh += count
+                total_length += lane_len
+            except Exception:
                 pass
-        return np.sum(densities) / 100 if densities else 0.0
+
+        if total_length > 0:
+            return total_veh / total_length
+        else:
+            return 0.0
 
     def get_num_phases(self, traffic_light):
         """
@@ -872,18 +810,37 @@ class QSimulation(SUMO):
         """
         return len(traffic_light["phase"])
 
+    def get_movements_from_phase(self, traffic_light, phase_str):
+        """
+        Get detector IDs whose street is active (green) in the given phase string.
+        """
+        phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
+        active_street = str(
+            phase_index + 1
+        )  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
+
+        # Collect detector IDs belonging to the active street
+        active_detectors = [
+            det["id"]
+            for det in traffic_light["detectors"]
+            if det["street"] == active_street
+        ]
+
+        return active_detectors
+
     def get_sum_queue_length(self, traffic_light):
         """
         Get the average queue length of a lane.
         """
         queue_lengths = []
-        for detector in traffic_light["detectors"]:
-            try:
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            length = traci.lane.getLength(lane)
+            if length <= 0:
+                queue_lengths.append(0.0)
+            else:
                 queue_lengths.append(
-                    traci.lanearea.getLastStepVehicleNumber(detector["id"])
+                    traci.lane.getLastStepOccupancy(lane) / 100 * length
                 )
-            except:
-                pass
         return np.sum(queue_lengths) if queue_lengths else 0.0
 
     def get_sum_waiting_time(self, traffic_light):
@@ -891,8 +848,8 @@ class QSimulation(SUMO):
         Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
         vehicle_ids = []
-        for detector in traffic_light["detectors"]:
-            vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(detector["id"]))
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            vehicle_ids.extend(traci.lane.getLastStepVehicleIDs(lane))
 
         total_waiting_time = 0.0
         for vid in vehicle_ids:
@@ -904,178 +861,5 @@ class QSimulation(SUMO):
             for tl_id in self.history[key]:
                 self.history[key][tl_id] = []
 
-    def initialize_rbf(self, state_dim, traffic_light_id):
-        """Initialize RBF sampler with a representative state for each traffic light."""
-        if traffic_light_id not in self.rbf_sampler:
-            self.rbf_sampler[traffic_light_id] = RBFSampler(
-                gamma=self.rbf_gamma, 
-                n_components=self.n_components, 
-                random_state=42
-            )
-            # Fit with dummy data to initialize - use normalized range
-            dummy_state = np.random.normal(0, 1, size=(10, state_dim + 1))  # +1 for action
-            self.rbf_sampler[traffic_light_id].fit(dummy_state)
-            print(f"RBF sampler initialized for {traffic_light_id} with {self.n_components} components")
-
-    def get_rbf_features(self, state, action, traffic_light_id):
-        """Extract RBF features for state-action pair with caching."""
-        # Create cache key
-        state_tuple = tuple(state)
-        cache_key = (state_tuple, action, traffic_light_id)
-        
-        # Check cache first
-        if cache_key in self.feature_cache:
-            return self.feature_cache[cache_key]
-        
-        if traffic_light_id not in self.rbf_sampler:
-            self.initialize_rbf(len(state), traffic_light_id)
-        
-        # Combine state and action into feature vector
-        state_action = np.concatenate([state, [action]]).reshape(1, -1)
-        features = self.rbf_sampler[traffic_light_id].transform(state_action).flatten()
-        
-        # Cache the features (limit cache size)
-        if len(self.feature_cache) > 10000:  # Clear cache when it gets too large
-            self.feature_cache.clear()
-        self.feature_cache[cache_key] = features
-        
-        return features
-
-    def get_q_rbf(self, state, action, traffic_light_id):
-        """Get Q-value using RBF function approximation."""
-        features = self.get_rbf_features(state, action, traffic_light_id)
-        key = (traffic_light_id, action)  # Include traffic light ID in key
-        
-        if key not in self.rbf_weights:
-            self.rbf_weights[key] = np.zeros(len(features))
-        
-        return np.dot(self.rbf_weights[key], features)
-
-    def update_q_rbf(self, state, action, target, traffic_light_id):
-        """Update Q-value using RBF function approximation with improved learning."""
-        features = self.get_rbf_features(state, action, traffic_light_id)
-        key = (traffic_light_id, action)
-        
-        if key not in self.rbf_weights:
-            self.rbf_weights[key] = np.zeros(len(features))
-        
-        current_q = np.dot(self.rbf_weights[key], features)
-        error = target - current_q
-        
-        # Clip error to prevent explosive updates
-        error = np.clip(error, -10, 10)
-        
-        # Compute gradient
-        gradient = error * features
-        
-        # Clip gradient norm for stability
-        gradient_norm = np.linalg.norm(gradient)
-        if gradient_norm > 5.0:  # Max gradient norm
-            gradient = gradient * (5.0 / gradient_norm)
-        
-        # Apply update
-        self.rbf_weights[key] += self.alpha * gradient
-
-    def normalize_state(self, state, traffic_light_id):
-        """
-        Normalize state features for better RBF performance.
-        Each traffic light maintains its own normalization statistics.
-        """
-        if traffic_light_id not in self.state_normalizer:
-            self.state_normalizer[traffic_light_id] = {
-                'mean': np.zeros_like(state),
-                'std': np.ones_like(state),
-                'count': 0,
-                'update_count': 0
-            }
-        
-        normalizer = self.state_normalizer[traffic_light_id]
-        
-        # Only update normalization statistics for first 1000 steps to stabilize
-        if normalizer['update_count'] < 1000:
-            normalizer['count'] += 1
-            normalizer['update_count'] += 1
-            delta = state - normalizer['mean']
-            normalizer['mean'] += delta / normalizer['count']
-            
-            if normalizer['count'] > 1:
-                delta2 = state - normalizer['mean']
-                normalizer['std'] = np.sqrt(
-                    ((normalizer['count'] - 2) * normalizer['std']**2 + delta * delta2) / 
-                    (normalizer['count'] - 1)
-                )
-                # Avoid division by zero
-                normalizer['std'] = np.maximum(normalizer['std'], 1e-8)
-        
-        # Normalize state using stabilized statistics
-        normalized_state = (state - normalizer['mean']) / normalizer['std']
-        
-        # Clip to reasonable range to avoid extreme values
-        normalized_state = np.clip(normalized_state, -3, 3)  # Reduced clipping range
-        
-        return normalized_state
-
-    def get_state_statistics(self):
-        """Get statistics about state normalization for debugging."""
-        stats = {}
-        for tl_id, normalizer in self.state_normalizer.items():
-            stats[tl_id] = {
-                'count': normalizer['count'],
-                'mean': normalizer['mean'].tolist(),
-                'std': normalizer['std'].tolist()
-            }
-        return stats
-    
-    def clear_feature_cache(self):
-        """Clear the RBF feature cache to free memory."""
-        self.feature_cache.clear()
-        print("RBF feature cache cleared")
-    
-    def get_rbf_info(self):
-        """Get information about RBF configuration and usage."""
-        info = {
-            'n_components': self.n_components,
-            'rbf_gamma': self.rbf_gamma,
-            'num_traffic_lights': len(self.rbf_sampler),
-            'num_weight_keys': len(self.rbf_weights),
-            'cache_size': len(self.feature_cache),
-            'state_normalizers': len(self.state_normalizer)
-        }
-        return info
-    
-    def reset_state_normalizers(self):
-        """Reset state normalization statistics. Useful when starting a new training phase."""
-        self.state_normalizer.clear()
-        print("State normalizers reset")
-    
-    def get_q_values_for_state(self, state, traffic_light_id):
-        """Get Q-values for all actions given a state (useful for analysis)."""
-        normalized_state = self.normalize_state(state, traffic_light_id)
-        q_values = [
-            self.get_q_rbf(normalized_state, a, traffic_light_id) 
-            for a in range(self.num_actions[traffic_light_id])
-        ]
-        return np.array(q_values)
-    
-    def debug_q_learning(self, episode, traffic_light_id, state, action, reward, q_value, target):
-        """Debug Q-learning performance"""
-        if episode % 10 == 0 and hasattr(self, '_debug_count'):
-            if not hasattr(self, '_debug_count'):
-                self._debug_count = 0
-            
-            self._debug_count += 1
-            if self._debug_count <= 5:  # Only print first 5 debug messages per 10 episodes
-                print(f"Episode {episode} - TL {traffic_light_id}:")
-                print(f"  State range: [{state.min():.3f}, {state.max():.3f}]")
-                print(f"  Action: {action}, Reward: {reward:.3f}")
-                print(f"  Q-value: {q_value:.3f}, Target: {target:.3f}")
-                print(f"  Error: {abs(target - q_value):.3f}")
-                
-                if hasattr(self, 'state_normalizer') and traffic_light_id in self.state_normalizer:
-                    normalizer = self.state_normalizer[traffic_light_id]
-                    print(f"  Norm stats: count={normalizer.get('update_count', 0)}")
-                print("  ---")
-        
-        # Reset debug count every 10 episodes
-        if episode % 10 == 0:
-            self._debug_count = 0
+    def get_num_vehicles(self, detector_id):
+        return traci.lanearea.getLastStepHaltingNumber(detector_id)
