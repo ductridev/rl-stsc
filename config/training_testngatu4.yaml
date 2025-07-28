@@ -1,5 +1,5 @@
 simulation:
-  gui: True
+  gui: False
   total_episodes: 1000
   max_steps: 3600
   interphase_duration: 3
@@ -33,7 +33,7 @@ agent:
     queue_length: -0.25
     outflow_rate: 1
     delay: -0.25
-    travel_time: 1
+    travel_time: -1
     waiting_time: -0.25
     switch_phase: -5
 
