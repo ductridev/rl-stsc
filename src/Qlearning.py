@@ -778,7 +778,7 @@ class QSimulation(SUMO):
 
         total_waiting_time = 0.0
         for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(vid)
+            total_waiting_time += traci.vehicle.getWaitingTime(vid)
         return total_waiting_time
 
     def reset_history(self):
