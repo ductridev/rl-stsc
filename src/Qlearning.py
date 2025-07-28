@@ -4,6 +4,7 @@ from src.normalizer import Normalizer
 from src.desra import DESRA
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
+from src.vehicle_tracker import VehicleTracker
 
 import traci
 import numpy as np
@@ -99,6 +100,9 @@ class QSimulation(SUMO):
         self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
             self.get_longest_phase()
         )
+        
+        # Initialize vehicle tracker with model path
+        self.vehicle_tracker = VehicleTracker(path=path, output_dir="logs")
 
     def get_longest_phase(self):
         max_len = -1
@@ -133,7 +137,8 @@ class QSimulation(SUMO):
             self.agent_reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0
             self.agent_old_state[traffic_light_id] = 0
-            self.queue_length[traffic_light_id] = 0
+            
+            # Initialize metrics like DQN
             self.outflow_rate[traffic_light_id] = 0
             self.travel_delay[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
@@ -207,6 +212,9 @@ class QSimulation(SUMO):
         print("---------------------------------------")
 
         start_time = time.time()
+        
+        # Reset vehicle tracker for new episode
+        self.vehicle_tracker.reset()
 
         # Initialize traffic light state tracking
         tl_states = self._init_traffic_light_states()
@@ -275,6 +283,17 @@ class QSimulation(SUMO):
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
+            
+            # Update vehicle statistics
+            self.vehicle_tracker.update_stats(self.step)
+            
+            # Optional: Print vehicle stats every 1000 steps
+            if self.step % 1000 == 0:
+                current_stats = self.vehicle_tracker.get_current_stats()
+                print(f"Step {self.step}: "
+                      f"Running={current_stats['total_running']}, "
+                      f"Total Departed={current_stats['total_departed']}, "
+                      f"Total Arrived={current_stats['total_arrived']}")
 
             # === 3) Per-light update & learning ===
             for tl in self.traffic_lights:
@@ -325,9 +344,20 @@ class QSimulation(SUMO):
         # Post-simulation teardown
         traci.close()
         sim_time = time.time() - start_time
-        print(
-            f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
-        )
+        
+        # Get final vehicle statistics
+        final_vehicle_stats = self.vehicle_tracker.get_current_stats()
+        num_vehicles = final_vehicle_stats['total_departed']
+        num_vehicles_out = final_vehicle_stats['total_arrived']
+        
+        print(f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through.")
+        
+        # Print detailed vehicle statistics
+        self.vehicle_tracker.print_summary("Q-Learning")
+        
+        # Save vehicle logs
+        self.vehicle_tracker.save_logs(episode, "qlearning")
+        
         self.save_plot(episode=episode)
         self.step = 0
 
