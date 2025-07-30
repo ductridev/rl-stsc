@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-07-30 17:25:20.585545 by randomTrips.py v1_23_1+0000-676720d13f6
+<configuration>
+    <net-file value="osm.net.xml.gz"/>
+    <weights-prefix value="random_edge_priority_interval_4"/>
+    <output-trip-file value="osm.res_bike.interval_4.trips.xml"/>
+    <prefix value="res_bike_int4"/>
+    <trip-attributes value="departLane='best'"/>
+    <fringe-start-attributes value="departSpeed='max'"/>
+    <vehicle-class value="bicycle"/>
+    <vclass value="bicycle"/>
+    <remove-loops value="True"/>
+    <validate value="True"/>
+    <begin value="1444.0"/>
+    <end value="1804.0"/>
+    <insertion-rate value="70.0"/>
+</configuration>
+-->
+
+<!-- generated on 2025-07-30 17:25:20 by Eclipse SUMO duarouter Version 1.23.1
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_bike.interval_4.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_bike.interval_4.trips.xml.tmp"/>
+        <alternatives-output value="NUL"/>
+        <write-trips value="true"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="1444.0"/>
+        <end value="1804.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_bike_int4_bicycle" vClass="bicycle"/>
+    <trip id="res_bike_int41" type="res_bike_int4_bicycle" depart="1495.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int42" type="res_bike_int4_bicycle" depart="1546.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int43" type="res_bike_int4_bicycle" depart="1598.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int44" type="res_bike_int4_bicycle" depart="1649.71" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int46" type="res_bike_int4_bicycle" depart="1752.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+</routes>
