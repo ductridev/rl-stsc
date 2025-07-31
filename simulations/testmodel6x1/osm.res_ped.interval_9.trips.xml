@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-30 17:25:34.732115 by randomTrips.py v1_23_1+0000-676720d13f6
+<!-- generated on 2025-07-31 11:10:48.997763 by randomTrips.py v1_23_1+0000-676720d13f6
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_9"/>
@@ -17,7 +17,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-07-30 17:25:34 by Eclipse SUMO duarouter Version 1.23.1
+<!-- generated on 2025-07-31 11:10:48 by Eclipse SUMO duarouter Version 1.23.1
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -50,11 +50,14 @@
 -->
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <trip id="res_ped_int90" depart="3249.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_ped_int91" depart="3284.10" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_ped_int92" depart="3319.20" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int92" depart="3319.20" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
     <trip id="res_ped_int93" depart="3354.30" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_ped_int94" depart="3389.40" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_ped_int95" depart="3424.50" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_ped_int96" depart="3459.60" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_ped_int97" depart="3494.70" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int97" depart="3494.70" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int98" depart="3529.80" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_ped_int99" depart="3564.90" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
 </routes>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-30 17:25:05.426895 by randomTrips.py v1_23_1+0000-676720d13f6
+<!-- generated on 2025-07-31 11:10:12.876828 by randomTrips.py v1_23_1+0000-676720d13f6
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_9"/>
@@ -16,7 +16,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-07-30 17:25:05 by Eclipse SUMO duarouter Version 1.23.1
+<!-- generated on 2025-07-31 11:10:12 by Eclipse SUMO duarouter Version 1.23.1
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -50,12 +50,15 @@
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
     <vType id="res_veh_int9_passenger" vClass="passenger"/>
+    <trip id="res_veh_int90" type="res_veh_int9_passenger" depart="3249.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_veh_int91" type="res_veh_int9_passenger" depart="3257.36" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_veh_int92" type="res_veh_int9_passenger" depart="3265.71" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_veh_int92" type="res_veh_int9_passenger" depart="3265.71" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
     <trip id="res_veh_int93" type="res_veh_int9_passenger" depart="3274.07" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_veh_int94" type="res_veh_int9_passenger" depart="3282.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_veh_int95" type="res_veh_int9_passenger" depart="3290.79" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_veh_int96" type="res_veh_int9_passenger" depart="3299.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_veh_int97" type="res_veh_int9_passenger" depart="3307.50" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_veh_int97" type="res_veh_int9_passenger" depart="3307.50" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_veh_int98" type="res_veh_int9_passenger" depart="3315.86" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_veh_int99" type="res_veh_int9_passenger" depart="3324.21" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_veh_int910" type="res_veh_int9_passenger" depart="3332.57" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
     <trip id="res_veh_int911" type="res_veh_int9_passenger" depart="3340.93" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
@@ -66,20 +69,19 @@
     <trip id="res_veh_int917" type="res_veh_int9_passenger" depart="3391.07" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_veh_int918" type="res_veh_int9_passenger" depart="3399.43" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
     <trip id="res_veh_int919" type="res_veh_int9_passenger" depart="3407.79" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
-    <trip id="res_veh_int921" type="res_veh_int9_passenger" depart="3424.50" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_veh_int920" type="res_veh_int9_passenger" depart="3416.14" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_veh_int921" type="res_veh_int9_passenger" depart="3424.50" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
     <trip id="res_veh_int922" type="res_veh_int9_passenger" depart="3432.86" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
     <trip id="res_veh_int923" type="res_veh_int9_passenger" depart="3441.21" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
-    <trip id="res_veh_int924" type="res_veh_int9_passenger" depart="3449.57" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
     <trip id="res_veh_int925" type="res_veh_int9_passenger" depart="3457.93" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_veh_int927" type="res_veh_int9_passenger" depart="3474.64" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_veh_int929" type="res_veh_int9_passenger" depart="3491.36" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_veh_int927" type="res_veh_int9_passenger" depart="3474.64" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_veh_int928" type="res_veh_int9_passenger" depart="3483.00" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_veh_int929" type="res_veh_int9_passenger" depart="3491.36" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
     <trip id="res_veh_int930" type="res_veh_int9_passenger" depart="3499.71" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
     <trip id="res_veh_int931" type="res_veh_int9_passenger" depart="3508.07" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_veh_int932" type="res_veh_int9_passenger" depart="3516.43" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
-    <trip id="res_veh_int933" type="res_veh_int9_passenger" depart="3524.79" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_veh_int933" type="res_veh_int9_passenger" depart="3524.79" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_veh_int934" type="res_veh_int9_passenger" depart="3533.14" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
-    <trip id="res_veh_int935" type="res_veh_int9_passenger" depart="3541.50" departLane="best" departSpeed="max" from="E18" to="E31.622"/>
-    <trip id="res_veh_int937" type="res_veh_int9_passenger" depart="3558.21" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
     <trip id="res_veh_int939" type="res_veh_int9_passenger" depart="3574.93" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_veh_int940" type="res_veh_int9_passenger" depart="3583.29" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
     <trip id="res_veh_int941" type="res_veh_int9_passenger" depart="3591.64" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
