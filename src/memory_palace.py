@@ -19,17 +19,17 @@ class MemoryPalace:
         self.min_size = min_size_to_sample
         self.palaces = defaultdict(list)  # {(phase, action): [experiences]}
 
-    def _key(self, green_time, action):
+    def _key(self, action):
         """Define how to key the palace — here (green_time, action)"""
-        return (green_time, action)
+        return (action)
 
-    def push(self, state, action, green_time, reward, next_state, done=False):
+    def push(self, state, action, reward, next_state, done=False):
         """
         Save a transition into the corresponding memory palace.
         """
-        key = self._key(green_time, action)
+        key = self._key(action)
         buffer = self.palaces[key]
-        buffer.append(((state, action, green_time), reward, (next_state, None), done))
+        buffer.append(((state, action), reward, (next_state, None), done))
         if len(buffer) > self.max_size:
             buffer.pop(0)  # Remove oldest item if buffer is full
 

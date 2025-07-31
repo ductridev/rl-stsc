@@ -95,9 +95,9 @@ class AccidentManager:
         if self.stopped_vehicle is not None:
             try:
                 traci.vehicle.remove(self.stopped_vehicle)
-                print(f"✅ Vehicle {self.stopped_vehicle} removed after stopping.")
+                print(f"Vehicle {self.stopped_vehicle} removed after stopping.")
             except traci.TraCIException:
-                print(f"⚠️ Vehicle {self.stopped_vehicle} could not be removed (not found).")
+                print(f"Vehicle {self.stopped_vehicle} could not be removed (not found).")
 
     def create_accident(self, current_step):
         """
