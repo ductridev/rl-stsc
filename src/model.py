@@ -71,8 +71,6 @@ class DQN(nn.Module):
         for dim in self._output_dims:
             if hasattr(self, "loss_type") and self.loss_type in ("qr", "wasserstein"):
                 heads[str(dim)] = nn.Linear(256, dim * self.num_quantiles)
-            elif hasattr(self, "loss_type") and self.loss_type == "c51":
-                heads[str(dim)] = nn.Linear(256, dim * self.num_atoms)
             else:
                 heads[str(dim)] = nn.Linear(256, dim)
 
@@ -332,7 +330,6 @@ class DQN(nn.Module):
                 "gamma": self.gamma,
                 "loss_type": self.loss_type,
                 "num_quantiles": self.num_quantiles,
-                "num_atoms": self.num_atoms,
                 "v_min": self.v_min,
                 "v_max": self.v_max,
             },
