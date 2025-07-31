@@ -262,7 +262,7 @@ class Simulation(SUMO):
         for tl in self.traffic_lights:
             tl_id = tl["id"]
             self.tl_states[tl_id] = {
-                "green_time_remaining": 5,
+                "green_time_remaining": 10,
                 "yellow_time_remaining": 0,
                 "interphase": False,
                 "travel_delay_sum": 0,
@@ -275,7 +275,7 @@ class Simulation(SUMO):
                 "action_idx": None,
                 "phase": tl["phase"][0],
                 "old_phase": tl["phase"][0],
-                "green_time": 5,
+                "green_time": 10,
                 "step_travel_delay_sum": 0,
                 "step_travel_time_sum": 0,
                 "step_outflow_sum": 0,
