@@ -180,6 +180,8 @@ def import_train_configuration(file_path):
         config['save_interval'] = content['model'].get('save_interval', 10)
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
+        config['training_steps'] = content['model']['training_steps']
+        config['updating_target_network_steps'] = content['model']['updating_target_network_steps']
 
         # Intersection configuration
         config['traffic_lights'] = content['traffic_lights']

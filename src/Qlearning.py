@@ -39,6 +39,8 @@ class QSimulation(SUMO):
         interphase_duration=3,
         epoch=1000,
         path=None,
+        training_steps=300,
+        updating_target_network_steps=100,
     ):
         self.memory = memory
         self.visualization = visualization
@@ -287,7 +289,7 @@ class QSimulation(SUMO):
             # Update vehicle statistics
             self.vehicle_tracker.update_stats(self.step)
 
-            # Optional: Print vehicle stats every 1000 steps
+            # Print vehicle stats every 1000 steps
             if self.step % 1000 == 0:
                 current_stats = self.vehicle_tracker.get_current_stats()
                 print(
@@ -374,6 +376,8 @@ class QSimulation(SUMO):
         # Clear agent memory
         for tl in self.traffic_lights:
             self.agent_memory[tl["id"]].clean()
+
+        self.reset_history()
 
         return sim_time, 0
 

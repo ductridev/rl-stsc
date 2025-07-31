@@ -43,6 +43,9 @@ class Simulation(SUMO):
         interphase_duration=3,
         epoch=1000,
         path=None,
+        training_steps=300,
+        updating_target_network_steps=100,
+        save_interval=2,
     ):
         self.memory = memory
         self.visualization = visualization
@@ -55,6 +58,10 @@ class Simulation(SUMO):
         self.epoch = epoch
         self.path = path
         self.weight = agent_cfg["weight"]
+        self.training_steps = training_steps
+        self.updating_target_network_steps = updating_target_network_steps
+        self.save_interval = save_interval
+
         self.outflow_rate_normalizer = Normalizer()
         self.queue_length_normalizer = Normalizer()
         self.travel_time_normalizer = Normalizer()
@@ -118,6 +125,17 @@ class Simulation(SUMO):
             loss_type=self.loss_type,
         )
 
+        self.target_net: DQN = DQN(
+            num_layers=self.agent_cfg["num_layers"],
+            batch_size=self.agent_cfg["batch_size"],
+            learning_rate=self.agent_cfg["learning_rate"],
+            input_dim=self.agent_cfg["num_states"],
+            output_dims=self.get_output_dims(),
+            gamma=self.agent_cfg["gamma"],
+            device=self.device,
+            loss_type=self.loss_type,
+        )
+
         self.desra = DESRA(interphase_duration=self.interphase_duration)
 
         if torch.cuda.device_count() > 1:
@@ -125,7 +143,7 @@ class Simulation(SUMO):
             self.agent = nn.DataParallel(self.agent)
 
         self.agent = self.agent.to(self.device)
-        self.target_net = copy.deepcopy(self.agent)
+        self.target_net.load_state_dict(self.agent.state_dict())
         self.target_net.eval()
 
         self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
@@ -244,7 +262,7 @@ class Simulation(SUMO):
         for tl in self.traffic_lights:
             tl_id = tl["id"]
             self.tl_states[tl_id] = {
-                "green_time_remaining": 20,
+                "green_time_remaining": 5,
                 "yellow_time_remaining": 0,
                 "interphase": False,
                 "travel_delay_sum": 0,
@@ -256,7 +274,8 @@ class Simulation(SUMO):
                 "state": None,
                 "action_idx": None,
                 "phase": tl["phase"][0],
-                "green_time": 20,
+                "old_phase": tl["phase"][0],
+                "green_time": 5,
                 "step_travel_delay_sum": 0,
                 "step_travel_time_sum": 0,
                 "step_outflow_sum": 0,
@@ -284,14 +303,14 @@ class Simulation(SUMO):
                 if state["green_time_remaining"] > 0:
                     continue
 
-                # 1c) green just ended, enter yellow if not already in interphase
-                if not state["interphase"]:
+                # 1c) green just ended, if old phase is different with new phase enter yellow and if not already in interphase
+                if not state["interphase"] and state["old_phase"] != state["phase"]:
                     self.set_yellow_phase(tl_id, state["phase"])
                     state["yellow_time_remaining"] = self.interphase_duration
                     state["interphase"] = True
                     continue
 
-                # 1d) yellow just finished (interphase==True && yellow==0) → pick new action
+                # 1d) green just finished → pick new action
                 # reset interphase flag now
                 state["interphase"] = False
 
@@ -299,26 +318,29 @@ class Simulation(SUMO):
                 s = self.get_state(tl, state["phase"])
 
                 # Select action
-                random_val, action_idx, pred_green = self.select_action(
+                random_val, action_idx = self.select_action(
                     tl_id, self.agent, s, epsilon
                 )
 
                 # Convert action to phase
-                phase = index_to_action(action_idx, self.actions_map[tl_id])
+                new_phase = index_to_action(action_idx, self.actions_map[tl_id])
 
                 # Get green time to not exceed max_steps
-                green_time = max(1, min(pred_green, self.max_steps - self.step))
+                green_time = max(
+                    1, min(state["green_time"], self.max_steps - self.step)
+                )
 
                 # switch to new green
-                self.set_green_phase(tl_id, green_time, phase)
+                self.set_green_phase(tl_id, green_time, new_phase)
 
                 # Update state
                 state.update(
                     {
-                        "phase": phase,
+                        "phase": new_phase,
+                        "old_phase": state["phase"],
                         "green_time": green_time,
                         "green_time_remaining": green_time,
-                        "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
+                        "old_vehicle_ids": self.get_vehicles_in_phase(tl, new_phase),
                         "state": s,
                         "action_idx": action_idx,
                     }
@@ -330,10 +352,20 @@ class Simulation(SUMO):
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
-            
+
             # Update vehicle tracking statistics
             self.vehicle_tracker.update_stats(self.step)
-            
+
+            # Print vehicle stats every 1000 steps
+            if self.step % 1000 == 0:
+                current_stats = self.vehicle_tracker.get_current_stats()
+                print(
+                    f"Step {self.step}: "
+                    f"Running={current_stats['total_running']}, "
+                    f"Total Departed={current_stats['total_departed']}, "
+                    f"Total Arrived={current_stats['total_arrived']}"
+                )
+
             self._record_arrivals()
 
             # === 3) Metric collection for each TL ===
@@ -377,8 +409,29 @@ class Simulation(SUMO):
                     self._finalize_phase(tl, tl_id, st)
 
                 # d) every 60 steps flush partial metrics into history
-                if self.step % 60 == 0:
+                if self.step > 0 and self.step % 60 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
+
+                if self.step > 0 and self.step % self.training_steps == 0:
+                    print(f"Training per {self.training_steps} steps...")
+                    start = time.time()
+                    self.training_step()
+                    print(
+                        f"Training per {self.training_steps} steps took {time.time() - start}"
+                    )
+
+                if (
+                    self.step > 0
+                    and self.step % self.updating_target_network_steps == 0
+                ):
+                    print(
+                        f"Updating target network per {self.updating_target_network_steps} steps..."
+                    )
+                    start = time.time()
+                    self.target_net.load_state_dict(self.agent.state_dict())
+                    print(
+                        f"Updating target network per {self.updating_target_network_steps} steps took {time.time() - start}"
+                    )
 
         traci.close()
         sim_time = time.time() - start_time
@@ -396,12 +449,11 @@ class Simulation(SUMO):
         for tl in self.traffic_lights:
             self.agent_memory[tl["id"]].clean()
 
-        
         # Print and save vehicle statistics
         self.vehicle_tracker.print_summary("dqn")
         self.vehicle_tracker.save_logs(episode, "dqn")
         self.vehicle_tracker.reset()
-        
+
         return sim_time, self._train_and_plot(epsilon, episode)
 
     def _record_arrivals(self):
@@ -454,8 +506,8 @@ class Simulation(SUMO):
         print("Training...")
         start_time = time.time()
 
-        # update target net every 10 episodes
-        if episode % 10 == 0:
+        # update target net every 2 episodes
+        if episode % self.save_interval == 0:
             self.target_net.load_state_dict(self.agent.state_dict())
 
         # run your training epochs
@@ -471,13 +523,6 @@ class Simulation(SUMO):
 
         # reset step counter & history
         self.step = 0
-
-        # compute and log total reward
-        total_reward = 0
-        for tl in self.traffic_lights:
-            rewards = self.history["agent_reward"].get(tl["id"], [])
-            total_reward += np.sum(rewards)
-        print(f"Total reward: {total_reward}  -  Epsilon: {epsilon}")
 
         self.reset_history()
         return training_time
@@ -510,7 +555,6 @@ class Simulation(SUMO):
         Called once, when a green expires.  Records the overall
         metrics for that full green, pushes to replay memory, etc.
         """
-        g = st["green_time"]
         self.queue_length[tl_id] = st["queue_length"]
         self.outflow_rate[tl_id] = st["outflow"]
         self.travel_delay[tl_id] = st["travel_delay_sum"]
@@ -522,7 +566,7 @@ class Simulation(SUMO):
         done = self.step >= self.max_steps
 
         self.agent_memory[tl_id].push(
-            st["state"], st["action_idx"], g, reward, next_state, done
+            st["state"], st["action_idx"], reward, next_state, done
         )
         self.history["agent_reward"][tl_id].append(reward)
 
@@ -623,7 +667,7 @@ class Simulation(SUMO):
                 continue
 
             state_data, rewards, next_state_data, dones = zip(*batch)
-            states, actions, green_times = zip(*state_data)
+            states, actions = zip(*state_data)
             next_states, _ = zip(*next_state_data)
 
             metrics = self.agent.train_batch(
@@ -631,7 +675,6 @@ class Simulation(SUMO):
                 actions,
                 rewards,
                 next_states,
-                green_targets=green_times,
                 output_dim=self.num_actions[traffic_light_id],
                 done=dones,
                 target_net=self.target_net,
@@ -643,6 +686,49 @@ class Simulation(SUMO):
             )
             self.history["target"][traffic_light_id].append(metrics["avg_target"])
             self.history["loss"][traffic_light_id].append(metrics["total_loss"])
+
+    def training_step(self):
+        """
+        Retrieve a batch from each traffic light memory and train the agent.
+        """
+        for traffic_light in self.traffic_lights:
+            tl_id = traffic_light["id"]
+            batch = self.agent_memory[tl_id].get_balanced_samples(
+                batch_size_per_palace=self.num_actions[tl_id]
+            )
+
+            if not batch:
+                continue
+
+            batch = [
+                sample
+                for sample in batch
+                if sample[0][0] is not None and sample[2][0] is not None
+            ]
+
+            if not batch:
+                continue
+
+            state_data, rewards, next_state_data, dones = zip(*batch)
+            states, actions = zip(*state_data)
+            next_states, _ = zip(*next_state_data)
+
+            metrics = self.agent.train_batch(
+                states,
+                actions,
+                rewards,
+                next_states,
+                output_dim=self.num_actions[tl_id],
+                done=dones,
+                target_net=self.target_net,
+            )
+
+            self.history["q_value"][tl_id].append(metrics["avg_q_value"])
+            self.history["max_next_q_value"][tl_id].append(
+                metrics["avg_max_next_q_value"]
+            )
+            self.history["target"][tl_id].append(metrics["avg_target"])
+            self.history["loss"][tl_id].append(metrics["total_loss"])
 
     def get_reward(self, traffic_light_id, phase):
         return (
@@ -815,33 +901,22 @@ class Simulation(SUMO):
 
         random_val = random.uniform(0, 1)
 
-        if epsilon == self.agent_cfg["epsilon"]:
-            # Use DESRA phase and green time hints
-            desra_phase = int(base_state[-2])
-            desra_green = float(base_state[-1])
-
-            return random_val, desra_phase, desra_green
-
         if random_val < epsilon:
-            # Explore using DESRA phase but add green time randomness
+            # Explore using DESRA phase or random phase
             desra_phase = int(base_state[-2])
-            desra_green = float(base_state[-1])
 
-            # Add variation to DESRA green time (e.g. ±5 seconds)
-            variation = random.uniform(-5, 5)
-            green_time = max(5, desra_green + variation)  # clamp min green time
+            random_phase = random.randint(0, num_actions - 1)
 
-            return random_val, desra_phase, green_time
+            return random_val, random.choice([desra_phase, random_phase])
 
         with torch.no_grad():
-            q_values, green_times = agent.predict_one(state_t, output_dim=num_actions)
+            q_values = agent.predict_one(state_t, output_dim=num_actions)
             if agent.loss_type == "qr":
                 q_values = q_values.mean(2)  # [1, A]
 
             best_action_idx = q_values.squeeze(0).argmax().item()
-            predicted_green_time = green_times.squeeze(0)[best_action_idx].item()
 
-            return random_val, best_action_idx, predicted_green_time
+            return random_val, best_action_idx
 
     def get_state(self, traffic_light, current_phase):
         """

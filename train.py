@@ -59,6 +59,9 @@ if __name__ == "__main__":
             accident_manager=accident_manager,
             epoch=config["training_epochs"],
             path=path,
+            training_steps=config["training_steps"],
+            updating_target_network_steps=config["updating_target_network_steps"],
+            save_interval=config["save_interval"],
         )
         for loss in config["agent"]["model"]["loss_type"]
     }
@@ -109,6 +112,8 @@ if __name__ == "__main__":
         accident_manager=accident_manager,
         epoch=config["training_epochs"],
         path=path,
+        training_steps=config["training_steps"],
+        updating_target_network_steps=config["updating_target_network_steps"],
     )
 
     # Load existing Q-table if specified in config
@@ -164,10 +169,10 @@ if __name__ == "__main__":
         simulation_time_base = simulation.run(episode)
         print("SimulationBase time:", simulation_time_base)
 
-        print("Running QSimulation (Q-learning)...")
-        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-        simulation_time_q = simulation_q.run(epsilon, episode)
-        print("QSimulation time:", simulation_time_q)
+        # print("Running QSimulation (Q-learning)...")
+        # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        # simulation_time_q = simulation_q.run(epsilon, episode)
+        # print("QSimulation time:", simulation_time_q)
 
         for loss_type, sim_dqn in simulations_dqn.items():
             print(f"Running DQN Simulation (loss: {loss_type})...")

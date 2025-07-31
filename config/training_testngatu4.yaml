@@ -13,7 +13,9 @@ model:
   save_model_name: "dqn_testngatu_model" # Name for saving the model
   load_model_name: null # Set to model name to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
-  save_interval: 10 # Save model every N episodes
+  save_interval: 2 # Save model every N episodes
+  training_steps: 300
+  updating_target_network_steps: 1200
 
 agent:
   rbf_components: 100   
@@ -39,22 +41,22 @@ agent:
 
 vehicle_counts:
   low:
-    motorcycle: 1500
-    passenger: 375
+    motorcycle: 1750
+    passenger: 1250
     bicycle: 75
-    truck: 50
+    truck: 250
     pedestrian: 100
   medium:
-    motorcycle: 3000
-    passenger: 750
+    motorcycle: 4000
+    passenger: 1500
     truck: 150
-    bicycle: 100
+    bicycle: 500
     pedestrian: 200
   high:
-    motorcycle: 6000
-    passenger: 1500
+    motorcycle: 8000
+    passenger: 3000
     truck: 300
-    bicycle: 200
+    bicycle: 1000
     pedestrian: 400
 
 edge_groups:
