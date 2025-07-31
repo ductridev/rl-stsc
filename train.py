@@ -137,18 +137,18 @@ if __name__ == "__main__":
         print("Generating routes...")
         # Run the build routes file command
 
-        # generate_and_save_random_intervals(
-        #     sumo_cfg_file=config["sumo_cfg_file"],
-        #     total_duration=3600,
-        #     min_interval=360,
-        #     max_interval=360,
-        #     base_weight=100.0,
-        #     high_min=100.0,
-        #     high_max=100.0,
-        #     min_active_sides=1,
-        #     max_active_sides=3,
-        #     edge_groups=config["edge_groups"],
-        # )
+        generate_and_save_random_intervals(
+            sumo_cfg_file=config["sumo_cfg_file"],
+            total_duration=3600,
+            min_interval=360,
+            max_interval=360,
+            base_weight=100.0,
+            high_min=200.0,
+            high_max=400.0,
+            min_active_sides=1,
+            max_active_sides=3,
+            edge_groups=config["edge_groups"],
+        )
 
         Intersection.generate_residential_demand_routes(
             config,

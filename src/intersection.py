@@ -166,7 +166,7 @@ class Intersection:
                             f'--prefix res_{prefix}_int{interval_id} '
                             f'--weights-prefix random_edge_priority_interval_{interval_id} '
                         )
-                        if interval_id == 6:
+                        if interval == 2 or interval_id == 6:
                             trip_cmd += f"--insertion-rate {vehicles_in_interval * 3600 * 4 / (end_time - begin_time)} "
                         else:
                             trip_cmd += f"--insertion-rate {vehicles_in_interval * 3600 / (end_time - begin_time)} "
