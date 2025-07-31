@@ -199,6 +199,7 @@ class Intersection:
                     f'-n osm.net.xml.gz '
                     f'--route-files {merged_trip_file} '
                     f'-o {route_file} '
+                    f'--ignore-errors '
                 )
                 os.system(route_cmd)
 

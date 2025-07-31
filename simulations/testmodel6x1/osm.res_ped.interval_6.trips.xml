@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-07-30 17:25:32.148838 by randomTrips.py v1_23_1+0000-676720d13f6
+<!-- generated on 2025-07-31 11:10:45.501551 by randomTrips.py v1_23_1+0000-676720d13f6
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_6"/>
@@ -14,11 +14,11 @@
     <validate value="True"/>
     <begin value="2166.0"/>
     <end value="2526.0"/>
-    <insertion-rate value="100.0"/>
+    <insertion-rate value="400.0"/>
 </configuration>
 -->
 
-<!-- generated on 2025-07-30 17:25:32 by Eclipse SUMO duarouter Version 1.23.1
+<!-- generated on 2025-07-31 11:10:45 by Eclipse SUMO duarouter Version 1.23.1
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -51,11 +51,34 @@
 -->
 
 <routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
-    <trip id="res_ped_int61" depart="2202.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_ped_int62" depart="2238.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_ped_int63" depart="2274.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
-    <trip id="res_ped_int64" depart="2310.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_ped_int66" depart="2382.00" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_ped_int67" depart="2418.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_ped_int69" depart="2490.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_ped_int62" depart="2184.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int63" depart="2193.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_ped_int65" depart="2211.00" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_ped_int66" depart="2220.00" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_ped_int67" depart="2229.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int68" depart="2238.00" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_ped_int69" depart="2247.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_ped_int610" depart="2256.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int613" depart="2283.00" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_ped_int614" depart="2292.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int615" depart="2301.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int616" depart="2310.00" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_ped_int617" depart="2319.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int618" depart="2328.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int619" depart="2337.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int620" depart="2346.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_ped_int621" depart="2355.00" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_ped_int622" depart="2364.00" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_ped_int623" depart="2373.00" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_ped_int624" depart="2382.00" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_ped_int626" depart="2400.00" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_ped_int627" depart="2409.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int628" depart="2418.00" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_ped_int629" depart="2427.00" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_ped_int630" depart="2436.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int631" depart="2445.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int632" depart="2454.00" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_ped_int633" depart="2463.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_ped_int634" depart="2472.00" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_ped_int637" depart="2499.00" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
 </routes>
