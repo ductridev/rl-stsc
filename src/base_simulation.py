@@ -108,16 +108,16 @@ class SimulationBase(SUMO):
         # 2) Accumulate into both TL‐level and step‐level metrics
         st["step"]["outflow"] += outflow
         st["step"]["delay"] += sum_travel_delay
-        st["step"]["time"] += sum_travel_time
+        st["step"]["time"] = sum_travel_time
         st["step"]["density"] += sum_density
         st["step"]["queue"] += sum_queue_length
-        st["step"]["waiting"] += sum_waiting_time
+        st["step"]["waiting"] = sum_waiting_time
 
         st["outflow"] += outflow
-        st["travel_delay_sum"] += sum_travel_delay
-        st["travel_time_sum"] += sum_travel_time
-        st["queue_length"] += sum_queue_length
-        st["waiting_time"] += sum_waiting_time
+        st["travel_delay_sum"] = sum_travel_delay
+        st["travel_time_sum"] = sum_travel_time
+        st["queue_length"] = sum_queue_length
+        st["waiting_time"] = sum_waiting_time
 
         # 3) Every 60 steps, flush step‐averages into history
         if self.step % 60 == 0:
@@ -157,6 +157,16 @@ class SimulationBase(SUMO):
 
             # Update vehicle tracking statistics
             self.vehicle_tracker.update_stats(self.step)
+
+            # Print vehicle stats every 1000 steps
+            if self.step % 1000 == 0:
+                current_stats = self.vehicle_tracker.get_current_stats()
+                print(
+                    f"Step {self.step}: "
+                    f"Running={current_stats['total_running']}, "
+                    f"Total Departed={current_stats['total_departed']}, "
+                    f"Total Arrived={current_stats['total_arrived']}"
+                )
 
             # 2b) Collect per‐TL metrics and count outflow
             for tl in self.traffic_lights:
@@ -371,13 +381,10 @@ class SimulationBase(SUMO):
         """
         Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
-        vehicle_ids = []
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            vehicle_ids.extend(traci.lane.getLastStepVehicleIDs(lane))
-
         total_waiting_time = 0.0
-        for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+            total_waiting_time += traci.lane.getWaitingTime(lane)
+
         return total_waiting_time
 
     def reset_history(self):

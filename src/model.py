@@ -36,7 +36,9 @@ class DQN(nn.Module):
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
-        self._input_dim = max_phases * input_dim + 2 + 1 # 2 for DESRA and 1 for current phase
+        self._input_dim = (
+            max_phases * input_dim + 2 + 1
+        )  # 2 for DESRA and 1 for current phase
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
@@ -65,7 +67,6 @@ class DQN(nn.Module):
         attn = SENet(channel=256)  # Replace multihead attention
 
         heads = nn.ModuleDict()
-        green_heads = nn.ModuleDict()
 
         for dim in self._output_dims:
             if hasattr(self, "loss_type") and self.loss_type in ("qr", "wasserstein"):
@@ -74,9 +75,7 @@ class DQN(nn.Module):
                 heads[str(dim)] = nn.Linear(256, dim * self.num_atoms)
             else:
                 heads[str(dim)] = nn.Linear(256, dim)
-            green_heads[str(dim)] = nn.Linear(256, dim)
 
-        self.green_heads = green_heads
         return backbone, attn, heads
 
     def summary(self):
@@ -110,10 +109,8 @@ class DQN(nn.Module):
         attn_out = self.attn(features)  # Apply SENet, input shape [B, 256]
 
         q_head = self.heads[str(output_dim)]
-        green_head = self.green_heads[str(output_dim)]
 
         q_out = q_head(attn_out)  # Q-values or distributions
-        green_out = green_head(attn_out)  # Green time predictions
 
         if self.loss_type in ("qr", "wasserstein"):
             q_out = q_out.view(-1, output_dim, self.num_quantiles)
@@ -121,7 +118,7 @@ class DQN(nn.Module):
         elif self.loss_type == "c51":
             q_out = q_out.view(-1, output_dim, self.num_atoms)
 
-        return q_out, green_out
+        return q_out
 
     def predict_one(self, x, output_dim=15):
         """
@@ -170,7 +167,6 @@ class DQN(nn.Module):
         actions,
         rewards,
         next_states,
-        green_targets,
         output_dim=15,
         done=False,
         target_net: Optional["DQN"] = None,
@@ -184,7 +180,6 @@ class DQN(nn.Module):
             actions (ndarray): Batch of actions (phase indices).
             rewards (ndarray): Batch of rewards.
             next_states (ndarray): Batch of next states.
-            green_targets (ndarray): Ground truth green times (used or DESRA).
             output_dim (int): Output dimension (number of valid phases).
             done (bool or np.ndarray): Whether episode terminated.
             target_net (DQN): Optional target network for DDQN.
@@ -200,9 +195,6 @@ class DQN(nn.Module):
         )
         actions = torch.tensor(np.array(actions), dtype=torch.int64).to(self.device)
         rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
-        green_targets = torch.tensor(np.array(green_targets), dtype=torch.float32).to(
-            self.device
-        )
         done = torch.tensor(done, dtype=torch.float32).to(self.device)
 
         loss_type = self.loss_type
@@ -210,10 +202,8 @@ class DQN(nn.Module):
 
         # Forward pass
         # Compute target Q-value using DDQN logic
-        q_values, green_preds = self.predict_batch(
-            states, output_dim
-        )  # [B, A, K] and [B, A]
-        next_q_values, _ = (
+        q_values = self.predict_batch(states, output_dim)  # [B, A, K] and [B, A]
+        next_q_values = (
             target_net.predict_batch(next_states, output_dim)
             if target_net is not None
             else self.predict_batch(next_states, output_dim)
@@ -295,31 +285,16 @@ class DQN(nn.Module):
         else:
             raise ValueError(f"Unknown loss_type '{loss_type}'")
 
-        # === Green Time Prediction Loss ===
-        green_preds_taken = green_preds[
-            torch.arange(green_preds.size(0)), actions
-        ]  # [B]
-
-        # Clamp predictions and targets for stability
-        green_preds_taken = green_preds_taken.clamp(min=5.0, max=60.0)
-        green_targets = green_targets.clamp(min=5.0, max=60.0)
-
-        green_loss = F.mse_loss(green_preds_taken, green_targets)
-
-        # === Total Loss ===
-        total_loss = q_loss + alpha * green_loss
-
         # Backpropagation
         self.optimizer.zero_grad()
-        total_loss.backward()
+        q_loss.backward()
         self.optimizer.step()
 
         max_next_q_value = next_q_values.max(dim=1)[0]
 
         return {
             "q_loss": q_loss.item(),
-            "green_loss": green_loss.item(),
-            "total_loss": total_loss.item(),
+            "total_loss": q_loss.item(),
             "avg_q_value": q_value.mean().item(),
             "avg_max_next_q_value": max_next_q_value.mean().item(),
             "avg_target": target_q_value.detach().mean().item(),
