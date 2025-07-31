@@ -221,22 +221,23 @@ if __name__ == "__main__":
         if episode % save_interval == 0 and episode > 0:
             model_save_name = config.get("save_model_name", "dqn_model")
 
-            # # Save model weights only
-            # model_save_path = path + f"{model_save_name}_episode_{episode}.pth"
-            # simulation_dqn.agent.save(model_save_path)
+            for loss_type, sim_dqn in simulations_dqn.items():
+                # Save model weights only
+                model_save_path = path + f"{model_save_name}_episode_{episode}.pth"
+                sim_dqn.agent.save(model_save_path)
 
-            # # Save complete checkpoint for continuing training
-            # checkpoint_save_path = path + f"{model_save_name}_episode_{episode}_checkpoint.pth"
-            # simulation_dqn.agent.save_checkpoint(checkpoint_save_path, episode=episode, epsilon=epsilon)
+                # Save complete checkpoint for continuing training
+                checkpoint_save_path = path + f"{model_save_name}_episode_{episode}_checkpoint.pth"
+                sim_dqn.agent.save_checkpoint(checkpoint_save_path, episode=episode, epsilon=epsilon)
 
-            # print(f"DQN model saved at episode {episode}: {model_save_path}")
-            # print(f"DQN checkpoint saved at episode {episode}: {checkpoint_save_path}")
+                print(f"DQN model saved at episode {episode}: {model_save_path}")
+                print(f"DQN checkpoint saved at episode {episode}: {checkpoint_save_path}")
 
             # Also save Q-learning Q-table
-            q_table_save_path = (
-                path + f"q_table_{model_save_name}_episode_{episode}.pkl"
-            )
-            simulation_q.save_q_table(path, episode)
+            # q_table_save_path = (
+            #     path + f"q_table_{model_save_name}_episode_{episode}.pkl"
+            # )
+            # simulation_q.save_q_table(path, episode)
 
         episode += 1
 
