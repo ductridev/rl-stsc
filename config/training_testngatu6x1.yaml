@@ -13,7 +13,9 @@ model:
   save_model_name: "dqn_testngatu_model" # Name for saving the model
   load_model_name: null # Set to model name to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
-  save_interval: 10 # Save model every N episodes
+  save_interval: 2 # Save model every N episodes
+  training_steps: 300
+  updating_target_network_steps: 1200
 
 agent:
   rbf_components: 100   
