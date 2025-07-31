@@ -21,7 +21,7 @@ import datetime
 
 if __name__ == "__main__":
     # Load configuration
-    config = import_train_configuration("config/training_testngatu4.yaml")
+    config = import_train_configuration("config/training_testngatu6x1.yaml")
     min_epsilon = config["agent"]["min_epsilon"]
     decay_rate = config["agent"]["decay_rate"]
     start_epsilon = config["agent"]["epsilon"]
@@ -137,18 +137,18 @@ if __name__ == "__main__":
         print("Generating routes...")
         # Run the build routes file command
 
-        random_demand_name = generate_and_save_random_intervals(
-            sumo_cfg_file=config["sumo_cfg_file"],
-            total_duration=3600,
-            min_interval=600,
-            max_interval=1800,
-            base_weight=100.0,
-            high_min=200.0,
-            high_max=500.0,
-            min_active_sides=1,
-            max_active_sides=3,
-            edge_groups=config["edge_groups"],
-        )
+        # generate_and_save_random_intervals(
+        #     sumo_cfg_file=config["sumo_cfg_file"],
+        #     total_duration=3600,
+        #     min_interval=360,
+        #     max_interval=360,
+        #     base_weight=100.0,
+        #     high_min=100.0,
+        #     high_max=100.0,
+        #     min_active_sides=1,
+        #     max_active_sides=3,
+        #     edge_groups=config["edge_groups"],
+        # )
 
         Intersection.generate_residential_demand_routes(
             config,
@@ -159,7 +159,6 @@ if __name__ == "__main__":
             enable_truck=True,
             enable_bicycle=True,
             enable_pedestrian=True,
-            random_demand_name=random_demand_name,
         )
         print("Routes generated")
 
