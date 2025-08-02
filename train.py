@@ -175,7 +175,11 @@ if __name__ == "__main__":
 
         for loss_type, sim_dqn in simulations_dqn.items():
             print(f"Running DQN Simulation (loss: {loss_type})...")
-            set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+            # Enable GUI once every 100 episodes for visual monitoring
+            gui_enabled = (episode % 100 == 0)
+            set_sumo(gui_enabled, config["sumo_cfg_file"], config["max_steps"])
+            if gui_enabled:
+                print(f"🖥️  GUI enabled for episode {episode} - Visual monitoring")
             simulation_time_dqn, training_time_dqn = sim_dqn.run(epsilon, episode)
             print(
                 f"Simulation (DQN - {loss_type}) time:",
@@ -216,13 +220,22 @@ if __name__ == "__main__":
                     "Comparison tables will be generated when CSV files are available"
                 )
 
+            # --- Generate vehicle comparison from logs ---
+            print("Generating vehicle comparison from logs...")
+            try:
+                visualization.create_vehicle_comparison_from_logs(episode, ["dqn", "base"])  # Only compare DQN and Base since Q is disabled
+                print("Vehicle comparison from logs generated successfully")
+            except Exception as e:
+                print(f"Error generating vehicle comparison from logs: {e}")
+                print("Vehicle comparison will be generated when log files are available")
+
         # Save model at specified intervals
         save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
         if episode % save_interval == 0 and episode > 0:
             model_save_name = config.get("save_model_name", "dqn_model")
 
             for loss_type, sim_dqn in simulations_dqn.items():
-                # Save model weights only
+                # Save model weights with simple DQN naming (since only running QR)
                 model_save_path = path + f"{model_save_name}_episode_{episode}.pth"
                 sim_dqn.agent.save(model_save_path)
 
@@ -233,10 +246,9 @@ if __name__ == "__main__":
                 print(f"DQN model saved at episode {episode}: {model_save_path}")
                 print(f"DQN checkpoint saved at episode {episode}: {checkpoint_save_path}")
 
-            # Also save Q-learning Q-table
-            # q_table_save_path = (
-            #     path + f"q_table_{model_save_name}_episode_{episode}.pkl"
-            # )
+            # Save Q-learning Q-table (only if Q-learning is running)
+            # Note: Uncomment when Q-learning is enabled
+            # q_table_save_path = path + f"q_table_{model_save_name}_episode_{episode}.pkl"
             # simulation_q.save_q_table(path, episode)
 
         episode += 1
