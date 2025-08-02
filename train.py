@@ -188,7 +188,7 @@ if __name__ == "__main__":
         for loss_type, sim_dqn in simulations_dqn.items():
             print(f"Running DQN Simulation (loss: {loss_type})...")
             # Enable GUI once every 100 episodes for visual monitoring
-            gui_enabled = (episode % 100 == 0)
+            gui_enabled = (episode % 100 == 0 and episode > 0)
             set_sumo(gui_enabled, config["sumo_cfg_file"], config["max_steps"])
             if gui_enabled:
                 print(f"🖥️  GUI enabled for episode {episode} - Visual monitoring")
