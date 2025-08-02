@@ -18,6 +18,8 @@ from src.scripts.random_demand_sides import (
     generate_and_save_random_intervals
 )
 import datetime
+import shutil
+import os
 
 if __name__ == "__main__":
     # Load configuration
@@ -131,6 +133,16 @@ if __name__ == "__main__":
     episode = start_episode
     epsilon = start_epsilon
     timestamp_start = datetime.datetime.now()
+    
+    # Track best performance
+    best_performance = {
+        'episode': -1,
+        'completion_rate': -1,
+        'avg_travel_time': float('inf'),
+        'avg_waiting_time': float('inf'),
+        'combined_score': -float('inf')
+    }
+    performance_history = []
 
     while episode < config["total_episodes"]:
         print("\n----- Episode", str(episode + 1), "of", str(config["total_episodes"]))
@@ -175,7 +187,11 @@ if __name__ == "__main__":
 
         for loss_type, sim_dqn in simulations_dqn.items():
             print(f"Running DQN Simulation (loss: {loss_type})...")
-            set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+            # Enable GUI once every 100 episodes for visual monitoring
+            gui_enabled = (episode % 100 == 0)
+            set_sumo(gui_enabled, config["sumo_cfg_file"], config["max_steps"])
+            if gui_enabled:
+                print(f"🖥️  GUI enabled for episode {episode} - Visual monitoring")
             simulation_time_dqn, training_time_dqn = sim_dqn.run(epsilon, episode)
             print(
                 f"Simulation (DQN - {loss_type}) time:",
@@ -185,6 +201,125 @@ if __name__ == "__main__":
             )
 
         epsilon = max(min_epsilon, epsilon * decay_rate)
+
+        # --- Track Performance ---
+        try:
+            # Get DQN vehicle statistics
+            dqn_sim = list(simulations_dqn.values())[0]  # Get first (only) DQN simulation
+            dqn_stats = dqn_sim.vehicle_tracker.get_current_stats()
+            
+            # Calculate performance metrics
+            completion_rate = (dqn_stats['total_arrived'] / max(dqn_stats['total_departed'], 1)) * 100
+            
+            # Get traffic metrics (if available)
+            avg_travel_time = 0
+            avg_waiting_time = 0
+            
+            # Try to get traffic metrics from simulation history
+            if hasattr(dqn_sim, 'history') and 'travel_time' in dqn_sim.history:
+                travel_times = []
+                waiting_times = []
+                for tl_id, times in dqn_sim.history['travel_time'].items():
+                    if times:
+                        travel_times.extend(times[-10:])  # Last 10 measurements
+                for tl_id, times in dqn_sim.history['waiting_time'].items():
+                    if times:
+                        waiting_times.extend(times[-10:])  # Last 10 measurements
+                
+                avg_travel_time = sum(travel_times) / len(travel_times) if travel_times else 0
+                avg_waiting_time = sum(waiting_times) / len(waiting_times) if waiting_times else 0
+            
+            # Combined score (higher is better)
+            # Weight: completion_rate (60%) - travel_time penalty (20%) - waiting_time penalty (20%)
+            combined_score = (completion_rate * 0.6) - (avg_travel_time * 0.2) - (avg_waiting_time * 0.2)
+            
+            # Store performance data
+            current_performance = {
+                'episode': episode,
+                'completion_rate': completion_rate,
+                'avg_travel_time': avg_travel_time,
+                'avg_waiting_time': avg_waiting_time,
+                'combined_score': combined_score,
+                'epsilon': epsilon,
+                'total_departed': dqn_stats['total_departed'],
+                'total_arrived': dqn_stats['total_arrived']
+            }
+            performance_history.append(current_performance)
+            
+            # Check if this is the best performance so far
+            if combined_score > best_performance['combined_score']:
+                # Clean up old best model files first
+                model_save_name = config.get("save_model_name", "dqn_model")
+                
+                # Remove old best files if they exist
+                if best_performance['episode'] != -1:  # If there was a previous best
+                    old_best_model = path + f"{model_save_name}_BEST_ep{best_performance['episode']}.pth"
+                    old_best_checkpoint = path + f"{model_save_name}_BEST_ep{best_performance['episode']}_checkpoint.pth"
+                    
+                    try:
+                        if os.path.exists(old_best_model):
+                            os.remove(old_best_model)
+                            print(f"   🗑️  Removed old best model: ep{best_performance['episode']}")
+                        if os.path.exists(old_best_checkpoint):
+                            os.remove(old_best_checkpoint)
+                            print(f"   🗑️  Removed old best checkpoint: ep{best_performance['episode']}")
+                    except Exception as e:
+                        print(f"   ⚠️  Could not remove old best files: {e}")
+                
+                # Update best performance record
+                best_performance = current_performance.copy()
+                print(f"\n🏆 NEW BEST PERFORMANCE at Episode {episode}!")
+                print(f"   Completion Rate: {completion_rate:.1f}%")
+                print(f"   Avg Travel Time: {avg_travel_time:.2f}")
+                print(f"   Avg Waiting Time: {avg_waiting_time:.2f}")
+                print(f"   Combined Score: {combined_score:.2f}")
+                
+                # Create new best model files
+                for loss_type, sim_dqn in simulations_dqn.items():
+                    # Source files (current episode checkpoint if it exists)
+                    current_model_path = path + f"{model_save_name}_episode_{episode}.pth"
+                    current_checkpoint_path = path + f"{model_save_name}_episode_{episode}_checkpoint.pth"
+                    
+                    # New best model files
+                    best_model_path = path + f"{model_save_name}_BEST_ep{episode}.pth"
+                    best_checkpoint_path = path + f"{model_save_name}_BEST_ep{episode}_checkpoint.pth"
+                    
+                    # Copy files if they exist, otherwise save current state
+                    if os.path.exists(current_model_path):
+                        shutil.copy2(current_model_path, best_model_path)
+                        print(f"   ✅ Best model copied: ep{episode}")
+                    else:
+                        # Save current state if regular checkpoint doesn't exist yet
+                        sim_dqn.agent.save(best_model_path)
+                        print(f"   ✅ Best model saved: ep{episode}")
+                    
+                    if os.path.exists(current_checkpoint_path):
+                        shutil.copy2(current_checkpoint_path, best_checkpoint_path)
+                        print(f"   ✅ Best checkpoint copied: ep{episode}")
+                    else:
+                        # Save current state if regular checkpoint doesn't exist yet
+                        sim_dqn.agent.save_checkpoint(best_checkpoint_path, episode=episode, epsilon=epsilon)
+                        print(f"   ✅ Best checkpoint saved: ep{episode}")
+                    
+                    # Always update the "CURRENT" best files (overwrite)
+                    current_best_model = path + f"{model_save_name}_BEST_CURRENT.pth"
+                    current_best_checkpoint = path + f"{model_save_name}_BEST_CURRENT_checkpoint.pth"
+                    
+                    sim_dqn.agent.save(current_best_model)
+                    sim_dqn.agent.save_checkpoint(current_best_checkpoint, episode=episode, epsilon=epsilon)
+                    print(f"   ✅ Current best updated: ep{episode}")
+                    
+                    break  # Only need to do this once since there's only one DQN simulation
+            
+            # Print current vs best performance every 10 episodes
+            if episode % 10 == 0:
+                print(f"\n📊 Performance Summary - Episode {episode}")
+                print(f"Current: Score={combined_score:.2f}, Completion={completion_rate:.1f}%, Travel={avg_travel_time:.2f}, Wait={avg_waiting_time:.2f}")
+                print(f"Best:    Score={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
+                
+        except Exception as e:
+            print(f"⚠️  Error tracking performance: {e}")
+            # Continue training even if performance tracking fails
 
         # --- Save comparison plots ---
         print("Saving comparison plots...")
@@ -216,13 +351,22 @@ if __name__ == "__main__":
                     "Comparison tables will be generated when CSV files are available"
                 )
 
+            # --- Generate vehicle comparison from logs ---
+            print("Generating vehicle comparison from logs...")
+            try:
+                visualization.create_vehicle_comparison_from_logs(episode, ["dqn", "base"])  # Only compare DQN and Base since Q is disabled
+                print("Vehicle comparison from logs generated successfully")
+            except Exception as e:
+                print(f"Error generating vehicle comparison from logs: {e}")
+                print("Vehicle comparison will be generated when log files are available")
+
         # Save model at specified intervals
         save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
         if episode % save_interval == 0 and episode > 0:
             model_save_name = config.get("save_model_name", "dqn_model")
 
             for loss_type, sim_dqn in simulations_dqn.items():
-                # Save model weights only
+                # Save model weights with simple DQN naming (since only running QR)
                 model_save_path = path + f"{model_save_name}_episode_{episode}.pth"
                 sim_dqn.agent.save(model_save_path)
 
@@ -233,10 +377,9 @@ if __name__ == "__main__":
                 print(f"DQN model saved at episode {episode}: {model_save_path}")
                 print(f"DQN checkpoint saved at episode {episode}: {checkpoint_save_path}")
 
-            # Also save Q-learning Q-table
-            # q_table_save_path = (
-            #     path + f"q_table_{model_save_name}_episode_{episode}.pkl"
-            # )
+            # Save Q-learning Q-table (only if Q-learning is running)
+            # Note: Uncomment when Q-learning is enabled
+            # q_table_save_path = path + f"q_table_{model_save_name}_episode_{episode}.pkl"
             # simulation_q.save_q_table(path, episode)
 
         episode += 1
@@ -244,6 +387,77 @@ if __name__ == "__main__":
     print("\n----- Start time:", timestamp_start)
     print("----- End time:", datetime.datetime.now())
     print("----- Session info saved at:", path)
+    
+    # Print best performance summary
+    print(f"\n🏆 BEST PERFORMANCE SUMMARY")
+    print("=" * 50)
+    print(f"Best Episode: {best_performance['episode']}")
+    print(f"Best Completion Rate: {best_performance['completion_rate']:.2f}%")
+    print(f"Best Travel Time: {best_performance['avg_travel_time']:.2f}")
+    print(f"Best Waiting Time: {best_performance['avg_waiting_time']:.2f}")
+    print(f"Best Combined Score: {best_performance['combined_score']:.2f}")
+    print(f"Vehicles: {best_performance['total_arrived']}/{best_performance['total_departed']}")
+    
+    # Save performance history to CSV
+    if performance_history:
+        import pandas as pd
+        performance_df = pd.DataFrame(performance_history)
+        performance_csv = path + "performance_history.csv"
+        performance_df.to_csv(performance_csv, index=False)
+        print(f"📈 Performance history saved: {performance_csv}")
+        
+        # Create performance plot
+        try:
+            import matplotlib.pyplot as plt
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+            fig.suptitle('Training Performance Over Time', fontsize=16)
+            
+            episodes = performance_df['episode']
+            
+            # Plot 1: Completion Rate
+            ax1.plot(episodes, performance_df['completion_rate'], 'b-', linewidth=2)
+            ax1.axhline(y=best_performance['completion_rate'], color='r', linestyle='--', alpha=0.7)
+            ax1.set_xlabel('Episode')
+            ax1.set_ylabel('Completion Rate (%)')
+            ax1.set_title('Vehicle Completion Rate')
+            ax1.grid(True, alpha=0.3)
+            ax1.text(0.02, 0.98, f"Best: {best_performance['completion_rate']:.1f}% (Ep {best_performance['episode']})", 
+                     transform=ax1.transAxes, verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
+            
+            # Plot 2: Combined Score
+            ax2.plot(episodes, performance_df['combined_score'], 'g-', linewidth=2)
+            ax2.axhline(y=best_performance['combined_score'], color='r', linestyle='--', alpha=0.7)
+            ax2.set_xlabel('Episode')
+            ax2.set_ylabel('Combined Score')
+            ax2.set_title('Overall Performance Score')
+            ax2.grid(True, alpha=0.3)
+            ax2.text(0.02, 0.98, f"Best: {best_performance['combined_score']:.1f} (Ep {best_performance['episode']})", 
+                     transform=ax2.transAxes, verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
+            
+            # Plot 3: Travel Time
+            ax3.plot(episodes, performance_df['avg_travel_time'], 'orange', linewidth=2)
+            if best_performance['avg_travel_time'] > 0:
+                ax3.axhline(y=best_performance['avg_travel_time'], color='r', linestyle='--', alpha=0.7)
+            ax3.set_xlabel('Episode')
+            ax3.set_ylabel('Avg Travel Time')
+            ax3.set_title('Average Travel Time')
+            ax3.grid(True, alpha=0.3)
+            
+            # Plot 4: Epsilon Decay
+            ax4.plot(episodes, performance_df['epsilon'], 'purple', linewidth=2)
+            ax4.set_xlabel('Episode')
+            ax4.set_ylabel('Epsilon')
+            ax4.set_title('Exploration Rate (Epsilon)')
+            ax4.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            performance_plot = path + "performance_history.png"
+            plt.savefig(performance_plot, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"📊 Performance plot saved: {performance_plot}")
+            
+        except Exception as e:
+            print(f"⚠️  Could not create performance plot: {e}")
 
     print(f"Saving final model at {path}...")
     # model_save_name = config.get("save_model_name", "dqn_model")
