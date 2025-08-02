@@ -412,26 +412,30 @@ class Simulation(SUMO):
                 if self.step > 0 and self.step % 60 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
 
-                if self.step > 0 and self.step % self.training_steps == 0:
-                    print(f"Training per {self.training_steps} steps...")
-                    start = time.time()
+            if self.step > 0 and self.step % self.training_steps == 0:
+                print(f"Training per {self.training_steps} steps...")
+                start = time.time()
+                for _ in range(self.epoch):
                     self.training_step()
-                    print(
-                        f"Training per {self.training_steps} steps took {time.time() - start}"
-                    )
+                # Clear agent memory
+                for tl in self.traffic_lights:
+                    self.agent_memory[tl["id"]].clean()
+                print(
+                    f"Training per {self.training_steps} steps took {time.time() - start}"
+                )
 
-                if (
-                    self.step > 0
-                    and self.step % self.updating_target_network_steps == 0
-                ):
-                    print(
-                        f"Updating target network per {self.updating_target_network_steps} steps..."
-                    )
-                    start = time.time()
-                    self.target_net.load_state_dict(self.agent.state_dict())
-                    print(
-                        f"Updating target network per {self.updating_target_network_steps} steps took {time.time() - start}"
-                    )
+            # if (
+            #     self.step > 0
+            #     and self.step % self.updating_target_network_steps == 0
+            # ):
+            #     print(
+            #         f"Updating target network per {self.updating_target_network_steps} steps..."
+            #     )
+            #     start = time.time()
+            #     self.target_net.load_state_dict(self.agent.state_dict())
+            #     print(
+            #         f"Updating target network per {self.updating_target_network_steps} steps took {time.time() - start}"
+            #     )
 
         traci.close()
         sim_time = time.time() - start_time
@@ -444,10 +448,6 @@ class Simulation(SUMO):
             np.sum(self.history["agent_reward"][tl["id"]]) for tl in self.traffic_lights
         )
         print(f"Total reward: {total_reward}  -  Epsilon: {epsilon}")
-
-        # Clear agent memory
-        for tl in self.traffic_lights:
-            self.agent_memory[tl["id"]].clean()
 
         # Print and save vehicle statistics
         self.vehicle_tracker.print_summary("dqn")
@@ -511,8 +511,8 @@ class Simulation(SUMO):
             self.target_net.load_state_dict(self.agent.state_dict())
 
         # run your training epochs
-        for _ in range(self.epoch):
-            self.training()
+        # for _ in range(self.epoch):
+        #     self.training()
 
         training_time = time.time() - start_time
         print("Training ended")
