@@ -422,7 +422,7 @@ class Simulation(SUMO):
         # Save vehicle statistics
         self.vehicle_tracker.print_summary("skrl_dqn")
         self.vehicle_tracker.save_logs(episode, "skrl_dqn")
-        self.vehicle_tracker.reset()
+        # self.vehicle_tracker.reset()
 
         # Print DESRA parameter summary
         self.print_desra_summary()
@@ -515,7 +515,7 @@ class Simulation(SUMO):
 
         # Reset for next episode
         self.step = 0
-        self.reset_history()
+        # self.reset_history()
 
         return 0.0  # Return dummy training time
 
