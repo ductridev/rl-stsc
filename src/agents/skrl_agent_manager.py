@@ -191,7 +191,8 @@ class SKRLAgentManager:
         if model_type == "noisy":
             # Noisy networks don't need epsilon-greedy as noise provides exploration
             with torch.no_grad():
-                q_values = agent.models["q_network"].compute({"states": state_tensor})[0]
+                # Get Q-values and handle different loss types (including quantile regression)
+                q_values = agent.models["q_network"].get_q_values(state_tensor)
                 action = q_values.argmax().item()
             random_val = 0.0
         else:
@@ -201,7 +202,8 @@ class SKRLAgentManager:
                 random_val = epsilon
             else:
                 with torch.no_grad():
-                    q_values = agent.models["q_network"].compute({"states": state_tensor})[0]
+                    # Get Q-values and handle different loss types (including quantile regression)
+                    q_values = agent.models["q_network"].get_q_values(state_tensor)
                     action = q_values.argmax().item()
                 random_val = 0.0
 
