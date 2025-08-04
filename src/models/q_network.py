@@ -79,7 +79,7 @@ class QNetwork(Model):
                 layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
                 
                 if self.batch_norm:
-                    layers.append(nn.BatchNorm1d(layer_sizes[i + 1]))
+                    layers.append(nn.LayerNorm(layer_sizes[i + 1]))
                 
                 layers.append(nn.ReLU())
                 
@@ -92,7 +92,7 @@ class QNetwork(Model):
             # Input layer
             layers.append(nn.Linear(self.input_dim, 128))
             if self.batch_norm:
-                layers.append(nn.BatchNorm1d(128))
+                layers.append(nn.LayerNorm(128))
             layers.append(nn.ReLU())
             if self.dropout_rate > 0:
                 layers.append(nn.Dropout(self.dropout_rate))
@@ -100,7 +100,7 @@ class QNetwork(Model):
             # Second layer
             layers.append(nn.Linear(128, self.hidden_size))
             if self.batch_norm:
-                layers.append(nn.BatchNorm1d(self.hidden_size))
+                layers.append(nn.LayerNorm(self.hidden_size))
             layers.append(nn.ReLU())
             if self.dropout_rate > 0:
                 layers.append(nn.Dropout(self.dropout_rate))
@@ -109,7 +109,7 @@ class QNetwork(Model):
             for _ in range(self.num_layers):
                 layers.append(nn.Linear(self.hidden_size, self.hidden_size))
                 if self.batch_norm:
-                    layers.append(nn.BatchNorm1d(self.hidden_size))
+                    layers.append(nn.LayerNorm(self.hidden_size))
                 layers.append(nn.ReLU())
                 if self.dropout_rate > 0:
                     layers.append(nn.Dropout(self.dropout_rate))
