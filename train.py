@@ -330,12 +330,10 @@ if __name__ == "__main__":
             # Continue training even if performance tracking fails
         
         # Reset vehicle trackers after performance tracking is complete
-        for loss_type, sim_dqn in simulation_skrl.items():
-            print(f"  Resetting vehicle tracker for DQN simulation")
-            sim_dqn.vehicle_tracker.reset()
-            print(f"  Resetting history for DQN simulation")
-            sim_dqn.reset_history()
-            break  # Only need to do this once since there's only one DQN simulation
+        print(f"  Resetting vehicle tracker for DQN simulation")
+        simulation_skrl.vehicle_tracker.reset()
+        print(f"  Resetting history for DQN simulation")
+        simulation_skrl.reset_history()
 
         # --- Save comparison plots ---
         print("Saving comparison plots...")
