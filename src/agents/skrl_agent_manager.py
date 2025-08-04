@@ -1,6 +1,7 @@
 """
 SKRL agent setup and management for traffic light control.
 """
+
 import torch
 import numpy as np
 import gymnasium as gym
@@ -23,29 +24,37 @@ from environment.traffic_light_env import TrafficLightEnvironment
 class SKRLAgentManager:
     """Manager for SKRL agents and components"""
 
-    def __init__(self, simulation_instance, agent_cfg: Dict, traffic_lights: List[Dict], 
-                 updating_target_network_steps: int = 100, device: torch.device = None):
+    def __init__(
+        self,
+        simulation_instance,
+        agent_cfg: Dict,
+        traffic_lights: List[Dict],
+        updating_target_network_steps: int = 100,
+        device: torch.device = None,
+    ):
         self.sim = simulation_instance
         self.agent_cfg = agent_cfg
         self.traffic_lights = traffic_lights
         self.updating_target_network_steps = updating_target_network_steps
-        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+        self.device = device or torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
+
         # Set random seed for reproducibility
         set_seed(42)
-        
+
         # Initialize containers
         self.agents = {}
         self.memories = {}
         self.environments = {}
-        
+
         # Setup agents
         self._setup_agents()
 
     def _create_model(self, observation_space, action_space, tl_id):
         """Create Q-network model with advanced configuration support"""
         model_config = self.agent_cfg.get("model", {})
-        
+
         # Basic model parameters
         model_params = {
             "observation_space": observation_space,
@@ -56,31 +65,39 @@ class SKRLAgentManager:
             "num_layers": model_config.get("num_layers", 3),
             "hidden_size": model_config.get("hidden_size", 256),
         }
-        
+
         # Advanced features from original model
-        model_params.update({
-            "use_attention": model_config.get("use_attention", True),
-            "loss_type": model_config.get("loss_type", "mse"),  # mse, huber, weighted, qr
-            "num_quantiles": model_config.get("num_quantiles", 100),
-            "v_min": model_config.get("v_min", -10.0),
-            "v_max": model_config.get("v_max", 10.0),
-            "dropout_rate": model_config.get("dropout_rate", 0.0),
-            "batch_norm": model_config.get("batch_norm", False),
-            "layer_sizes": model_config.get("layer_sizes", None),  # Custom architecture
-        })
-        
+        model_params.update(
+            {
+                "use_attention": model_config.get("use_attention", True),
+                "loss_type": model_config.get(
+                    "loss_type", "mse"
+                ),  # mse, huber, weighted, qr
+                "num_quantiles": model_config.get("num_quantiles", 100),
+                "v_min": model_config.get("v_min", -10.0),
+                "v_max": model_config.get("v_max", 10.0),
+                "dropout_rate": model_config.get("dropout_rate", 0.0),
+                "batch_norm": model_config.get("batch_norm", False),
+                "layer_sizes": model_config.get(
+                    "layer_sizes", None
+                ),  # Custom architecture
+            }
+        )
+
         # Model type selection (for future extensibility)
         model_type = model_config.get("type", "qnetwork")
-        
+
         if model_type == "qnetwork":
             return QNetwork(**model_params).to(self.device)
         elif model_type == "dueling":
             # Future: DuelingQNetwork implementation
             from models.dueling_q_network import DuelingQNetwork
+
             return DuelingQNetwork(**model_params).to(self.device)
         elif model_type == "noisy":
-            # Future: NoisyQNetwork implementation  
+            # Future: NoisyQNetwork implementation
             from models.noisy_q_network import NoisyQNetwork
+
             return NoisyQNetwork(**model_params).to(self.device)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
@@ -109,21 +126,32 @@ class SKRLAgentManager:
             action_space = gym.spaces.Discrete(action_space_size)
 
             # Create memory with proper tensor names
-            tensor_names = ["states", "actions", "rewards", "next_states", "terminated", "truncated"]
+            tensor_names = [
+                "states",
+                "actions",
+                "rewards",
+                "next_states",
+                "terminated",
+                "truncated",
+            ]
             memory = RandomMemory(
                 memory_size=self.agent_cfg.get("memory_size", 10000),
                 num_envs=1,
                 device=self.device,
             )
-            
+
             # Initialize memory with a dummy sample to set up tensor structure
-            dummy_state = torch.zeros((1, observation_space_size), dtype=torch.float32, device=self.device)
+            dummy_state = torch.zeros(
+                (1, observation_space_size), dtype=torch.float32, device=self.device
+            )
             dummy_action = torch.zeros((1, 1), dtype=torch.long, device=self.device)
             dummy_reward = torch.zeros((1, 1), dtype=torch.float32, device=self.device)
-            dummy_next_state = torch.zeros((1, observation_space_size), dtype=torch.float32, device=self.device)
+            dummy_next_state = torch.zeros(
+                (1, observation_space_size), dtype=torch.float32, device=self.device
+            )
             dummy_terminated = torch.zeros((1, 1), dtype=torch.bool, device=self.device)
             dummy_truncated = torch.zeros((1, 1), dtype=torch.bool, device=self.device)
-            
+
             # Add the dummy sample to initialize tensor structure
             memory.add_samples(
                 states=dummy_state,
@@ -133,21 +161,25 @@ class SKRLAgentManager:
                 terminated=dummy_terminated,
                 truncated=dummy_truncated,
             )
-            
+
             # Reset memory after initialization (removes the dummy sample)
             memory.reset()
-            
+
             self.memories[tl_id] = memory
 
             # Create Q-network models using the factory method
             q_network = self._create_model(observation_space, action_space, tl_id)
-            target_q_network = self._create_model(observation_space, action_space, tl_id)
+            target_q_network = self._create_model(
+                observation_space, action_space, tl_id
+            )
 
             # Setup DQN agent configuration
             dqn_cfg = DQN_DEFAULT_CONFIG.copy()
             dqn_cfg.update(
                 {
-                    "learning_rate": self.agent_cfg.get("model", {}).get("learning_rate", 0.001),
+                    "learning_rate": self.agent_cfg.get("model", {}).get(
+                        "learning_rate", 0.001
+                    ),
                     "gamma": self.agent_cfg.get("gamma", 0.99),
                     "batch_size": self.agent_cfg.get("model", {}).get("batch_size", 32),
                     "epsilon_initial": 1.0,
@@ -168,14 +200,23 @@ class SKRLAgentManager:
                 action_space=action_space,
                 device=self.device,
             )
-            
+
             # SKRL DQN agents need tensors_names to be set manually
             # This must match what the memory records
-            agent.tensors_names = ["states", "actions", "rewards", "next_states", "terminated", "truncated"]
+            agent.tensors_names = [
+                "states",
+                "actions",
+                "rewards",
+                "next_states",
+                "terminated",
+                "truncated",
+            ]
 
             self.agents[tl_id] = agent
 
-    def select_action(self, tl_id: str, state: np.ndarray, epsilon: float) -> Tuple[float, int]:
+    def select_action(
+        self, tl_id: str, state: np.ndarray, epsilon: float
+    ) -> Tuple[float, int]:
         """Select action using SKRL agent"""
         agent = self.agents[tl_id]
 
@@ -184,7 +225,7 @@ class SKRLAgentManager:
 
         # For noisy networks, reset noise before action selection
         model_type = self.agent_cfg.get("model", {}).get("type", "qnetwork")
-        if model_type == "noisy" and hasattr(agent.models["q_network"], 'reset_noise'):
+        if model_type == "noisy" and hasattr(agent.models["q_network"], "reset_noise"):
             agent.models["q_network"].reset_noise()
 
         # Use epsilon-greedy action selection (for noisy networks, noise provides exploration)
@@ -209,8 +250,15 @@ class SKRLAgentManager:
 
         return random_val, action
 
-    def store_transition(self, tl_id: str, state: np.ndarray, action: int, 
-                        reward: float, next_state: np.ndarray, done: bool):
+    def store_transition(
+        self,
+        tl_id: str,
+        state: np.ndarray,
+        action: int,
+        reward: float,
+        next_state: np.ndarray,
+        done: bool,
+    ):
         """Store transition in agent's memory"""
         memory = self.memories[tl_id]
 
@@ -247,8 +295,11 @@ class SKRLAgentManager:
             try:
                 # SKRL agents handle training internally via post_interaction
                 # when they have enough samples
-                if (len(memory) >= agent.cfg.get("learning_starts", 100) and 
-                    hasattr(agent, 'tensors_names') and agent.tensors_names):
+                if (
+                    len(memory) >= agent.cfg.get("learning_starts", 100)
+                    and hasattr(agent, "tensors_names")
+                    and agent.tensors_names
+                ):
                     agent.post_interaction(timestep=step, timesteps=max_steps)
                     num_trained += 1
 
@@ -263,8 +314,11 @@ class SKRLAgentManager:
         for tl_id, agent in self.agents.items():
             memory = self.memories[tl_id]
             # Only update if we have enough samples and agent is properly configured
-            if (len(memory) >= self.agent_cfg.get("model", {}).get("batch_size", 32) and 
-                hasattr(agent, 'tensors_names') and agent.tensors_names):
+            if (
+                len(memory) >= self.agent_cfg.get("model", {}).get("batch_size", 32)
+                and hasattr(agent, "tensors_names")
+                and agent.tensors_names
+            ):
                 try:
                     agent.post_interaction(timestep=step, timesteps=max_steps)
                 except Exception as e:
@@ -300,7 +354,9 @@ class SKRLAgentManager:
             checkpoint_path = f"{path.replace('.pt', '')}_{tl_id}_checkpoint.pt"
             checkpoint = {
                 "model_state_dict": agent.models["q_network"].state_dict(),
-                "target_model_state_dict": agent.models["target_q_network"].state_dict(),
+                "target_model_state_dict": agent.models[
+                    "target_q_network"
+                ].state_dict(),
                 "episode": episode,
                 "epsilon": epsilon,
             }
