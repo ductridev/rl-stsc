@@ -1,6 +1,6 @@
 import os
 import xml.etree.ElementTree as ET
-
+import random
 class Intersection:
     @staticmethod
     def get_all_intersections_with_sumo():
@@ -141,7 +141,7 @@ class Intersection:
 
                 with open(merged_trip_file, "w") as merged_file:
                     merged_file.write("<routes>\n")
-
+                    random_intervals = random.randint(0,7) # Randomly choose number of intervals between 0 and 7
                     for interval_id, (begin_time, end_time) in enumerate(intervals):
                         demand_file_name = f"random_edge_priority_interval_{interval_id}.src.xml"
                         if not os.path.exists(demand_file_name):
@@ -166,7 +166,7 @@ class Intersection:
                             f'--prefix res_{prefix}_int{interval_id} '
                             f'--weights-prefix random_edge_priority_interval_{interval_id} '
                         )
-                        if interval == 2 or interval_id == 6:
+                        if interval_id == random_intervals:
                             trip_cmd += f"--insertion-rate {vehicles_in_interval * 3600 * 4 / (end_time - begin_time)} "
                         else:
                             trip_cmd += f"--insertion-rate {vehicles_in_interval * 3600 / (end_time - begin_time)} "

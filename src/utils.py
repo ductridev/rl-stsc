@@ -190,7 +190,7 @@ def import_train_configuration(file_path):
         config["junction_id_list"] = [junction["id"] for junction in content['accident']['junction']]
         config["start_step"] = content['accident']['start_step']
         config["duration"] = content['accident']['duration']
-
+        config['sumocfg_path'] = content['dir']['sumocfg_path']
         print("Configuration loaded successfully.")
         return config
     
@@ -236,6 +236,7 @@ def import_test_configuration(file_path):
         # Testing configuration
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
+        config['sumocfg_path'] = content['dir']['sumocfg_path']
         config['model_to_test'] = content['dir']['model_to_test']
 
         # Intersection configuration

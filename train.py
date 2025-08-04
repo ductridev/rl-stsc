@@ -27,6 +27,7 @@ if __name__ == "__main__":
     min_epsilon = config["agent"]["min_epsilon"]
     decay_rate = config["agent"]["decay_rate"]
     start_epsilon = config["agent"]["epsilon"]
+    simulation_path = config["sumocfg_path"]
 
     # Set model save path
     path = set_train_path(config["models_path_name"])
@@ -155,6 +156,32 @@ if __name__ == "__main__":
         print("Running SimulationBase (static baseline)...")
         set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
         simulation_time_base = simulation.run(episode)
+        # After running the base simulation
+        base_stats = simulation.vehicle_tracker.get_current_stats()
+        base_completion_rate = (base_stats['total_arrived'] / max(base_stats['total_departed'], 1)) * 100
+
+        base_avg_travel_time = 0
+        base_avg_waiting_time = 0
+
+        if hasattr(simulation, 'history') and 'travel_time' in simulation.history:
+            travel_times = []
+            waiting_times = []
+            for tl_id, times in simulation.history['travel_time'].items():
+                if times:
+                    travel_times.extend(times[-10:])  # Last 10 measurements
+            for tl_id, times in simulation.history['waiting_time'].items():
+                if times:
+                    waiting_times.extend(times[-10:])  # Last 10 measurements
+            base_avg_travel_time = sum(travel_times) / len(travel_times) if travel_times else 0
+            base_avg_waiting_time = sum(waiting_times) / len(waiting_times) if waiting_times else 0
+
+        base_combined_score = (base_completion_rate * 0.6) - (base_avg_travel_time * 0.2) - (base_avg_waiting_time * 0.2)
+        # Debug: Print base simulation metrics
+        # print(f"Base Completion Rate: {base_completion_rate:.2f}%")
+        # print(f"Base Avg Travel Time: {base_avg_travel_time:.2f}")
+        # print(f"Base Avg Waiting Time: {base_avg_waiting_time:.2f}")
+        # print(f"Base Combined Score: {base_combined_score:.2f}")
+
         print("SimulationBase time:", simulation_time_base)
         # Reset base simulation vehicle tracker after its run
         print("  Resetting vehicle tracker for base simulation")
@@ -218,7 +245,16 @@ if __name__ == "__main__":
             # Combined score (higher is better)
             # Weight: completion_rate (60%) - travel_time penalty (20%) - waiting_time penalty (20%)
             combined_score = (completion_rate * 0.6) - (avg_travel_time * 0.2) - (avg_waiting_time * 0.2)
-            
+            # Debug: 
+            print("combined_score:", combined_score)
+            print("base_combined_score:", base_combined_score)
+            if combined_score > base_combined_score:
+                dest_folder = f"{simulation_path}_better_DQN_ep{episode}"
+                # Remove the destination if it already exists to avoid errors
+                if os.path.exists(dest_folder):
+                    shutil.rmtree(dest_folder)
+                shutil.copytree(simulation_path, dest_folder)
+                print(f"✅ DQN outperformed base! Simulation folder copied to: {dest_folder}")
             # Store performance data
             current_performance = {
                 'episode': episode,
