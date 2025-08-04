@@ -452,7 +452,7 @@ class Simulation(SUMO):
         # Print and save vehicle statistics
         self.vehicle_tracker.print_summary("dqn")
         self.vehicle_tracker.save_logs(episode, "dqn")
-        self.vehicle_tracker.reset()
+        # Note: vehicle_tracker.reset() moved to train.py after performance tracking
 
         return sim_time, self._train_and_plot(epsilon, episode)
 
@@ -521,10 +521,10 @@ class Simulation(SUMO):
         # save episode plot
         self.save_plot(episode=episode)
 
-        # reset step counter & history
+        # reset step counter
         self.step = 0
 
-        self.reset_history()
+        # Note: reset_history() moved to train.py after performance tracking
         return training_time
 
     def _flush_step_metrics(self, tl, tl_id, st):

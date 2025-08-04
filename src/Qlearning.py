@@ -377,7 +377,7 @@ class QSimulation(SUMO):
         for tl in self.traffic_lights:
             self.agent_memory[tl["id"]].clean()
 
-        self.reset_history()
+        # Note: reset_history() moved to train.py after performance tracking
 
         return sim_time, 0
 

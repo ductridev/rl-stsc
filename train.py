@@ -179,6 +179,11 @@ if __name__ == "__main__":
         set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
         simulation_time_base = simulation.run(episode)
         print("SimulationBase time:", simulation_time_base)
+        # Reset base simulation vehicle tracker after its run
+        print("  Resetting vehicle tracker for base simulation")
+        simulation.vehicle_tracker.reset()
+        print("  Resetting history for base simulation")
+        simulation.reset_history()
 
         # print("Running QSimulation (Q-learning)...")
         # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
@@ -208,12 +213,29 @@ if __name__ == "__main__":
             dqn_sim = list(simulations_dqn.values())[0]  # Get first (only) DQN simulation
             dqn_stats = dqn_sim.vehicle_tracker.get_current_stats()
             
+            # Debug: Print vehicle statistics
+            print(f"Debug - Vehicle stats for episode {episode}:")
+            print(f"  Total departed: {dqn_stats.get('total_departed', 'N/A')}")
+            print(f"  Total arrived: {dqn_stats.get('total_arrived', 'N/A')}")
+            print(f"  Current running: {dqn_stats.get('total_running', 'N/A')}")
+            
             # Calculate performance metrics
             completion_rate = (dqn_stats['total_arrived'] / max(dqn_stats['total_departed'], 1)) * 100
             
             # Get traffic metrics (if available)
             avg_travel_time = 0
             avg_waiting_time = 0
+            
+            # Debug: Check if history exists and has data
+            if hasattr(dqn_sim, 'history'):
+                print(f"  History keys: {list(dqn_sim.history.keys())}")
+                if 'travel_time' in dqn_sim.history:
+                    travel_time_data = dqn_sim.history['travel_time']
+                    print(f"  Travel time data available for TLs: {list(travel_time_data.keys())}")
+                    for tl_id, times in travel_time_data.items():
+                        print(f"    {tl_id}: {len(times)} measurements")
+            else:
+                print("  No history attribute found")
             
             # Try to get traffic metrics from simulation history
             if hasattr(dqn_sim, 'history') and 'travel_time' in dqn_sim.history:
@@ -317,9 +339,25 @@ if __name__ == "__main__":
                 print(f"Current: Score={combined_score:.2f}, Completion={completion_rate:.1f}%, Travel={avg_travel_time:.2f}, Wait={avg_waiting_time:.2f}")
                 print(f"Best:    Score={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
                 
+        except AttributeError as e:
+            if 'num_atoms' in str(e):
+                print(f"⚠️  Model compatibility error: {e}")
+                print("   This error indicates the DQN model is missing the 'num_atoms' attribute for C51 distributional DQN.")
+                print("   The model should be updated to include: self.num_atoms = 51")
+            else:
+                print(f"⚠️  Attribute error tracking performance: {e}")
+            # Continue training even if performance tracking fails
         except Exception as e:
             print(f"⚠️  Error tracking performance: {e}")
             # Continue training even if performance tracking fails
+        
+        # Reset vehicle trackers after performance tracking is complete
+        for loss_type, sim_dqn in simulations_dqn.items():
+            print(f"  Resetting vehicle tracker for DQN simulation")
+            sim_dqn.vehicle_tracker.reset()
+            print(f"  Resetting history for DQN simulation")
+            sim_dqn.reset_history()
+            break  # Only need to do this once since there's only one DQN simulation
 
         # --- Save comparison plots ---
         print("Saving comparison plots...")
