@@ -190,9 +190,9 @@ if __name__ == "__main__":
             
             # Debug: Print vehicle statistics
             print(f"Debug - Vehicle stats for episode {episode}:")
-            print(f"  Total departed: {dqn_stats.get('total_departed', 'N/A')}")
-            print(f"  Total arrived: {dqn_stats.get('total_arrived', 'N/A')}")
-            print(f"  Current running: {dqn_stats.get('total_running', 'N/A')}")
+            print(f"  Total departed: {skrl_stats.get('total_departed', 'N/A')}")
+            print(f"  Total arrived: {skrl_stats.get('total_arrived', 'N/A')}")
+            print(f"  Current running: {skrl_stats.get('total_running', 'N/A')}")
             
             # Calculate performance metrics
             completion_rate = (skrl_stats['total_arrived'] / max(skrl_stats['total_departed'], 1)) * 100
@@ -200,17 +200,6 @@ if __name__ == "__main__":
             # Get traffic metrics (if available)
             avg_travel_time = 0
             avg_waiting_time = 0
-            
-            # Debug: Check if history exists and has data
-            if hasattr(dqn_sim, 'history'):
-                print(f"  History keys: {list(dqn_sim.history.keys())}")
-                if 'travel_time' in dqn_sim.history:
-                    travel_time_data = dqn_sim.history['travel_time']
-                    print(f"  Travel time data available for TLs: {list(travel_time_data.keys())}")
-                    for tl_id, times in travel_time_data.items():
-                        print(f"    {tl_id}: {len(times)} measurements")
-            else:
-                print("  No history attribute found")
             
             # Try to get traffic metrics from simulation history
             if hasattr(simulation_skrl, 'history') and 'travel_time' in simulation_skrl.history:
@@ -305,7 +294,7 @@ if __name__ == "__main__":
             # Continue training even if performance tracking fails
         
         # Reset vehicle trackers after performance tracking is complete
-        for loss_type, sim_dqn in simulations_dqn.items():
+        for loss_type, sim_dqn in simulation_skrl.items():
             print(f"  Resetting vehicle tracker for DQN simulation")
             sim_dqn.vehicle_tracker.reset()
             print(f"  Resetting history for DQN simulation")
