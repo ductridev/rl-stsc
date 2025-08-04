@@ -198,9 +198,18 @@ class DESRA(SUMO):
         try:
             import numpy as np
             
-            # Use recent data (last 50 measurements)
-            recent_densities = np.array(densities[-50:])
-            recent_flows = np.array(flows[-50:])
+            # Use recent data (last 50 measurements) and ensure same length
+            min_length = min(len(densities), len(flows))
+            if min_length < 20:
+                return  # Insufficient data
+            
+            # Take the same number of recent measurements from both
+            recent_size = min(50, min_length)
+            recent_densities = np.array(densities[-recent_size:])
+            recent_flows = np.array(flows[-recent_size:])
+            
+            # Verify arrays have same length
+            assert len(recent_densities) == len(recent_flows), f"Array length mismatch: densities={len(recent_densities)}, flows={len(recent_flows)}"
             
             # Remove outliers (beyond 2 standard deviations)
             flow_mean, flow_std = np.mean(recent_flows), np.std(recent_flows)
@@ -313,7 +322,6 @@ class DESRA(SUMO):
     def estimate_shockwave_extent(self, x0, q_arr, link_length, saturation_flow=None, critical_density=None, jam_density=None):
         """
         Estimate the extent of the shockwave using the shockwave theory.
-        
         Based on Eq. (3): xM = x0 * (kj * s - q_arr * kc) / (kj * (s - q_arr))
         
         Args:
@@ -323,6 +331,7 @@ class DESRA(SUMO):
             saturation_flow (float): Override saturation flow rate (veh/s)
             critical_density (float): Override critical density (veh/m)
             jam_density (float): Override jam density (veh/m)
+        
         Returns:
             float: Shockwave extent (meters), bounded to [0, link_length]
         """
@@ -374,6 +383,7 @@ class DESRA(SUMO):
             saturation_flow (float): Override saturation flow rate (veh/s)
             critical_density (float): Override critical density (veh/m)
             jam_density (float): Override jam density (veh/m)
+        
         Returns:
             float: Saturated green time (seconds)
         """
@@ -414,21 +424,26 @@ class DESRA(SUMO):
 
     def get_movements_from_phase(self, traffic_light, phase_str):
         """
-        Get detector IDs whose street is active (green) in the given phase string.
+        Get movement detectors from a phase string.
+        This is a simplified implementation - should be overridden based on actual traffic light configuration.
         """
-        phase_index = traffic_light["phase"].index(phase_str)  # Find index of phase_str
-        active_street = str(
-            phase_index + 1
-        )  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
+        # This is a placeholder implementation
+        # In practice, this should map phase strings to actual detector IDs
+        try:
+            phase_index = traffic_light["phase"].index(phase_str)
+            active_street = str(phase_index + 1)  # Assuming street "1" is for phase 0, "2" is for phase 1, etc.
 
-        # Collect detector IDs belonging to the active street
-        active_detectors = [
-            det["id"]
-            for det in traffic_light["detectors"]
-            if det["street"] == active_street
-        ]
+            # Collect detector IDs belonging to the active street
+            active_detectors = [
+                det["id"]
+                for det in traffic_light["detectors"]
+                if det["street"] == active_street
+            ]
 
-        return active_detectors
+            return active_detectors
+        except (KeyError, ValueError, IndexError):
+            # Fallback: return empty list if configuration is not available
+            return []
 
     def get_queue_length(self, detector_id):
         return (
