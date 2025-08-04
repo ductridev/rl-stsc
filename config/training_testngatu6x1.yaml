@@ -21,16 +21,42 @@ agent:
   rbf_components: 100   
   rbf_gamma: 0.5 
   gamma: 0.8
-  num_states: 3 # waiting_time, queue_length, num_vehicles. 
+  num_states: 32 # Per-phase features (max 10 phases × 3 features) + current_phase + DESRA_phase
   model:
-    num_layers: 16
+    # Model architecture type
+    type: "qnetwork"  # Options: "qnetwork", "dueling", "noisy"
+    
+    # Basic architecture (from original model)
+    num_layers: 32
+    hidden_size: 256
     batch_size: 256
     learning_rate: 0.001
+    
+    # Advanced features from your original model
+    use_attention: true  # Enable SENet attention mechanism
+    loss_type: "qr"  # Options: "mse", "huber", "weighted", "qr", "wasserstein"
+    
+    # Quantile regression settings (for loss_type: "qr" or "wasserstein")
+    num_quantiles: 100
+    v_min: -10.0
+    v_max: 10.0
+    
+    # Regularization options
+    dropout_rate: 0.1  # 0.0 to disable dropout
+    batch_norm: true  # Enable batch normalization
+    
+    # Custom layer architecture (optional - overrides num_layers and hidden_size)
+    # Uncomment to use custom architecture:
+    # layer_sizes: [128, 256, 512, 256, 128]  # Custom hidden layer sizes
+    
+    # Noisy network specific settings (only used when type: "noisy")
+    noise_std: 0.5  # Initial noise standard deviation
+    noisy_layers_only: true  # Only make final layers noisy (vs all layers)
+    
+    # Epsilon decay settings (not used for noisy networks)
     decay_rate: 0.99
     epsilon: 1.0
     min_epsilon: 0.05
-    loss_type:
-      - qr
   weight:
     queue_length: -0.25
     outflow_rate: 1

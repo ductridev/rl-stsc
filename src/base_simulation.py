@@ -363,18 +363,14 @@ class SimulationBase(SUMO):
         return active_detectors
 
     def get_sum_queue_length(self, traffic_light):
-        """
-        Get the average queue length of a lane.
-        """
+        """Get sum of queue lengths for a traffic light"""
         queue_lengths = []
         for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            length = traci.lane.getLength(lane)
+            length = traci.lane.getLastStepHaltingNumber(lane)
             if length <= 0:
                 queue_lengths.append(0.0)
             else:
-                queue_lengths.append(
-                    traci.lane.getLastStepOccupancy(lane) / 100 * length
-                )
+                queue_lengths.append(length)
         return np.sum(queue_lengths) if queue_lengths else 0.0
 
     def get_sum_waiting_time(self, traffic_light):

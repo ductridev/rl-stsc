@@ -41,13 +41,14 @@ class SimulationComparison:
             print("No data files found for episode", episode)
             return pd.DataFrame()
     
-    def create_traffic_light_comparison_table(self, episode: int, metrics: List[str] = None) -> pd.DataFrame:
+    def create_traffic_light_comparison_table(self, episode: int, metrics: List[str] = None, simulation_types: List[str] = None) -> pd.DataFrame:
         """
         Create a comparison table showing metrics for each traffic light across all simulations.
         
         Args:
             episode (int): Episode number to compare
             metrics (List[str]): List of metrics to include in comparison
+            simulation_types (List[str]): List of simulation types to include
             
         Returns:
             pd.DataFrame: Comparison table with traffic lights as rows and simulation types as columns
@@ -55,7 +56,7 @@ class SimulationComparison:
         if metrics is None:
             metrics = ['density', 'travel_speed', 'travel_time', 'outflow', 'queue_length', 'waiting_time']
         
-        combined_df = self.combine_simulation_dataframes(episode)
+        combined_df = self.combine_simulation_dataframes(episode, simulation_types)
         
         if combined_df.empty:
             return pd.DataFrame()
@@ -78,13 +79,14 @@ class SimulationComparison:
         
         return comparison_tables
     
-    def create_summary_comparison_table(self, episode: int, metrics: List[str] = None) -> pd.DataFrame:
+    def create_summary_comparison_table(self, episode: int, metrics: List[str] = None, simulation_types: List[str] = None) -> pd.DataFrame:
         """
         Create a summary table showing overall performance across all traffic lights.
         
         Args:
             episode (int): Episode number to compare
             metrics (List[str]): List of metrics to include
+            simulation_types (List[str]): List of simulation types to include
             
         Returns:
             pd.DataFrame: Summary table with metrics as rows and simulation types as columns
@@ -92,7 +94,7 @@ class SimulationComparison:
         if metrics is None:
             metrics = ['density', 'travel_speed', 'travel_time', 'outflow', 'queue_length', 'waiting_time']
         
-        combined_df = self.combine_simulation_dataframes(episode)
+        combined_df = self.combine_simulation_dataframes(episode, simulation_types)
         
         if combined_df.empty:
             return pd.DataFrame()
@@ -108,13 +110,14 @@ class SimulationComparison:
         
         return pivot_df
     
-    def save_comparison_tables(self, episode: int, metrics: List[str] = None) -> Dict[str, pd.DataFrame]:
+    def save_comparison_tables(self, episode: int, metrics: List[str] = None, simulation_types: List[str] = None) -> Dict[str, pd.DataFrame]:
         """
         Save comparison tables to CSV files and return them as dictionary.
         
         Args:
             episode (int): Episode number to compare
             metrics (List[str]): List of metrics to include
+            simulation_types (List[str]): List of simulation types to include
             
         Returns:
             Dict[str, pd.DataFrame]: Dictionary containing all comparison tables
@@ -125,7 +128,7 @@ class SimulationComparison:
         results = {}
         
         # Per-traffic-light comparison
-        tl_comparison_tables = self.create_traffic_light_comparison_table(episode, metrics)
+        tl_comparison_tables = self.create_traffic_light_comparison_table(episode, metrics, simulation_types)
         
         if tl_comparison_tables:
             for metric, table in tl_comparison_tables.items():
@@ -135,7 +138,7 @@ class SimulationComparison:
                 results[f"per_tl_{metric}"] = table
         
         # Summary comparison
-        summary_table = self.create_summary_comparison_table(episode, metrics)
+        summary_table = self.create_summary_comparison_table(episode, metrics, simulation_types)
         
         if not summary_table.empty:
             filename = f"{self.path}comparison_summary_episode_{episode}.csv"
@@ -145,13 +148,14 @@ class SimulationComparison:
         
         return results
     
-    def create_performance_ranking(self, episode: int, metrics: List[str] = None) -> pd.DataFrame:
+    def create_performance_ranking(self, episode: int, metrics: List[str] = None, simulation_types: List[str] = None) -> pd.DataFrame:
         """
         Create a performance ranking table for each metric.
         
         Args:
             episode (int): Episode number to compare
             metrics (List[str]): List of metrics to rank
+            simulation_types (List[str]): List of simulation types to include
             
         Returns:
             pd.DataFrame: Ranking table showing best to worst performers
@@ -159,7 +163,7 @@ class SimulationComparison:
         if metrics is None:
             metrics = ['density', 'travel_speed', 'travel_time', 'outflow', 'queue_length', 'waiting_time']
         
-        summary_table = self.create_summary_comparison_table(episode, metrics)
+        summary_table = self.create_summary_comparison_table(episode, metrics, simulation_types)
         
         if summary_table.empty:
             return pd.DataFrame()
@@ -198,19 +202,20 @@ class SimulationComparison:
         
         return ranking_df
 
-    def print_comparison_summary(self, episode: int):
+    def print_comparison_summary(self, episode: int, simulation_types: List[str] = None):
         """
         Print a formatted summary of the comparison results.
         
         Args:
             episode (int): Episode number to summarize
+            simulation_types (List[str]): List of simulation types to include
         """
         print(f"\n{'='*60}")
         print(f"SIMULATION COMPARISON SUMMARY - EPISODE {episode}")
         print(f"{'='*60}")
         
-        summary_table = self.create_summary_comparison_table(episode)
-        ranking_df = self.create_performance_ranking(episode)
+        summary_table = self.create_summary_comparison_table(episode, simulation_types=simulation_types)
+        ranking_df = self.create_performance_ranking(episode, simulation_types=simulation_types)
         
         if not summary_table.empty:
             print("\nOVERALL PERFORMANCE SUMMARY:")
