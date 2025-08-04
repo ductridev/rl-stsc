@@ -182,11 +182,11 @@ class SimulationBase(SUMO):
         # Print and save vehicle statistics
         self.vehicle_tracker.print_summary("base")
         self.vehicle_tracker.save_logs(episode, "base")
-        self.vehicle_tracker.reset()
+        # Note: vehicle_tracker.reset() moved to train.py after performance tracking
 
-        # 4) Save & reset
+        # 4) Save 
         self.save_metrics(episode=episode)
-        self.reset_history()
+        # Note: reset_history() moved to train.py after performance tracking
         self.step = 0
 
         return time.time() - sim_start

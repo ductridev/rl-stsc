@@ -43,6 +43,7 @@ class DQN(nn.Module):
         self.gamma = gamma
         self.device = device
         self.num_quantiles = 100
+        self.num_atoms = 51  # For C51 distributional DQN
         self.v_min, self.v_max = -10.0, 10.0
         self.backbone, self.attn, self.heads = self.__build_model()
 
@@ -71,6 +72,8 @@ class DQN(nn.Module):
         for dim in self._output_dims:
             if hasattr(self, "loss_type") and self.loss_type in ("qr", "wasserstein"):
                 heads[str(dim)] = nn.Linear(256, dim * self.num_quantiles)
+            elif hasattr(self, "loss_type") and self.loss_type == "c51":
+                heads[str(dim)] = nn.Linear(256, dim * self.num_atoms)
             else:
                 heads[str(dim)] = nn.Linear(256, dim)
 
@@ -288,6 +291,10 @@ class DQN(nn.Module):
         q_loss.backward()
         self.optimizer.step()
 
+        # Soft update target network if provided
+        # if target_net is not None:
+        #     self.soft_update_target_network(target_net, alpha)
+
         max_next_q_value = next_q_values.max(dim=1)[0]
 
         return {
@@ -330,11 +337,29 @@ class DQN(nn.Module):
                 "gamma": self.gamma,
                 "loss_type": self.loss_type,
                 "num_quantiles": self.num_quantiles,
+                "num_atoms": getattr(self, 'num_atoms', 51),  # Safe access with default
                 "v_min": self.v_min,
                 "v_max": self.v_max,
             },
         }
         torch.save(checkpoint, path)
+
+    def soft_update_target_network(self, target_net, alpha):
+        """
+        Soft update target network parameters using exponential moving average.
+        
+        Args:
+            target_net (DQN): Target network to update.
+            alpha (float): Soft update coefficient (0 < alpha < 1).
+                          Higher values update target network faster.
+                          
+        Formula: θ_target = α * θ_online + (1 - α) * θ_target
+        """
+        with torch.no_grad():
+            for target_param, online_param in zip(target_net.parameters(), self.parameters()):
+                target_param.data.copy_(
+                    alpha * online_param.data + (1 - alpha) * target_param.data
+                )
 
     def load(self, path, for_training=False):
         """

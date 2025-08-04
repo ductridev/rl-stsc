@@ -7,7 +7,7 @@ from src.utils import (
     set_load_model_path,
 )
 from src.model import DQN
-from src.simulation import Simulation
+from src.simulation_skrl import SimulationSKRL
 from src.Qlearning import QSimulation
 from src.base_simulation import SimulationBase
 from src.visualization import Visualization
@@ -28,6 +28,15 @@ if __name__ == "__main__":
     decay_rate = config["agent"]["decay_rate"]
     start_epsilon = config["agent"]["epsilon"]
 
+    # Create replay memory for the agent (not used by SKRL but kept for compatibility)
+    agent_memory_dqn = MemoryPalace(
+        max_size_per_palace=config["memory_size_max"], min_size_to_sample=config["memory_size_min"]
+    )
+
+    agent_memory_q = MemoryPalace(
+        max_size_per_palace=config["memory_size_max"], min_size_to_sample=config["memory_size_min"]
+    )
+
     # Set model save path
     path = set_train_path(config["models_path_name"])
 
@@ -40,38 +49,36 @@ if __name__ == "__main__":
         junction_id_list=config["junction_id_list"],
     )
 
-    # Initialize SKRL-based DQN simulation (no memory needed - SKRL handles it internally)
-    simulation_skrl = Simulation(
-        visualization=visualization,
-        agent_cfg=config["agent"],
-        max_steps=config["max_steps"],
-        traffic_lights=config["traffic_lights"],
-        accident_manager=accident_manager,
-        interphase_duration=config["interphase_duration"],
-        epoch=config["training_epochs"],
-        path=path,
-        training_steps=config["training_steps"],
-        updating_target_network_steps=config["updating_target_network_steps"],
-        save_interval=config["save_interval"],
-    )
+    # Initialize SKRL simulation (replaces regular DQN simulation)
+    simulations_dqn_skrl = {
+        loss: SimulationSKRL(
+            visualization=visualization,
+            agent_cfg={**config["agent"], "loss_type": loss},
+            max_steps=config["max_steps"],
+            traffic_lights=config["traffic_lights"],
+            interphase_duration=config["interphase_duration"],
+            accident_manager=accident_manager,
+            epoch=config["training_epochs"],
+            path=path,
+            training_steps=config["training_steps"],
+            updating_target_network_steps=config["updating_target_network_steps"],
+            save_interval=config["save_interval"],
+        )
+        for loss in config["agent"]["model"]["loss_type"]
+    }
 
-    # Initialize Q-learning simulation for comparison
-    agent_memory_q = MemoryPalace(
-        max_size_per_palace=config["memory_size_max"], 
-        min_size_to_sample=config["memory_size_min"]
-    )
-
-    # Load existing SKRL model if specified in config
+    # Load existing model if specified in config
     start_episode = 0
-    if config.get("load_model_name") and config["load_model_name"] is not None:
-        model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + ".pth"
-        try:
-            simulation_skrl.load_model(start_episode)  # Will try to load from the specified episode
-            print(f"Successfully loaded SKRL model from: {model_load_path}")
-        except FileNotFoundError:
-            print(f"SKRL model file not found: {model_load_path}. Starting with fresh model.")
-        except Exception as e:
-            print(f"Error loading SKRL model: {e}. Starting with fresh model.")
+
+    # Note: SKRL model loading would be different - implement as needed
+    # if config.get("load_model_name") and config["load_model_name"] is not None:
+    #     for loss_type, sim_skrl in simulations_dqn_skrl.items():
+    #         model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + f"_{loss_type}.pt"
+    #         try:
+    #             sim_skrl.load_models(episode="final")  # or specific episode
+    #             print(f"Successfully loaded SKRL model: {model_load_path}")
+    #         except Exception as e:
+    #             print(f"Error loading SKRL model: {e}. Starting with fresh model.")
 
     simulation = SimulationBase(
         max_steps=config["max_steps"],
@@ -152,6 +159,7 @@ if __name__ == "__main__":
         )
         print("Routes generated")
 
+        # --- Run all three simulations ---
         print("Running SimulationBase (static baseline)...")
         set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
         simulation_time_base = simulation.run(episode)
@@ -167,45 +175,47 @@ if __name__ == "__main__":
         # simulation_time_q = simulation_q.run(epsilon, episode)
         # print("QSimulation time:", simulation_time_q)
 
-        print("Running SKRL DQN Simulation...")
-        # Enable GUI once every 100 episodes for visual monitoring
-        gui_enabled = (episode % 100 == 0 and episode > 0)
-        set_sumo(gui_enabled, config["sumo_cfg_file"], config["max_steps"])
-        if gui_enabled:
-            print(f"🖥️  GUI enabled for episode {episode} - Visual monitoring")
-        simulation_time_skrl, training_time_skrl = simulation_skrl.run(epsilon, episode)
-        print(
-            f"Simulation (SKRL DQN) time:",
-            simulation_time_skrl,
-            "Training time:",
-            training_time_skrl,
-        )
+        for loss_type, sim_dqn_skrl in simulations_dqn_skrl.items():
+            print(f"Running SKRL DQN Simulation (loss: {loss_type})...")
+            # Enable GUI once every 100 episodes for visual monitoring
+            gui_enabled = (episode % 100 == 0 and episode > 0)
+            set_sumo(gui_enabled, config["sumo_cfg_file"], config["max_steps"])
+            if gui_enabled:
+                print(f"🖥️  GUI enabled for episode {episode} - Visual monitoring")
+            simulation_time_dqn_skrl, training_time_dqn_skrl = sim_dqn_skrl.run(epsilon, episode)
+            print(
+                f"Simulation (SKRL DQN - {loss_type}) time:",
+                simulation_time_dqn_skrl,
+                "Training time:",
+                training_time_dqn_skrl,
+            )
 
         epsilon = max(min_epsilon, epsilon * decay_rate)
 
         # --- Track Performance ---
         try:
             # Get SKRL DQN vehicle statistics
-            skrl_stats = simulation_skrl.vehicle_tracker.get_current_stats()
+            dqn_skrl_sim = list(simulations_dqn_skrl.values())[0]  # Get first (only) SKRL DQN simulation
+            dqn_skrl_stats = dqn_skrl_sim.vehicle_tracker.get_current_stats()
             
             # Debug: Print vehicle statistics
             print(f"Debug - Vehicle stats for episode {episode}:")
-            print(f"  Total departed: {dqn_stats.get('total_departed', 'N/A')}")
-            print(f"  Total arrived: {dqn_stats.get('total_arrived', 'N/A')}")
-            print(f"  Current running: {dqn_stats.get('total_running', 'N/A')}")
+            print(f"  Total departed: {dqn_skrl_stats.get('total_departed', 'N/A')}")
+            print(f"  Total arrived: {dqn_skrl_stats.get('total_arrived', 'N/A')}")
+            print(f"  Current running: {dqn_skrl_stats.get('total_running', 'N/A')}")
             
             # Calculate performance metrics
-            completion_rate = (skrl_stats['total_arrived'] / max(skrl_stats['total_departed'], 1)) * 100
+            completion_rate = (dqn_skrl_stats['total_arrived'] / max(dqn_skrl_stats['total_departed'], 1)) * 100
             
             # Get traffic metrics (if available)
             avg_travel_time = 0
             avg_waiting_time = 0
             
             # Debug: Check if history exists and has data
-            if hasattr(dqn_sim, 'history'):
-                print(f"  History keys: {list(dqn_sim.history.keys())}")
-                if 'travel_time' in dqn_sim.history:
-                    travel_time_data = dqn_sim.history['travel_time']
+            if hasattr(dqn_skrl_sim, 'history'):
+                print(f"  History keys: {list(dqn_skrl_sim.history.keys())}")
+                if 'travel_time' in dqn_skrl_sim.history:
+                    travel_time_data = dqn_skrl_sim.history['travel_time']
                     print(f"  Travel time data available for TLs: {list(travel_time_data.keys())}")
                     for tl_id, times in travel_time_data.items():
                         print(f"    {tl_id}: {len(times)} measurements")
@@ -213,13 +223,13 @@ if __name__ == "__main__":
                 print("  No history attribute found")
             
             # Try to get traffic metrics from simulation history
-            if hasattr(simulation_skrl, 'history') and 'travel_time' in simulation_skrl.history:
+            if hasattr(dqn_skrl_sim, 'history') and 'travel_time' in dqn_skrl_sim.history:
                 travel_times = []
                 waiting_times = []
-                for tl_id, times in simulation_skrl.history['travel_time'].items():
+                for tl_id, times in dqn_skrl_sim.history['travel_time'].items():
                     if times:
                         travel_times.extend(times[-10:])  # Last 10 measurements
-                for tl_id, times in simulation_skrl.history['waiting_time'].items():
+                for tl_id, times in dqn_skrl_sim.history['waiting_time'].items():
                     if times:
                         waiting_times.extend(times[-10:])  # Last 10 measurements
                 
@@ -238,28 +248,27 @@ if __name__ == "__main__":
                 'avg_waiting_time': avg_waiting_time,
                 'combined_score': combined_score,
                 'epsilon': epsilon,
-                'total_departed': skrl_stats['total_departed'],
-                'total_arrived': skrl_stats['total_arrived']
+                'total_departed': dqn_skrl_stats['total_departed'],
+                'total_arrived': dqn_skrl_stats['total_arrived']
             }
             performance_history.append(current_performance)
             
             # Check if this is the best performance so far
             if combined_score > best_performance['combined_score']:
                 # Clean up old best model files first
-                model_save_name = config.get("save_model_name", "dqn_model")
+                model_save_name = config.get("save_model_name", "dqn_skrl_model")
                 
                 # Remove old best files if they exist
                 if best_performance['episode'] != -1:  # If there was a previous best
-                    old_best_model = path + f"{model_save_name}_BEST_ep{best_performance['episode']}.pth"
-                    old_best_checkpoint = path + f"{model_save_name}_BEST_ep{best_performance['episode']}_checkpoint.pth"
+                    # Note: SKRL models are saved differently - update file patterns as needed
+                    old_best_pattern = f"*_BEST_ep{best_performance['episode']}.pt"
                     
                     try:
-                        if os.path.exists(old_best_model):
-                            os.remove(old_best_model)
-                            print(f"   🗑️  Removed old best model: ep{best_performance['episode']}")
-                        if os.path.exists(old_best_checkpoint):
-                            os.remove(old_best_checkpoint)
-                            print(f"   🗑️  Removed old best checkpoint: ep{best_performance['episode']}")
+                        import glob
+                        old_files = glob.glob(path + old_best_pattern)
+                        for old_file in old_files:
+                            os.remove(old_file)
+                            print(f"   🗑️  Removed old best model: {os.path.basename(old_file)}")
                     except Exception as e:
                         print(f"   ⚠️  Could not remove old best files: {e}")
                 
@@ -271,20 +280,25 @@ if __name__ == "__main__":
                 print(f"   Avg Waiting Time: {avg_waiting_time:.2f}")
                 print(f"   Combined Score: {combined_score:.2f}")
                 
-                # Create new best model files
-                best_model_path = path + f"{model_save_name}_BEST_ep{episode}.pt"
-                best_checkpoint_path = path + f"{model_save_name}_BEST_ep{episode}_checkpoint.pt"
-                
-                # Save SKRL model as best
-                simulation_skrl.save_model(episode)
-                print(f"   ✅ Best SKRL model saved: ep{episode}")
-                
-                # Always update the "CURRENT" best files (overwrite)
-                current_best_model = path + f"{model_save_name}_BEST_CURRENT.pt"
-                current_best_checkpoint = path + f"{model_save_name}_BEST_CURRENT_checkpoint.pt"
-                
-                simulation_skrl.save_model(episode)  # This will save with the episode number
-                print(f"   ✅ Current best updated: ep{episode}")
+                # Save new best model files using SKRL's save method
+                for loss_type, sim_dqn_skrl in simulations_dqn_skrl.items():
+                    try:
+                        # Save SKRL models for each traffic light
+                        for tl_id, agent in sim_dqn_skrl.agents.items():
+                            best_model_path = f"{path}skrl_dqn_{tl_id}_BEST_ep{episode}.pt"
+                            agent.save(best_model_path)
+                            print(f"   ✅ Best SKRL model saved: {tl_id} ep{episode}")
+                        
+                        # Save current best files (overwrite)
+                        for tl_id, agent in sim_dqn_skrl.agents.items():
+                            current_best_model = f"{path}skrl_dqn_{tl_id}_BEST_CURRENT.pt"
+                            agent.save(current_best_model)
+                            print(f"   ✅ Current best SKRL updated: {tl_id} ep{episode}")
+                        
+                    except Exception as e:
+                        print(f"   ⚠️  Error saving SKRL models: {e}")
+                    
+                    break  # Only need to do this once since there's only one SKRL DQN simulation
             
             # Print current vs best performance every 10 episodes
             if episode % 10 == 0:
@@ -292,25 +306,17 @@ if __name__ == "__main__":
                 print(f"Current: Score={combined_score:.2f}, Completion={completion_rate:.1f}%, Travel={avg_travel_time:.2f}, Wait={avg_waiting_time:.2f}")
                 print(f"Best:    Score={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
                 
-        except AttributeError as e:
-            if 'num_atoms' in str(e):
-                print(f"⚠️  Model compatibility error: {e}")
-                print("   This error indicates the DQN model is missing the 'num_atoms' attribute for C51 distributional DQN.")
-                print("   The model should be updated to include: self.num_atoms = 51")
-            else:
-                print(f"⚠️  Attribute error tracking performance: {e}")
-            # Continue training even if performance tracking fails
         except Exception as e:
             print(f"⚠️  Error tracking performance: {e}")
             # Continue training even if performance tracking fails
         
-        # Reset vehicle trackers after performance tracking is complete
-        for loss_type, sim_dqn in simulations_dqn.items():
-            print(f"  Resetting vehicle tracker for DQN simulation")
-            sim_dqn.vehicle_tracker.reset()
-            print(f"  Resetting history for DQN simulation")
-            sim_dqn.reset_history()
-            break  # Only need to do this once since there's only one DQN simulation
+        # Reset vehicle trackers and history after performance tracking is complete
+        for loss_type, sim_dqn_skrl in simulations_dqn_skrl.items():
+            print(f"  Resetting vehicle tracker for SKRL DQN simulation")
+            sim_dqn_skrl.vehicle_tracker.reset()
+            print(f"  Resetting history for SKRL DQN simulation")
+            sim_dqn_skrl.reset_history()
+            break  # Only need to do this once since there's only one SKRL DQN simulation
 
         # --- Save comparison plots ---
         print("Saving comparison plots...")
@@ -326,17 +332,15 @@ if __name__ == "__main__":
                     "waiting_time_avg",
                     "queue_length_avg",
                 ],
-                names=["skrl_dqn", "base"],  # Only include actually running simulations
+                names=["dqn_skrl_qr", "dqn_skrl_mse", "dqn_skrl_huber", "dqn_skrl_weighted", "q", "base"],
             )
             print("Plots at episode", episode, "generated")
 
             # --- Generate traffic light comparison tables ---
             print("Generating traffic light comparison tables...")
             try:
-                # Specify the actual simulation types that are running and saving data
-                available_sim_types = ["baseline", "skrl_dqn"]  # Add q_learning when it's enabled
-                comparison_results = comparison.save_comparison_tables(episode, simulation_types=available_sim_types)
-                comparison.print_comparison_summary(episode, simulation_types=available_sim_types)
+                comparison_results = comparison.save_comparison_tables(episode)
+                comparison.print_comparison_summary(episode)
                 print("Traffic light comparison tables generated successfully")
             except Exception as e:
                 print(f"Error generating comparison tables: {e}")
@@ -347,7 +351,7 @@ if __name__ == "__main__":
             # --- Generate vehicle comparison from logs ---
             print("Generating vehicle comparison from logs...")
             try:
-                visualization.create_vehicle_comparison_from_logs(episode, ["skrl_dqn", "base"])  # Updated for SKRL
+                visualization.create_vehicle_comparison_from_logs(episode, ["dqn_skrl", "base"])  # Compare SKRL DQN and Base
                 print("Vehicle comparison from logs generated successfully")
             except Exception as e:
                 print(f"Error generating vehicle comparison from logs: {e}")
@@ -356,11 +360,18 @@ if __name__ == "__main__":
         # Save model at specified intervals
         save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
         if episode % save_interval == 0 and episode > 0:
-            model_save_name = config.get("save_model_name", "skrl_dqn_model")
+            model_save_name = config.get("save_model_name", "dqn_skrl_model")
 
-            # Save SKRL model
-            simulation_skrl.save_model(episode)
-            print(f"SKRL DQN model saved at episode {episode}")
+            for loss_type, sim_dqn_skrl in simulations_dqn_skrl.items():
+                try:
+                    # Save SKRL models for each traffic light
+                    for tl_id, agent in sim_dqn_skrl.agents.items():
+                        model_save_path = f"{path}skrl_dqn_{tl_id}_episode_{episode}.pt"
+                        agent.save(model_save_path)
+                        print(f"SKRL DQN model saved for {tl_id} at episode {episode}: {model_save_path}")
+                        
+                except Exception as e:
+                    print(f"Error saving SKRL models at episode {episode}: {e}")
 
             # Save Q-learning Q-table (only if Q-learning is running)
             # Note: Uncomment when Q-learning is enabled
@@ -387,15 +398,15 @@ if __name__ == "__main__":
     if performance_history:
         import pandas as pd
         performance_df = pd.DataFrame(performance_history)
-        performance_csv = path + "performance_history.csv"
+        performance_csv = path + "performance_history_skrl.csv"
         performance_df.to_csv(performance_csv, index=False)
-        print(f"📈 Performance history saved: {performance_csv}")
+        print(f"📈 SKRL Performance history saved: {performance_csv}")
         
         # Create performance plot
         try:
             import matplotlib.pyplot as plt
             fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
-            fig.suptitle('Training Performance Over Time', fontsize=16)
+            fig.suptitle('SKRL DQN Training Performance Over Time', fontsize=16)
             
             episodes = performance_df['episode']
             
@@ -436,61 +447,63 @@ if __name__ == "__main__":
             ax4.grid(True, alpha=0.3)
             
             plt.tight_layout()
-            performance_plot = path + "performance_history.png"
+            performance_plot = path + "performance_history_skrl.png"
             plt.savefig(performance_plot, dpi=300, bbox_inches='tight')
             plt.close()
-            print(f"📊 Performance plot saved: {performance_plot}")
+            print(f"📊 SKRL Performance plot saved: {performance_plot}")
             
         except Exception as e:
             print(f"⚠️  Could not create performance plot: {e}")
 
-    print(f"Saving final model at {path}...")
-    # model_save_name = config.get("save_model_name", "dqn_model")
-
-    # # Save final model weights
-    # model_final_path = path + f"{model_save_name}_final.pth"
-    # simulation_dqn.agent.save(model_final_path)
-
-    # # Save final checkpoint
-    # checkpoint_final_path = path + f"{model_save_name}_final_checkpoint.pth"
-    # simulation_dqn.agent.save_checkpoint(checkpoint_final_path, episode=episode, epsilon=epsilon)
-
-    # print(f"Final DQN model saved: {model_final_path}")
-    # print(f"Final DQN checkpoint saved: {checkpoint_final_path}")
+    print(f"Saving final SKRL models at {path}...")
+    
+    # Save final SKRL models
+    for loss_type, sim_dqn_skrl in simulations_dqn_skrl.items():
+        try:
+            for tl_id, agent in sim_dqn_skrl.agents.items():
+                model_final_path = f"{path}skrl_dqn_{tl_id}_final.pt"
+                agent.save(model_final_path)
+                print(f"Final SKRL DQN model saved for {tl_id}: {model_final_path}")
+        except Exception as e:
+            print(f"Error saving final SKRL models: {e}")
 
     # Save final Q-table
     simulation_q.save_q_table(path, episode="final")
     print(f"Final Q-table saved")
     print("---------------------------------------")
 
-    print("Generating plots...")
-    # We simplify by averaging the history over all traffic lights
-    avg_history = {}
+    print("Generating SKRL plots...")
+    # Generate plots for SKRL simulation
+    for loss_type, sim_dqn_skrl in simulations_dqn_skrl.items():
+        # We simply average the history over all traffic lights
+        avg_history = {}
 
-    for metric, data_per_tls in simulation_skrl.history.items():
-        # Transpose the list of lists into per-timestep values
-        # Filter out missing/empty lists first
-        data_lists = [data for data in data_per_tls.values() if len(data) > 0]
+        for metric, data_per_tls in sim_dqn_skrl.history.items():
+            # Transpose the list of lists into per-timestep values
+            # Filter out missing/empty lists first
+            data_lists = [data for data in data_per_tls.values() if len(data) > 0]
 
-        if not data_lists:
-            continue  # Skip if no data
+            if not data_lists:
+                continue  # Skip if no data
 
-        # Truncate to minimum length to avoid index errors
-        min_length = min(len(data) for data in data_lists)
-        data_lists = [data[:min_length] for data in data_lists]
+            # Truncate to minimum length to avoid index errors
+            min_length = min(len(data) for data in data_lists)
+            data_lists = [data[:min_length] for data in data_lists]
 
-        # Average per timestep
-        avg_data = [sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)]
+            # Average per timestep
+            avg_data = [sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)]
 
-        # Save to avg_history
-        avg_history[metric] = avg_data
+            # Save to avg_history
+            avg_history[metric] = avg_data
 
-    for metric, data in avg_history.items():
-        visualization.save_data_and_plot(
-            data=data,
-            filename=f"skrl_{metric}_avg",
-            xlabel="Step",
-            ylabel=metric.replace("_", " ").title(),
-        )
+        for metric, data in avg_history.items():
+            visualization.save_data_and_plot(
+                data=data,
+                filename=f"skrl_{loss_type}_{metric}_avg",
+                xlabel="Step",
+                ylabel=metric.replace("_", " ").title(),
+            )
 
-    print("Plots generated")
+        break  # Only process first simulation since they're all the same type
+
+    print("SKRL plots generated")
