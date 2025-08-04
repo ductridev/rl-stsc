@@ -2,6 +2,7 @@
 Main simulation class using SKRL for reinforcement learning.
 Refactored to use separate modules for better organization.
 """
+
 import numpy as np
 import torch
 import time
@@ -118,11 +119,17 @@ class Simulation(SUMO):
             agent_cfg=self.agent_cfg,
             traffic_lights=self.traffic_lights,
             updating_target_network_steps=self.updating_target_network_steps,
-            device=self.device
+            device=self.device,
         )
 
         # DESRA setup
         self.desra = DESRA(interphase_duration=self.interphase_duration)
+
+        # DESRA configuration (default to detector-specific parameters)
+        self.desra_use_global_params = False
+        self.desra_global_saturation_flow = None
+        self.desra_global_critical_density = None
+        self.desra_global_jam_density = None
 
         # Comparison utility
         self.comparison = SimulationComparison(path=self.path) if self.path else None
@@ -189,14 +196,25 @@ class Simulation(SUMO):
                 for det in self.get_movements_from_phase(traffic_light, phase):
                     _ = self.arrival_buffers[det]
 
-    def select_action(self, tl_id: str, state: np.ndarray, epsilon: float) -> Tuple[float, int]:
+    def select_action(
+        self, tl_id: str, state: np.ndarray, epsilon: float
+    ) -> Tuple[float, int]:
         """Select action using SKRL agent manager"""
         return self.agent_manager.select_action(tl_id, state, epsilon)
 
-    def store_transition(self, tl_id: str, state: np.ndarray, action: int, 
-                        reward: float, next_state: np.ndarray, done: bool):
+    def store_transition(
+        self,
+        tl_id: str,
+        state: np.ndarray,
+        action: int,
+        reward: float,
+        next_state: np.ndarray,
+        done: bool,
+    ):
         """Store transition in agent's memory"""
-        self.agent_manager.store_transition(tl_id, state, action, reward, next_state, done)
+        self.agent_manager.store_transition(
+            tl_id, state, action, reward, next_state, done
+        )
 
     def train_agents(self):
         """Train all agents using SKRL"""
@@ -303,7 +321,9 @@ class Simulation(SUMO):
                         "old_phase": state["phase"],
                         "green_time": green_time,
                         "green_time_remaining": green_time,
-                        "old_vehicle_ids": TrafficMetrics.get_vehicles_in_phase(tl, new_phase),
+                        "old_vehicle_ids": TrafficMetrics.get_vehicles_in_phase(
+                            tl, new_phase
+                        ),
                         "state": current_state,
                         "action_idx": action_idx,
                     }
@@ -318,6 +338,11 @@ class Simulation(SUMO):
 
             # Update vehicle tracking
             self.vehicle_tracker.update_stats(self.step)
+
+            # Update DESRA traffic parameters for real-time adaptation
+            current_time = traci.simulation.getTime()
+            for det in self.all_detectors:
+                self.desra.update_traffic_parameters(det, current_time)
 
             # Print stats periodically
             if self.step % 1000 == 0:
@@ -398,6 +423,9 @@ class Simulation(SUMO):
         self.vehicle_tracker.print_summary("skrl_dqn")
         self.vehicle_tracker.save_logs(episode, "skrl_dqn")
         self.vehicle_tracker.reset()
+
+        # Print DESRA parameter summary
+        self.print_desra_summary()
 
         return sim_time, self._finalize_episode(epsilon, episode)
 
@@ -534,24 +562,35 @@ class Simulation(SUMO):
         # Compute per-detector q_arr over [last_call, now]
         q_arr_dict = self._compute_arrival_flows()
 
-        saturation_flow, critical_density, jam_density = self.estimate_fd_params(
-            tl["id"]
-        )
+        # Get current simulation time for DESRA parameter updates
+        current_time = traci.simulation.getTime()
 
-        # DESRA recommended phase and green time
+        # Get DESRA configuration for this traffic light
+        (
+            use_global_params,
+            global_saturation_flow,
+            global_critical_density,
+            global_jam_density,
+        ) = self.get_desra_parameters(tl["id"])
+
+        # DESRA recommended phase and green time with real-time parameter updates
         best_phase, desra_green = self.desra.select_phase_with_desra_hints(
             tl,
             q_arr_dict,
-            saturation_flow=saturation_flow,
-            critical_density=critical_density,
-            jam_density=jam_density,
+            current_time=current_time,
+            use_global_params=use_global_params,
+            global_saturation_flow=global_saturation_flow,
+            global_critical_density=global_critical_density,
+            global_jam_density=global_jam_density,
         )
 
         # Append current phase
         current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)
         state_vector.extend([current_phase_idx])
 
-        padding = self.agent_cfg["num_states"] - len(state_vector) - 1  # 1 for DESRA phase instead of green time
+        padding = (
+            self.agent_cfg["num_states"] - len(state_vector) - 1
+        )  # 1 for DESRA phase instead of green time
         state_vector.extend([0] * padding)
 
         # Convert phase to index
@@ -634,6 +673,12 @@ class Simulation(SUMO):
 
     def estimate_fd_params(self, tl_id, window=60, min_history=10, ema_alpha=None):
         """
+        Legacy method for estimating fundamental diagram parameters.
+
+        NOTE: This method is kept for backward compatibility. The new DESRA class
+        now handles real-time parameter estimation internally using detector-specific
+        traffic measurements. Use DESRA.get_detector_parameters() instead.
+
         Estimate per-lane saturation_flow, critical_density, jam_density for a traffic light
         using recent flow and density history.
         """
@@ -759,3 +804,110 @@ class Simulation(SUMO):
             print(f"SKRL DQN metrics DataFrame saved to {filename}")
 
         return df
+
+    def configure_desra_parameters(
+        self,
+        use_global_params=False,
+        global_saturation_flow=None,
+        global_critical_density=None,
+        global_jam_density=None,
+    ):
+        """
+        Configure DESRA to use either global or detector-specific parameters.
+
+        Args:
+            use_global_params: If True, use global parameters for all detectors
+            global_saturation_flow: Global saturation flow rate (veh/s)
+            global_critical_density: Global critical density (veh/m)
+            global_jam_density: Global jam density (veh/m)
+        """
+        self.desra_use_global_params = use_global_params
+        self.desra_global_saturation_flow = global_saturation_flow
+        self.desra_global_critical_density = global_critical_density
+        self.desra_global_jam_density = global_jam_density
+
+        print(f"DESRA configured: use_global_params={use_global_params}")
+        if use_global_params:
+            print(
+                f"Global parameters: s={global_saturation_flow}, "
+                f"kc={global_critical_density}, kj={global_jam_density}"
+            )
+
+    def get_desra_parameters(self, tl_id):
+        """
+        Get DESRA parameters for a traffic light, either global or detector-specific.
+
+        Args:
+            tl_id: Traffic light ID
+
+        Returns:
+            Tuple of (use_global_params, global_saturation_flow, global_critical_density, global_jam_density)
+        """
+        if hasattr(self, "desra_use_global_params") and self.desra_use_global_params:
+            return (
+                True,
+                getattr(self, "desra_global_saturation_flow", None),
+                getattr(self, "desra_global_critical_density", None),
+                getattr(self, "desra_global_jam_density", None),
+            )
+        else:
+            return (False, None, None, None)
+
+    def get_desra_statistics(self):
+        """
+        Get current DESRA parameter estimates for all detectors.
+
+        Returns:
+            Dict with detector statistics including estimated parameters and buffer sizes
+        """
+        stats = {}
+        for det in self.all_detectors:
+            params = self.desra.get_detector_parameters(det)
+            stats[det] = {
+                "estimated_saturation_flow": params["saturation_flow"],
+                "estimated_critical_density": params["critical_density"],
+                "estimated_jam_density": params["jam_density"],
+                "vehicle_count_buffer_size": len(
+                    self.desra.vehicle_counts.get(det, [])
+                ),
+                "occupancy_buffer_size": len(self.desra.occupancies.get(det, [])),
+                "flow_rate_buffer_size": len(self.desra.flow_rates.get(det, [])),
+                "density_buffer_size": len(self.desra.densities.get(det, [])),
+            }
+        return stats
+
+    def print_desra_summary(self):
+        """Print a summary of DESRA parameter estimates."""
+        print("\n=== DESRA Parameter Summary ===")
+        print(
+            f"Mode: {'Global Parameters' if self.desra_use_global_params else 'Detector-Specific Parameters'}"
+        )
+
+        if self.desra_use_global_params:
+            print(f"Global Saturation Flow: {self.desra_global_saturation_flow}")
+            print(f"Global Critical Density: {self.desra_global_critical_density}")
+            print(f"Global Jam Density: {self.desra_global_jam_density}")
+        else:
+            stats = self.get_desra_statistics()
+            print(f"Number of detectors: {len(stats)}")
+
+            if stats:
+                # Calculate averages
+                avg_saturation_flow = np.mean(
+                    [s["estimated_saturation_flow"] for s in stats.values()]
+                )
+                avg_critical_density = np.mean(
+                    [s["estimated_critical_density"] for s in stats.values()]
+                )
+                avg_jam_density = np.mean(
+                    [s["estimated_jam_density"] for s in stats.values()]
+                )
+                avg_buffer_size = np.mean(
+                    [s["vehicle_count_buffer_size"] for s in stats.values()]
+                )
+
+                print(f"Average Saturation Flow: {avg_saturation_flow:.3f} veh/s")
+                print(f"Average Critical Density: {avg_critical_density:.3f} veh/m")
+                print(f"Average Jam Density: {avg_jam_density:.3f} veh/m")
+                print(f"Average Buffer Size: {avg_buffer_size:.1f} measurements")
+        print("==============================\n")
