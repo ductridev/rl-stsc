@@ -117,8 +117,7 @@ if __name__ == "__main__":
     best_performance = {
         'episode': -1,
         'completion_rate': -1,
-        'avg_travel_time': float('inf'),
-        'avg_waiting_time': float('inf'),
+        'total_reward': -float('inf'),
         'combined_score': -float('inf')
     }
     performance_history = []
@@ -160,27 +159,23 @@ if __name__ == "__main__":
         base_stats = simulation.vehicle_tracker.get_current_stats()
         base_completion_rate = (base_stats['total_arrived'] / max(base_stats['total_departed'], 1)) * 100
 
-        base_avg_travel_time = 0
-        base_avg_waiting_time = 0
-
-        if hasattr(simulation, 'history') and 'travel_time' in simulation.history:
-            travel_times = []
-            waiting_times = []
-            for tl_id, times in simulation.history['travel_time'].items():
-                if times:
-                    travel_times.extend(times[-10:])  # Last 10 measurements
-            for tl_id, times in simulation.history['waiting_time'].items():
-                if times:
-                    waiting_times.extend(times[-10:])  # Last 10 measurements
-            base_avg_travel_time = sum(travel_times) / len(travel_times) if travel_times else 0
-            base_avg_waiting_time = sum(waiting_times) / len(waiting_times) if waiting_times else 0
-
-        base_combined_score = (base_completion_rate * 0.6) - (base_avg_travel_time * 0.2) - (base_avg_waiting_time * 0.2)
-        # Debug: Print base simulation metrics
-        # print(f"Base Completion Rate: {base_completion_rate:.2f}%")
-        # print(f"Base Avg Travel Time: {base_avg_travel_time:.2f}")
-        # print(f"Base Avg Waiting Time: {base_avg_waiting_time:.2f}")
-        # print(f"Base Combined Score: {base_combined_score:.2f}")
+        # Extract avg_outflow from baseline simulation history
+        base_avg_outflow = 0
+        if hasattr(simulation, 'history') and 'outflow' in simulation.history:
+            # Get average outflow from all traffic lights
+            outflow_data = []
+            for tl_id, outflows in simulation.history['outflow'].items():
+                if outflows:
+                    avg_outflow_tl = sum(outflows) / len(outflows)
+                    outflow_data.append(avg_outflow_tl)
+            if outflow_data:
+                base_avg_outflow = sum(outflow_data) / len(outflow_data)
+        
+        print(f"Base Simulation Results:")
+        print(f"  Total Departed: {base_stats['total_departed']}")
+        print(f"  Total Arrived: {base_stats['total_arrived']}")
+        print(f"  Completion Rate: {base_completion_rate:.2f}%")
+        print(f"  Avg Outflow (from history): {base_avg_outflow:.2f}")
 
         print("SimulationBase time:", simulation_time_base)
         # Reset base simulation vehicle tracker after its run
@@ -211,6 +206,9 @@ if __name__ == "__main__":
         epsilon = max(min_epsilon, epsilon * decay_rate)
 
         # --- Track Performance ---
+        # DUAL COMPARISON SYSTEM:
+        # 1. DQN vs DQN (Best Model): Use total_reward - higher reward indicates better learning
+        # 2. DQN vs Baseline: Use avg_outflow from simulation history - higher outflow is better traffic flow
         try:
             # Get SKRL DQN vehicle statistics
             skrl_stats = simulation_skrl.vehicle_tracker.get_current_stats()
@@ -224,47 +222,61 @@ if __name__ == "__main__":
             # Calculate performance metrics
             completion_rate = (skrl_stats['total_arrived'] / max(skrl_stats['total_departed'], 1)) * 100
             
-            # Get traffic metrics (if available)
-            avg_travel_time = 0
-            avg_waiting_time = 0
+            # Get reward-based metrics from simulation history
+            total_reward = 0
             
-            # Try to get traffic metrics from simulation history
-            if hasattr(simulation_skrl, 'history') and 'travel_time' in simulation_skrl.history:
-                travel_times = []
-                waiting_times = []
-                for tl_id, times in simulation_skrl.history['travel_time'].items():
-                    if times:
-                        travel_times.extend(times[-10:])  # Last 10 measurements
-                for tl_id, times in simulation_skrl.history['waiting_time'].items():
-                    if times:
-                        waiting_times.extend(times[-10:])  # Last 10 measurements
-                
-                avg_travel_time = sum(travel_times) / len(travel_times) if travel_times else 0
-                avg_waiting_time = sum(waiting_times) / len(waiting_times) if waiting_times else 0
+            # Try to get reward metrics from simulation history
+            if hasattr(simulation_skrl, 'history') and 'agent_reward' in simulation_skrl.history:
+                for tl_id, rewards in simulation_skrl.history['agent_reward'].items():
+                    if rewards:
+                        total_reward += sum(rewards)
             
-            # Combined score (higher is better)
-            # Weight: completion_rate (60%) - travel_time penalty (20%) - waiting_time penalty (20%)
-            combined_score = (completion_rate * 0.6) - (avg_travel_time * 0.2) - (avg_waiting_time * 0.2)
-            # Debug: 
-            print("combined_score:", combined_score)
-            print("base_combined_score:", base_combined_score)
-            if combined_score > base_combined_score:
+            # Extract avg_outflow from DQN simulation history
+            dqn_avg_outflow = 0
+            if hasattr(simulation_skrl, 'history') and 'outflow' in simulation_skrl.history:
+                # Get average outflow from all traffic lights
+                outflow_data = []
+                for tl_id, outflows in simulation_skrl.history['outflow'].items():
+                    if outflows:
+                        avg_outflow_tl = sum(outflows) / len(outflows)
+                        outflow_data.append(avg_outflow_tl)
+                if outflow_data:
+                    dqn_avg_outflow = sum(outflow_data) / len(outflow_data)
+            
+            # DUAL COMPARISON SYSTEM:
+            # 1. Use total_reward for DQN vs DQN (best model tracking)
+            combined_score = total_reward
+            
+            # 2. Use avg_outflow for base vs DQN comparison
+            print(f"DQN Results:")
+            print(f"  Total Reward (for best model): {total_reward:.2f}")
+            print(f"  Avg Outflow (vs baseline): {dqn_avg_outflow:.2f}")
+            print(f"Comparison:")
+            print(f"  DQN avg_outflow: {dqn_avg_outflow:.2f}")
+            print(f"  Base avg_outflow: {base_avg_outflow:.2f}")
+            
+            # Compare DQN vs baseline using avg_outflow
+            if dqn_avg_outflow > base_avg_outflow:
                 dest_folder = f"{simulation_path}_better_DQN_ep{episode}"
                 # Remove the destination if it already exists to avoid errors
                 if os.path.exists(dest_folder):
                     shutil.rmtree(dest_folder)
                 shutil.copytree(simulation_path, dest_folder)
-                print(f"✅ DQN outperformed base! Simulation folder copied to: {dest_folder}")
+                print(f"✅ DQN outperformed base! Higher avg_outflow: {dqn_avg_outflow:.2f} > {base_avg_outflow:.2f}")
+                print(f"   Simulation folder copied to: {dest_folder}")
+            else:
+                print(f"❌ DQN did not outperform base: {dqn_avg_outflow:.2f} <= {base_avg_outflow:.2f}")
             # Store performance data
             current_performance = {
                 'episode': episode,
                 'completion_rate': completion_rate,
-                'avg_travel_time': avg_travel_time,
-                'avg_waiting_time': avg_waiting_time,
-                'combined_score': combined_score,
+                'total_reward': total_reward,
+                'combined_score': combined_score,  # total_reward for best model tracking
                 'epsilon': epsilon,
                 'total_departed': skrl_stats['total_departed'],
-                'total_arrived': skrl_stats['total_arrived']
+                'total_arrived': skrl_stats['total_arrived'],
+                'dqn_avg_outflow': dqn_avg_outflow,  # DQN avg outflow for baseline comparison
+                'base_avg_outflow': base_avg_outflow  # Baseline avg outflow for comparison
             }
             performance_history.append(current_performance)
             
@@ -292,9 +304,9 @@ if __name__ == "__main__":
                 best_performance = current_performance.copy()
                 print(f"\n🏆 NEW BEST PERFORMANCE at Episode {episode}!")
                 print(f"   Completion Rate: {completion_rate:.1f}%")
-                print(f"   Avg Travel Time: {avg_travel_time:.2f}")
-                print(f"   Avg Waiting Time: {avg_waiting_time:.2f}")
-                print(f"   Combined Score: {combined_score:.2f}")
+                print(f"   Total Reward (Best Model Metric): {total_reward:.2f}")
+                print(f"   DQN Avg Outflow: {dqn_avg_outflow:.2f}")
+                print(f"   Combined Score (Total Reward): {combined_score:.2f}")
                 
                 # Create new best model files
                 best_model_path = path + f"{model_save_name}_BEST_ep{episode}.pt"
@@ -314,8 +326,9 @@ if __name__ == "__main__":
             # Print current vs best performance every 10 episodes
             if episode % 10 == 0:
                 print(f"\n📊 Performance Summary - Episode {episode}")
-                print(f"Current: Score={combined_score:.2f}, Completion={completion_rate:.1f}%, Travel={avg_travel_time:.2f}, Wait={avg_waiting_time:.2f}")
-                print(f"Best:    Score={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
+                print(f"Current: Reward={combined_score:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
+                print(f"Best:    Reward={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
+                print(f"Baseline vs DQN: Base_Outflow={base_avg_outflow:.2f} vs DQN_Outflow={dqn_avg_outflow:.2f}")
                 
         except AttributeError as e:
             if 'num_atoms' in str(e):
@@ -401,9 +414,8 @@ if __name__ == "__main__":
     print("=" * 50)
     print(f"Best Episode: {best_performance['episode']}")
     print(f"Best Completion Rate: {best_performance['completion_rate']:.2f}%")
-    print(f"Best Travel Time: {best_performance['avg_travel_time']:.2f}")
-    print(f"Best Waiting Time: {best_performance['avg_waiting_time']:.2f}")
-    print(f"Best Combined Score: {best_performance['combined_score']:.2f}")
+    print(f"Best Total Reward (Model Selection): {best_performance['combined_score']:.2f}")
+    print(f"Best DQN Avg Outflow: {best_performance.get('dqn_avg_outflow', 'N/A')}")
     print(f"Vehicles: {best_performance['total_arrived']}/{best_performance['total_departed']}")
     
     # Save performance history to CSV
