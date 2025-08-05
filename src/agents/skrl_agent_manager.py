@@ -140,18 +140,6 @@ class SKRLAgentManager:
                 device=self.device,
             )
 
-            # Initialize memory with a dummy sample to set up tensor structure
-            dummy_state = torch.zeros(
-                (1, observation_space_size), dtype=torch.float32, device=self.device
-            )
-            dummy_action = torch.zeros((1, 1), dtype=torch.long, device=self.device)
-            dummy_reward = torch.zeros((1, 1), dtype=torch.float32, device=self.device)
-            dummy_next_state = torch.zeros(
-                (1, observation_space_size), dtype=torch.float32, device=self.device
-            )
-            dummy_terminated = torch.zeros((1, 1), dtype=torch.bool, device=self.device)
-            dummy_truncated = torch.zeros((1, 1), dtype=torch.bool, device=self.device)
-
             # Create tensors dictionary and use create_tensor to register the tensor names properly
             print(f"🔧 Initializing memory for {tl_id}...")
             
@@ -281,7 +269,7 @@ class SKRLAgentManager:
         done: bool,
     ):
         """Store transition in agent's memory"""
-        agent = self.agents[tl_id]
+        memory = self.memories[tl_id]
 
         # Convert to tensors
         state_tensor = torch.FloatTensor(state).to(self.device)
@@ -291,16 +279,13 @@ class SKRLAgentManager:
         done_tensor = torch.BoolTensor([done]).to(self.device)
 
         # Store in memory
-        agent.record_transition(
+        memory.add_samples(
             states=state_tensor.unsqueeze(0),
             actions=action_tensor.unsqueeze(0),
             rewards=reward_tensor.unsqueeze(0),
             next_states=next_state_tensor.unsqueeze(0),
             terminated=done_tensor.unsqueeze(0),
             truncated=torch.BoolTensor([False]).to(self.device).unsqueeze(0),
-            infos=None,
-            timestep=0,
-            timesteps=10,
         )
 
     def train_agents(self, step: int, max_steps: int) -> float:

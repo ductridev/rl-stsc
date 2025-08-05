@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from skrl.models.torch import Model
+from skrl.models.torch import Model, DeterministicMixin
 from torchinfo import summary
 from typing import Optional
 
@@ -33,11 +33,12 @@ except ImportError:
             return x * attn
 
 
-class QNetwork(Model):
+class QNetwork(DeterministicMixin, Model):
     """Advanced Q-network model for DQN using SKRL with features from original model"""
 
     def __init__(self, observation_space, action_space, device="cpu", **kwargs):
         Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self)
 
         # Basic configuration
         self.input_dim = kwargs.get("input_dim", observation_space.shape[0])
@@ -135,12 +136,13 @@ class QNetwork(Model):
             return nn.Linear(self.final_feature_size, self.output_dim)
 
     def compute(self, inputs, role=""):
-        """Forward pass through the network (SKRL interface)"""
-        x = inputs["states"]
-        return self.forward(x), {}
+        """Compute Q-values for given inputs (SKRL interface)"""
+        states = inputs["states"]
+        q_values = self._forward_internal(states)
+        return q_values, {}
         
-    def forward(self, x):
-        """Forward pass through the network"""
+    def _forward_internal(self, x):
+        """Internal forward pass through the network"""
         # Backbone feature extraction
         features = self.backbone(x)  # [B, feature_size]
         
@@ -159,16 +161,15 @@ class QNetwork(Model):
         return output
         
     def act(self, inputs, role=""):
-        """Select actions based on Q-values (SKRL interface)"""
-        q_values = self.forward(inputs["states"])
+        """Get Q-values for given inputs (SKRL interface)"""
+        q_values = self._forward_internal(inputs["states"])
         
         if self.loss_type in ("qr", "wasserstein"):
             # For quantile regression, average across quantiles to get Q-values
             q_values = q_values.mean(dim=-1)
         
-        # Select action with highest Q-value
-        actions = torch.argmax(q_values, dim=-1, keepdim=True)
-        return actions, None, {}
+        # SKRL expects Q-values, not actions!
+        return q_values, None, {}
 
     def predict_one(self, x):
         """Predict Q-values for a single input (compatibility method)"""
@@ -176,17 +177,17 @@ class QNetwork(Model):
             x = torch.tensor(np.reshape(x, [1, self.input_dim]), dtype=torch.float32).to(self.device)
         else:
             x = torch.reshape(x, [1, self.input_dim])
-        return self.forward(x)
+        return self._forward_internal(x)
 
     def predict_batch(self, x):
         """Predict Q-values for a batch of inputs (compatibility method)"""
         if not isinstance(x, torch.Tensor):
             x = torch.tensor(x, dtype=torch.float32).to(self.device)
-        return self.forward(x)
+        return self._forward_internal(x)
 
     def get_q_values(self, states):
         """Get Q-values for given states (handles different loss types)"""
-        output = self.forward(states)
+        output = self._forward_internal(states)
         
         if self.loss_type in ("qr", "wasserstein"):
             # Average across quantiles for standard Q-values
