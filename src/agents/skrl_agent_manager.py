@@ -44,9 +44,9 @@ class SKRLAgentManager:
         set_seed(42)
 
         # Initialize containers
-        self.agents = {}
-        self.memories = {}
-        self.environments = {}
+        self.agents: dict[str, DQN] = {}
+        self.memories: dict[str, RandomMemory] = {}
+        self.environments: dict[str, TrafficLightEnvironment] = {}
 
         # Setup agents
         self._setup_agents()
@@ -281,7 +281,7 @@ class SKRLAgentManager:
         done: bool,
     ):
         """Store transition in agent's memory"""
-        memory = self.memories[tl_id]
+        agent = self.agents[tl_id]
 
         # Convert to tensors
         state_tensor = torch.FloatTensor(state).to(self.device)
@@ -291,13 +291,16 @@ class SKRLAgentManager:
         done_tensor = torch.BoolTensor([done]).to(self.device)
 
         # Store in memory
-        memory.add_samples(
+        agent.record_transition(
             states=state_tensor.unsqueeze(0),
             actions=action_tensor.unsqueeze(0),
             rewards=reward_tensor.unsqueeze(0),
             next_states=next_state_tensor.unsqueeze(0),
             terminated=done_tensor.unsqueeze(0),
             truncated=torch.BoolTensor([False]).to(self.device).unsqueeze(0),
+            infos=None,
+            timestep=0,
+            timesteps=10,
         )
 
     def train_agents(self, step: int, max_steps: int) -> float:
