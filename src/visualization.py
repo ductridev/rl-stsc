@@ -114,6 +114,70 @@ class Visualization:
             )
             plt.close()
 
+    def save_comparison_plots(self, episode=0, metrics=None, names=None):
+        """
+        Plot per-traffic-light comparison metrics over episodes
+        (density, travel_time, outflow, etc.) for different simulation types.
+
+        Args:
+            episode (int): Current episode number to plot up to.
+            metrics (list): List of metric names (e.g., ["density", "travel_time"]).
+            names (list): Simulation types to compare (e.g., ["baseline", "dqn_qr"]).
+        """
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        import os
+
+        if metrics is None:
+            metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
+
+        if names is None:
+            names = ["baseline", "skrl_dqn"]
+
+        for metric in metrics:
+            print(f"Generating plot for metric: {metric}")
+            plt.ioff()
+            fig, ax = plt.subplots()
+            episodes = []
+            tl_data = {sim_type: {} for sim_type in names}
+
+            # Process data up to the current episode
+            for ep in range(0, episode):  
+                filename = os.path.join(self.path, f"comparison_per_tl_{metric}_episode_{ep}.csv")
+                if os.path.exists(filename):
+                    df = pd.read_csv(filename)
+                    episodes.append(ep)
+                    for tl_id in df['traffic_light_id']:
+                        for sim_type in names:
+                            if sim_type in df.columns:
+                                value = df.loc[df['traffic_light_id'] == tl_id, sim_type].values
+                                if len(value) > 0:
+                                    if tl_id not in tl_data[sim_type]:
+                                        tl_data[sim_type][tl_id] = []
+                                    tl_data[sim_type][tl_id].append(value[0])
+
+            # Plotting per TL per Simulation Type
+            has_data = False
+            for sim_type in names:
+                for tl_id, values in tl_data[sim_type].items():
+                    ax.plot(episodes[:len(values)], values, marker='o', label=f'{sim_type} - {tl_id}')
+                    has_data = True
+
+            if has_data:
+                ax.set_xlabel('Episode')
+                ax.set_ylabel(metric.replace('_', ' ').title())
+                ax.set_title(f'{metric.replace("_", " ").title()} Over Episodes')
+                ax.legend()
+                ax.grid(True)
+                plt.tight_layout()
+                img_filename = os.path.join(self.path, f"comparison_{metric}_over_episodes.png")
+                plt.savefig(img_filename, dpi=150)
+                plt.close(fig)
+                print(f"Plot saved to {img_filename}")
+            else:
+                print(f"No data available for metric: {metric}, skipping plot.")
+
+
     def create_vehicle_comparison_from_logs(self, episode, simulation_types):
         """
         Create vehicle comparison plots by reading saved CSV log files.
