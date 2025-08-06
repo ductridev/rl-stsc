@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-02 13:30:18.447919 by randomTrips.py UNKNOWN
+<configuration>
+    <net-file value="osm.net.xml.gz"/>
+    <weights-prefix value="random_edge_priority_interval_7"/>
+    <output-trip-file value="osm.res_truck.interval_7.trips.xml"/>
+    <prefix value="res_truck_int7"/>
+    <trip-attributes value="departLane='best'"/>
+    <fringe-start-attributes value="departSpeed='max'"/>
+    <vehicle-class value="truck"/>
+    <vclass value="truck"/>
+    <remove-loops value="True"/>
+    <validate value="True"/>
+    <begin value="2527.0"/>
+    <end value="2887.0"/>
+    <insertion-rate value="250.0"/>
+</configuration>
+-->
+
+<!-- generated on 2025-08-02 13:30:18 by Eclipse SUMO duarouter Version 1.22.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_truck.interval_7.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_truck.interval_7.trips.xml.tmp"/>
+        <alternatives-output value="NUL"/>
+        <write-trips value="true"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="2527.0"/>
+        <end value="2887.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_truck_int7_truck" vClass="truck"/>
+    <trip id="res_truck_int71" type="res_truck_int7_truck" depart="2541.40" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_truck_int72" type="res_truck_int7_truck" depart="2555.80" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int73" type="res_truck_int7_truck" depart="2570.20" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_truck_int74" type="res_truck_int7_truck" depart="2584.60" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_truck_int76" type="res_truck_int7_truck" depart="2613.40" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_truck_int77" type="res_truck_int7_truck" depart="2627.80" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int710" type="res_truck_int7_truck" depart="2671.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int711" type="res_truck_int7_truck" depart="2685.40" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_truck_int713" type="res_truck_int7_truck" depart="2714.20" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_truck_int714" type="res_truck_int7_truck" depart="2728.60" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int715" type="res_truck_int7_truck" depart="2743.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int718" type="res_truck_int7_truck" depart="2786.20" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int719" type="res_truck_int7_truck" depart="2800.60" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_truck_int721" type="res_truck_int7_truck" depart="2829.40" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_truck_int722" type="res_truck_int7_truck" depart="2843.80" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_truck_int723" type="res_truck_int7_truck" depart="2858.20" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_truck_int724" type="res_truck_int7_truck" depart="2872.60" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+</routes>
