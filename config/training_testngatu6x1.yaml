@@ -9,7 +9,7 @@ memory:
   memory_size_max: 1000
 
 model:
-  training_epochs: 10000
+  training_epochs: 1000
   save_model_name: "dqn_testngatu_model" # Name for saving the model
   load_model_name: null # Set to model name to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
@@ -42,7 +42,7 @@ agent:
     v_max: 10.0
     
     # Regularization options
-    dropout_rate: 0.1  # 0.0 to disable dropout
+    dropout_rate: 0.2  # 0.0 to disable dropout
     batch_norm: true  # Enable batch normalization
     
     # Custom layer architecture (optional - overrides num_layers and hidden_size)
@@ -55,7 +55,7 @@ agent:
     
     # Epsilon decay settings (not used for noisy networks)
     decay_rate: 0.99
-    epsilon: 1.0
+    epsilon: 0.95
     min_epsilon: 0.05
   weight:
     queue_length: -0.25
