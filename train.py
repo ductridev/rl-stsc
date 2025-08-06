@@ -390,8 +390,8 @@ if __name__ == "__main__":
                     import pandas as pd
                     import os
 
-                    simulation_types = ["baseline", "dqn_qr"] 
-                    metrics = ["density", "travel_speed", "travel_time", "outflow", "queue_length", "waiting_time"]
+                    simulation_types = ["baseline", "skrl_dqn"] 
+                    metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
 
                     for metric in metrics:
                         plt.ioff()
