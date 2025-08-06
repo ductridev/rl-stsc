@@ -139,7 +139,7 @@ if __name__ == "__main__":
             high_min=200.0,
             high_max=400.0,
             min_active_sides=1,
-            max_active_sides=3,
+            max_active_sides=2,
             edge_groups=config["edge_groups"],
         )
 
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         # After running the base simulation
         base_stats = simulation.vehicle_tracker.get_current_stats()
         base_completion_rate = (base_stats['total_arrived'] / max(base_stats['total_departed'], 1)) * 100
-
+        base_total_arrived = base_stats['total_arrived']
         # Extract avg_outflow from baseline simulation history
         base_avg_outflow = 0
         if hasattr(simulation, 'history') and 'outflow' in simulation.history:
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         
         print(f"Base Simulation Results:")
         print(f"  Total Departed: {base_stats['total_departed']}")
-        print(f"  Total Arrived: {base_stats['total_arrived']}")
+        print(f"  Total Arrived: {base_total_arrived}")
         print(f"  Completion Rate: {base_completion_rate:.2f}%")
         print(f"  Avg Outflow (from history): {base_avg_outflow:.2f}")
 
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         try:
             # Get SKRL DQN vehicle statistics
             skrl_stats = simulation_skrl.vehicle_tracker.get_current_stats()
-            
+            skrl_total_arrived = skrl_stats['total_arrived']
             # Debug: Print vehicle statistics
             print(f"Debug - Vehicle stats for episode {episode}:")
             print(f"  Total departed: {skrl_stats.get('total_departed', 'N/A')}")
@@ -259,16 +259,16 @@ if __name__ == "__main__":
             print(f"  Base avg_outflow: {base_avg_outflow:.2f}")
             
             # Compare DQN vs baseline using avg_outflow
-            if dqn_avg_outflow > base_avg_outflow:
-                dest_folder = f"{simulation_path}_better_DQN_ep{episode}"
+            if skrl_total_arrived > base_total_arrived:
+                dest_folder = f"{simulation_path}_better_SKRL_ep{episode}"
                 # Remove the destination if it already exists to avoid errors
                 if os.path.exists(dest_folder):
                     shutil.rmtree(dest_folder)
                 shutil.copytree(simulation_path, dest_folder)
-                print(f"✅ DQN outperformed base! Higher avg_outflow: {dqn_avg_outflow:.2f} > {base_avg_outflow:.2f}")
+                print(f"✅ SKRL outperformed base! Higher total_arrived: {skrl_total_arrived:.2f} > {base_total_arrived:.2f}")
                 print(f"   Simulation folder copied to: {dest_folder}")
             else:
-                print(f"❌ DQN did not outperform base: {dqn_avg_outflow:.2f} <= {base_avg_outflow:.2f}")
+                print(f"❌ SKRL did not outperform base: {skrl_total_arrived:.2f} <= {base_total_arrived:.2f}")
             # Store performance data
             current_performance = {
                 'episode': episode,
@@ -374,7 +374,7 @@ if __name__ == "__main__":
             try:
                 # Specify the actual simulation types that are running and saving data
                 available_sim_types = ["baseline", "skrl_dqn"]  # Add q_learning when it's enabled
-                comparison_results = comparison.save_comparison_tables(episode, simulation_types=available_sim_types)
+                comparison.save_comparison_tables(episode, simulation_types=available_sim_types)
                 comparison.print_comparison_summary(episode, simulation_types=available_sim_types)
                 print("Traffic light comparison tables generated successfully")
             except Exception as e:
@@ -382,52 +382,13 @@ if __name__ == "__main__":
                 print(
                     "Comparison tables will be generated when CSV files are available"
                 )
-            
-            # --- Generate comparison for metrics over episodes ---
-            if comparison_results:
-                try:
-                    import matplotlib.pyplot as plt
-                    import pandas as pd
-                    import os
-
-                    simulation_types = ["baseline", "dqn_qr"] 
-                    metrics = ["density", "travel_speed", "travel_time", "outflow", "queue_length", "waiting_time"]
-
-                    for metric in metrics:
-                        plt.ioff()
-                        fig, ax = plt.subplots()
-                        episodes = []
-                        tl_data = {sim_type: {} for sim_type in simulation_types}
-
-                        # Only plot up to the current episode
-                        for ep in range(0, episode + 1, 5):
-                            filename = f"{path}comparison_per_tl_{metric}_episode_{ep}.csv"
-                            if os.path.exists(filename):
-                                df = pd.read_csv(filename)
-                                episodes.append(ep)
-                                for tl_id in df['traffic_light_id']:
-                                    for sim_type in simulation_types:
-                                        value = df.loc[df['traffic_light_id'] == tl_id, sim_type].values
-                                        if len(value) > 0:
-                                            if tl_id not in tl_data[sim_type]:
-                                                tl_data[sim_type][tl_id] = []
-                                            tl_data[sim_type][tl_id].append(value[0])
-
-                        ax.clear()
-                        for sim_type in simulation_types:
-                            for tl_id, values in tl_data[sim_type].items():
-                                ax.plot(episodes[:len(values)], values, marker='o', label=f'{sim_type} - {tl_id}')
-                        ax.set_xlabel('Episode')
-                        ax.set_ylabel(metric)
-                        ax.set_title(f'{metric} over Episodes')
-                        ax.legend()
-                        img_filename = f"{path}comparison_{metric}_over_episodes.png"
-                        plt.savefig(img_filename)
-                        plt.close(fig)
-                        print(f"Plot saved to {img_filename}")
-
-                except Exception as e:
-                    print(f"Error generating comparison plots: {e}")
+            # --- Generate comparison results were generated ---
+            try:
+                print("Traffic light comparison tables generated successfully")
+                visualization.save_comparison_plots(episode=episode)
+            except Exception as e:
+                print(f"Error generating comparison plots: {e}")
+                print("No comparison results available for plotting.")
 
             # --- Generate vehicle comparison from logs ---
             print("Generating vehicle comparison from logs...")
