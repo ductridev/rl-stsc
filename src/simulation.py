@@ -77,7 +77,7 @@ class Simulation(SUMO):
         self.actions_map = {}
 
         # Agent states and memories
-        self.agent_reward = {}
+        self.reward = {}
         self.agent_state = {}
         self.agent_old_state = {}
 
@@ -93,7 +93,7 @@ class Simulation(SUMO):
 
         # History tracking
         self.history = {
-            "agent_reward": {},
+            "reward": {},
             "travel_delay": {},
             "travel_time": {},
             "density": {},
@@ -177,7 +177,7 @@ class Simulation(SUMO):
                 self.actions_map[traffic_light_id][i] = {"phase": phase}
 
             # Initialize metrics
-            self.agent_reward[traffic_light_id] = 0
+            self.reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0
             self.agent_old_state[traffic_light_id] = 0
             self.queue_length[traffic_light_id] = 0
@@ -417,7 +417,7 @@ class Simulation(SUMO):
 
         # Calculate total reward
         total_reward = sum(
-            np.sum(self.history["agent_reward"][tl["id"]]) for tl in self.traffic_lights
+            np.sum(self.history["reward"][tl["id"]]) for tl in self.traffic_lights
         )
         print(f"Total reward: {total_reward} - Epsilon: {epsilon}")
 
@@ -454,7 +454,7 @@ class Simulation(SUMO):
             )
 
         # Update history
-        self.history["agent_reward"][tl_id].append(reward)
+        self.history["reward"][tl_id].append(reward)
 
         # Reset phase metrics
         for key in [
@@ -769,12 +769,7 @@ class Simulation(SUMO):
 
         # Only collect specified system metrics
         target_metrics = [
-            "density",
-            "outflow",
-            "queue_length",
-            "travel_delay",
-            "travel_time",
-            "waiting_time",
+            "reward", "queue_length", "travel_delay", "waiting_time", "outflow"
         ]
 
         for metric, data_per_tls in self.history.items():

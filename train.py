@@ -358,12 +358,11 @@ if __name__ == "__main__":
             visualization.save_plot(
                 episode=episode,
                 metrics=[
-                    "density_avg",
-                    "travel_time_avg",
-                    "outflow_avg",
+                    "reward_avg",
+                    "queue_length_avg",
                     "travel_delay_avg",
                     "waiting_time_avg",
-                    "queue_length_avg",
+                    "outflow_avg"
                 ],
                 names=["skrl_dqn", "base"],  # Only include actually running simulations
             )
@@ -374,8 +373,9 @@ if __name__ == "__main__":
             try:
                 # Specify the actual simulation types that are running and saving data
                 available_sim_types = ["baseline", "skrl_dqn"]  # Add q_learning when it's enabled
-                comparison.save_comparison_tables(episode, simulation_types=available_sim_types)
-                comparison.print_comparison_summary(episode, simulation_types=available_sim_types)
+                metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
+                comparison.save_comparison_tables(episode, metrics, simulation_types=available_sim_types)
+                comparison.print_comparison_summary(episode, metrics, simulation_types=available_sim_types)
                 print("Traffic light comparison tables generated successfully")
             except Exception as e:
                 print(f"Error generating comparison tables: {e}")
