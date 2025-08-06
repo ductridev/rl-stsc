@@ -404,6 +404,7 @@ class Simulation(SUMO):
 
                 for _ in range(self.epoch):
                     loss = self.train_agents()
+                    print(f"Loss: {loss}")
 
                 print(f"Training took {time.time() - train_start:.2f}s")
 
@@ -745,7 +746,7 @@ class Simulation(SUMO):
             avg_history[metric] = avg_data
 
         # Save and plot averaged metrics
-        if episode % 10 == 0:
+        if episode % self.save_interval == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data(
