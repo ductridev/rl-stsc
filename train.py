@@ -41,6 +41,8 @@ if __name__ == "__main__":
         junction_id_list=config["junction_id_list"],
     )
 
+    save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
+
     # Initialize SKRL-based DQN simulation (no memory needed - SKRL handles it internally)
     simulation_skrl = Simulation(
         visualization=visualization,
@@ -53,7 +55,7 @@ if __name__ == "__main__":
         path=path,
         training_steps=config["training_steps"],
         updating_target_network_steps=config["updating_target_network_steps"],
-        save_interval=config["save_interval"],
+        save_interval=save_interval,
     )
 
     # Initialize Q-learning simulation for comparison
@@ -81,6 +83,7 @@ if __name__ == "__main__":
         visualization=visualization,
         epoch=config["training_epochs"],
         path=path,
+        save_interval=save_interval,
     )
 
     simulation_q = QSimulation(
@@ -323,8 +326,8 @@ if __name__ == "__main__":
                 simulation_skrl.save_model(episode)  # This will save with the episode number
                 print(f"   ✅ Current best updated: ep{episode}")
             
-            # Print current vs best performance every 10 episodes
-            if episode % 10 == 0:
+            # Print current vs best performance every save_interval episodes
+            if episode % save_interval == 0 and episode > 0:
                 print(f"\n📊 Performance Summary - Episode {episode}")
                 print(f"Current: Reward={combined_score:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
                 print(f"Best:    Reward={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
@@ -350,7 +353,7 @@ if __name__ == "__main__":
 
         # --- Save comparison plots ---
         print("Saving comparison plots...")
-        if episode % 10 == 0:
+        if episode % save_interval == 0 and episode > 0:
             print("Generating plots at episode", episode, "...")
             visualization.save_plot(
                 episode=episode,
@@ -390,7 +393,6 @@ if __name__ == "__main__":
                 print("Vehicle comparison will be generated when log files are available")
 
         # Save model at specified intervals
-        save_interval = config.get("save_interval", 10)  # Default to every 10 episodes
         if episode % save_interval == 0 and episode > 0:
             model_save_name = config.get("save_model_name", "skrl_dqn_model")
 
