@@ -320,10 +320,10 @@ class Simulation(SUMO):
                         "phase": new_phase,
                         "old_phase": state["phase"],
                         "green_time": green_time,
-                        "green_time_remaining": green_time,
                         "old_vehicle_ids": TrafficMetrics.get_vehicles_in_phase(
                             tl, new_phase
                         ),
+                        "green_time_remaining": green_time,
                         "state": current_state,
                         "action_idx": action_idx,
                     }
@@ -359,7 +359,7 @@ class Simulation(SUMO):
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
                 st = self.tl_states[tl_id]
-                current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
+                current_phase = st["phase"]
 
                 # Calculate metrics
                 new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
@@ -500,7 +500,6 @@ class Simulation(SUMO):
             self.history[metric][tl_id].append(val)
             st[f"step_{metric}_sum"] = 0
 
-        print(st["step_outflow_sum"])
         self.history["outflow"][tl_id].append(st["step_outflow_sum"])
         st["step_outflow_sum"] = 0
 

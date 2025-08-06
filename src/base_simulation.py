@@ -76,6 +76,8 @@ class SimulationBase(SUMO):
                 "waiting_time": 0,
                 "outflow": 0,
                 "queue_length": 0,
+                "phase": tl["phase"][0],
+                "old_phase": tl["phase"][0],
                 # step‐accumulators
                 "step": {
                     "delay": 0,
@@ -98,9 +100,16 @@ class SimulationBase(SUMO):
 
         # 1) Detect outflow: vehicles that left since last step
         current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
+        if current_phase != st["phase"]:
+            # Phase change detected, reset old vehicle IDs
+            st["old_vehicle_ids"] = TrafficMetrics.get_vehicles_in_phase(
+                tl, current_phase
+            )
+            st["phase"] = current_phase
+
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-        outflow = sum(1 for v in st["step"]["old_ids"] if v not in new_ids)
-        st["step"]["old_ids"] = new_ids
+        outflow = sum(1 for v in st["old_vehicle_ids"] if v not in new_ids)
+        st["old_vehicle_ids"] = new_ids
 
         sum_travel_delay = self.get_sum_travel_delay(tl)
         sum_travel_time = self.get_sum_travel_time(tl)
@@ -135,7 +144,6 @@ class SimulationBase(SUMO):
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
 
-            print(st["step"]["outflow"])
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             st["step"]["outflow"] = 0
 
@@ -188,7 +196,7 @@ class SimulationBase(SUMO):
         self.vehicle_tracker.save_logs(episode, "base")
         # Note: vehicle_tracker.reset() moved to train.py after performance tracking
 
-        # 4) Save 
+        # 4) Save
         self.save_metrics(episode=episode)
         # Note: reset_history() moved to train.py after performance tracking
         self.step = 0
