@@ -17,6 +17,7 @@ class SimulationBase(SUMO):
         visualization: Visualization,
         epoch=1000,
         path=None,
+        save_interval=10,
     ):
         self.max_steps = max_steps
         self.traffic_lights = traffic_lights
@@ -24,6 +25,7 @@ class SimulationBase(SUMO):
         self.visualization = visualization
         self.epoch = epoch
         self.path = path
+        self.save_interval = save_interval
 
         # Initialize VehicleTracker for logging vehicle statistics
         self.vehicle_tracker = VehicleTracker(path=self.path)
@@ -211,7 +213,7 @@ class SimulationBase(SUMO):
             avg_history[metric] = avg_data
 
         # Save and plot averaged metrics
-        if episode % 10 == 0:
+        if episode % self.save_interval == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 self.visualization.save_data(
