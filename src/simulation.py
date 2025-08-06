@@ -402,10 +402,11 @@ class Simulation(SUMO):
                 print(f"Training per {self.training_steps} steps...")
                 train_start = time.time()
 
+                loss = 0.0
                 for _ in range(self.epoch):
-                    loss = self.train_agents()
-                    print(f"Loss: {loss}")
+                    loss += self.train_agents()
 
+                print(f"Loss: {loss}")
                 print(f"Training took {time.time() - train_start:.2f}s")
 
         traci.close()
