@@ -1,6 +1,8 @@
 import os
 import xml.etree.ElementTree as ET
 import random
+import time
+import subprocess
 class Intersection:
     @staticmethod
     def get_all_intersections_with_sumo():
@@ -154,40 +156,79 @@ class Intersection:
                             vehicles_in_interval = count - ((len(intervals) - 1) * int(count / len(intervals)))
 
                         trip_file = f"osm.res_{prefix}.interval_{interval_id}.trips.xml"
-                        trip_cmd = (
-                            f'python {original_path}/randomTrips.py '
-                            f'-n osm.net.xml.gz '
-                            f'-o {trip_file} '
-                            f'--begin {begin_time} --end {end_time} '
-                            f'--validate --remove-loops '
-                            f'--vclass {vclass} '
-                            f'--trip-attributes "departLane=\'best\'" '
-                            f'--fringe-start-attributes "departSpeed=\'max\'" '
-                            f'--prefix res_{prefix}_int{interval_id} '
-                            f'--weights-prefix random_edge_priority_interval_{interval_id} '
-                        )
-                        if interval_id == random_intervals:
-                            trip_cmd += f"--insertion-rate {vehicles_in_interval * 3600 * 4 / (end_time - begin_time)} "
-                        else:
-                            trip_cmd += f"--insertion-rate {vehicles_in_interval * 3600 / (end_time - begin_time)} "
-
-                        if vehicle_class == "pedestrian":
-                            trip_cmd += "--via-edge-types footway,path,sidewalk "
-                        else:
-                            trip_cmd += f"--vehicle-class {vehicle_class} "
-
+                        route_temp_file = f"osm.res_{prefix}.interval_{interval_id}.rou.xml"
 
                         # Run randomTrips.py
-                        os.system(trip_cmd)
+                        print(f"    Running randomTrips.py for interval {interval_id}")
+                        try:
+                            # Build command arguments properly
+                            cmd_args = [
+                                'python', f'{original_path}/randomTrips.py',
+                                '-n', 'osm.net.xml.gz',
+                                '-o', trip_file,
+                                '-r', route_temp_file,
+                                '--begin', str(int(begin_time)),
+                                '--end', str(int(end_time)),
+                                '--validate', '--remove-loops',
+                                '--vclass', vclass,
+                                '--trip-attributes', 'departLane="best"',
+                                '--fringe-start-attributes', 'departSpeed="max"',
+                                '--prefix', f'res_{prefix}_int{interval_id}',
+                                '--weights-prefix', f'random_edge_priority_interval_{interval_id}'
+                            ]
+                            
+                            if interval_id == random_intervals:
+                                insertion_rate = vehicles_in_interval * 3600 * 4 / (end_time - begin_time)
+                            else:
+                                insertion_rate = vehicles_in_interval * 3600 / (end_time - begin_time)
+                            cmd_args.extend(['--insertion-rate', str(insertion_rate)])
+
+                            if vehicle_class == "pedestrian":
+                                cmd_args.extend(['--via-edge-types', 'footway,path,sidewalk'])
+                            else:
+                                cmd_args.extend(['--vehicle-class', vehicle_class])
+                            
+                            result = subprocess.run(cmd_args, capture_output=True, text=True, timeout=300, cwd=os.getcwd())
+                            if result.returncode != 0:
+                                print(f"    Warning: randomTrips.py returned exit code {result.returncode}")
+                                if result.stderr:
+                                    print(f"    stderr: {result.stderr}")
+                                if result.stdout:
+                                    print(f"    stdout: {result.stdout}")
+                        except subprocess.TimeoutExpired:
+                            print(f"    Error: randomTrips.py timed out after 300 seconds")
+                            continue
+                        except Exception as e:
+                            print(f"    Error running randomTrips.py: {e}")
+                            continue
+
+                        # Small delay to ensure file operations complete
+                        time.sleep(0.2)
 
                         # Merge trips into the combined file
-                        with open(trip_file, "r") as trip_f:
-                            for line in trip_f:
-                                if line.strip().startswith("<?xml"):
-                                    continue  # Skip XML declaration
-                                if "<routes" in line or "</routes" in line:
-                                    continue  # Skip <routes> tags
-                                merged_file.write(line)
+                        if os.path.exists(trip_file):
+                            with open(trip_file, "r") as trip_f:
+                                for line in trip_f:
+                                    if line.strip().startswith("<?xml"):
+                                        continue  # Skip XML declaration
+                                    if "<routes" in line or "</routes" in line:
+                                        continue  # Skip <routes> tags
+                                    merged_file.write(line)
+                            
+                            # Clean up temporary trip file
+                            try:
+                                os.remove(trip_file)
+                            except OSError:
+                                pass  # Ignore if file can't be removed
+                        else:
+                            print(f"    Warning: Trip file {trip_file} was not created")
+                        
+                        # Clean up temporary route file if it exists
+                        if os.path.exists(route_temp_file):
+                            try:
+                                os.remove(route_temp_file)
+                            except OSError:
+                                pass  # Ignore if file can't be removed
 
                     merged_file.write("</routes>\n")  # Close routes tag
 
