@@ -2,6 +2,7 @@ import time
 import traci
 import numpy as np
 import pandas as pd
+from sim_utils.traffic_metrics import TrafficMetrics
 from src.visualization import Visualization
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
@@ -97,7 +98,7 @@ class SimulationBase(SUMO):
 
         # 1) Detect outflow: vehicles that left since last step
         current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
-        new_ids = self.get_vehicles_in_phase(tl, current_phase)
+        new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
         outflow = sum(1 for v in st["step"]["old_ids"] if v not in new_ids)
         st["step"]["old_ids"] = new_ids
 
@@ -134,6 +135,7 @@ class SimulationBase(SUMO):
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
 
+            print(st["step"]["outflow"])
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             st["step"]["outflow"] = 0
 
