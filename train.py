@@ -382,6 +382,52 @@ if __name__ == "__main__":
                 print(
                     "Comparison tables will be generated when CSV files are available"
                 )
+            
+            # --- Generate comparison for metrics over episodes ---
+            if comparison_results:
+                try:
+                    import matplotlib.pyplot as plt
+                    import pandas as pd
+                    import os
+
+                    simulation_types = ["baseline", "dqn_qr"] 
+                    metrics = ["density", "travel_speed", "travel_time", "outflow", "queue_length", "waiting_time"]
+
+                    for metric in metrics:
+                        plt.ioff()
+                        fig, ax = plt.subplots()
+                        episodes = []
+                        tl_data = {sim_type: {} for sim_type in simulation_types}
+
+                        # Only plot up to the current episode
+                        for ep in range(0, episode + 1, 5):
+                            filename = f"{path}comparison_per_tl_{metric}_episode_{ep}.csv"
+                            if os.path.exists(filename):
+                                df = pd.read_csv(filename)
+                                episodes.append(ep)
+                                for tl_id in df['traffic_light_id']:
+                                    for sim_type in simulation_types:
+                                        value = df.loc[df['traffic_light_id'] == tl_id, sim_type].values
+                                        if len(value) > 0:
+                                            if tl_id not in tl_data[sim_type]:
+                                                tl_data[sim_type][tl_id] = []
+                                            tl_data[sim_type][tl_id].append(value[0])
+
+                        ax.clear()
+                        for sim_type in simulation_types:
+                            for tl_id, values in tl_data[sim_type].items():
+                                ax.plot(episodes[:len(values)], values, marker='o', label=f'{sim_type} - {tl_id}')
+                        ax.set_xlabel('Episode')
+                        ax.set_ylabel(metric)
+                        ax.set_title(f'{metric} over Episodes')
+                        ax.legend()
+                        img_filename = f"{path}comparison_{metric}_over_episodes.png"
+                        plt.savefig(img_filename)
+                        plt.close(fig)
+                        print(f"Plot saved to {img_filename}")
+
+                except Exception as e:
+                    print(f"Error generating comparison plots: {e}")
 
             # --- Generate vehicle comparison from logs ---
             print("Generating vehicle comparison from logs...")
@@ -480,6 +526,7 @@ if __name__ == "__main__":
             
         except Exception as e:
             print(f"⚠️  Could not create performance plot: {e}")
+    
 
     print(f"Saving final model at {path}...")
     # model_save_name = config.get("save_model_name", "dqn_model")
