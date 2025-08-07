@@ -1,6 +1,6 @@
 <routes>
 
-<!-- generated on 2025-08-07 05:47:10.897458 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:32.171328 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_0"/>
@@ -18,7 +18,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:10 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:32 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -51,12 +51,14 @@
 -->
 
     <vType id="res_bike_int0_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int01" type="res_bike_int0_bicycle" depart="51.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int00" type="res_bike_int0_bicycle" depart="0.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int01" type="res_bike_int0_bicycle" depart="51.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_bike_int02" type="res_bike_int0_bicycle" depart="102.86" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
     <trip id="res_bike_int03" type="res_bike_int0_bicycle" depart="154.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int05" type="res_bike_int0_bicycle" depart="257.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int06" type="res_bike_int0_bicycle" depart="308.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:11.632717 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:32.891732 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_1"/>
@@ -75,7 +77,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:11 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:32 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -108,13 +110,15 @@
 -->
 
     <vType id="res_bike_int1_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int11" type="res_bike_int1_bicycle" depart="412.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int10" type="res_bike_int1_bicycle" depart="361.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int11" type="res_bike_int1_bicycle" depart="412.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_bike_int12" type="res_bike_int1_bicycle" depart="463.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_bike_int13" type="res_bike_int1_bicycle" depart="515.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_bike_int14" type="res_bike_int1_bicycle" depart="566.71" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int15" type="res_bike_int1_bicycle" depart="618.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int16" type="res_bike_int1_bicycle" depart="669.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:12.471481 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:33.609417 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_2"/>
@@ -133,7 +137,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:12 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:33 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -166,13 +170,14 @@
 -->
 
     <vType id="res_bike_int2_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int21" type="res_bike_int2_bicycle" depart="773.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int21" type="res_bike_int2_bicycle" depart="773.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_bike_int22" type="res_bike_int2_bicycle" depart="824.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_bike_int23" type="res_bike_int2_bicycle" depart="876.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_bike_int24" type="res_bike_int2_bicycle" depart="927.71" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int25" type="res_bike_int2_bicycle" depart="979.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int26" type="res_bike_int2_bicycle" depart="1030.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:13.219944 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:34.334297 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_3"/>
@@ -191,7 +196,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:13 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:34 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -224,13 +229,13 @@
 -->
 
     <vType id="res_bike_int3_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int31" type="res_bike_int3_bicycle" depart="1134.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int31" type="res_bike_int3_bicycle" depart="1134.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
     <trip id="res_bike_int32" type="res_bike_int3_bicycle" depart="1185.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_bike_int33" type="res_bike_int3_bicycle" depart="1237.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
-    <trip id="res_bike_int35" type="res_bike_int3_bicycle" depart="1340.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int34" type="res_bike_int3_bicycle" depart="1288.71" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
     <trip id="res_bike_int36" type="res_bike_int3_bicycle" depart="1391.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:14.123008 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:35.167343 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_4"/>
@@ -245,11 +250,11 @@
     <validate value="True"/>
     <begin value="1444.0"/>
     <end value="1804.0"/>
-    <insertion-rate value="280.0"/>
+    <insertion-rate value="70.0"/>
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:14 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:35 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -282,31 +287,13 @@
 -->
 
     <vType id="res_bike_int4_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int41" type="res_bike_int4_bicycle" depart="1456.86" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int42" type="res_bike_int4_bicycle" depart="1469.71" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int43" type="res_bike_int4_bicycle" depart="1482.57" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
-    <trip id="res_bike_int44" type="res_bike_int4_bicycle" depart="1495.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int45" type="res_bike_int4_bicycle" depart="1508.29" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
-    <trip id="res_bike_int46" type="res_bike_int4_bicycle" depart="1521.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int47" type="res_bike_int4_bicycle" depart="1534.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int48" type="res_bike_int4_bicycle" depart="1546.86" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
-    <trip id="res_bike_int410" type="res_bike_int4_bicycle" depart="1572.57" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int411" type="res_bike_int4_bicycle" depart="1585.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int413" type="res_bike_int4_bicycle" depart="1611.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int414" type="res_bike_int4_bicycle" depart="1624.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int415" type="res_bike_int4_bicycle" depart="1636.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int416" type="res_bike_int4_bicycle" depart="1649.71" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
-    <trip id="res_bike_int417" type="res_bike_int4_bicycle" depart="1662.57" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
-    <trip id="res_bike_int418" type="res_bike_int4_bicycle" depart="1675.43" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int419" type="res_bike_int4_bicycle" depart="1688.29" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int421" type="res_bike_int4_bicycle" depart="1714.00" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
-    <trip id="res_bike_int422" type="res_bike_int4_bicycle" depart="1726.86" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int423" type="res_bike_int4_bicycle" depart="1739.71" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
-    <trip id="res_bike_int424" type="res_bike_int4_bicycle" depart="1752.57" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
-    <trip id="res_bike_int425" type="res_bike_int4_bicycle" depart="1765.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int427" type="res_bike_int4_bicycle" depart="1791.14" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int41" type="res_bike_int4_bicycle" depart="1495.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int42" type="res_bike_int4_bicycle" depart="1546.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int43" type="res_bike_int4_bicycle" depart="1598.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int45" type="res_bike_int4_bicycle" depart="1701.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int46" type="res_bike_int4_bicycle" depart="1752.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:14.874276 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:35.884444 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_5"/>
@@ -321,11 +308,11 @@
     <validate value="True"/>
     <begin value="1805.0"/>
     <end value="2165.0"/>
-    <insertion-rate value="70.0"/>
+    <insertion-rate value="280.0"/>
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:14 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:35 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -358,14 +345,30 @@
 -->
 
     <vType id="res_bike_int5_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int50" type="res_bike_int5_bicycle" depart="1805.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int51" type="res_bike_int5_bicycle" depart="1856.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int52" type="res_bike_int5_bicycle" depart="1907.86" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
-    <trip id="res_bike_int53" type="res_bike_int5_bicycle" depart="1959.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
-    <trip id="res_bike_int54" type="res_bike_int5_bicycle" depart="2010.71" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int56" type="res_bike_int5_bicycle" depart="2113.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int51" type="res_bike_int5_bicycle" depart="1817.86" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int52" type="res_bike_int5_bicycle" depart="1830.71" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int53" type="res_bike_int5_bicycle" depart="1843.57" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int54" type="res_bike_int5_bicycle" depart="1856.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int55" type="res_bike_int5_bicycle" depart="1869.29" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int56" type="res_bike_int5_bicycle" depart="1882.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int57" type="res_bike_int5_bicycle" depart="1895.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int58" type="res_bike_int5_bicycle" depart="1907.86" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int510" type="res_bike_int5_bicycle" depart="1933.57" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int511" type="res_bike_int5_bicycle" depart="1946.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int513" type="res_bike_int5_bicycle" depart="1972.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int514" type="res_bike_int5_bicycle" depart="1985.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int515" type="res_bike_int5_bicycle" depart="1997.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int517" type="res_bike_int5_bicycle" depart="2023.57" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int518" type="res_bike_int5_bicycle" depart="2036.43" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int519" type="res_bike_int5_bicycle" depart="2049.29" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int521" type="res_bike_int5_bicycle" depart="2075.00" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_bike_int522" type="res_bike_int5_bicycle" depart="2087.86" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int523" type="res_bike_int5_bicycle" depart="2100.71" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_bike_int524" type="res_bike_int5_bicycle" depart="2113.57" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_bike_int525" type="res_bike_int5_bicycle" depart="2126.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int527" type="res_bike_int5_bicycle" depart="2152.14" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
 
-<!-- generated on 2025-08-07 05:47:15.596637 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:36.604188 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_6"/>
@@ -384,7 +387,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:15 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:36 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -417,13 +420,14 @@
 -->
 
     <vType id="res_bike_int6_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int61" type="res_bike_int6_bicycle" depart="2217.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int62" type="res_bike_int6_bicycle" depart="2268.86" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int61" type="res_bike_int6_bicycle" depart="2217.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int62" type="res_bike_int6_bicycle" depart="2268.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_bike_int63" type="res_bike_int6_bicycle" depart="2320.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_bike_int64" type="res_bike_int6_bicycle" depart="2371.71" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int65" type="res_bike_int6_bicycle" depart="2423.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int66" type="res_bike_int6_bicycle" depart="2474.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:16.315851 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:37.309972 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_7"/>
@@ -442,7 +446,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:16 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:37 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -476,12 +480,13 @@
 
     <vType id="res_bike_int7_bicycle" vClass="bicycle"/>
     <trip id="res_bike_int71" type="res_bike_int7_bicycle" depart="2578.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int72" type="res_bike_int7_bicycle" depart="2629.86" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int72" type="res_bike_int7_bicycle" depart="2629.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_bike_int73" type="res_bike_int7_bicycle" depart="2681.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_bike_int74" type="res_bike_int7_bicycle" depart="2732.71" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int75" type="res_bike_int7_bicycle" depart="2784.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int76" type="res_bike_int7_bicycle" depart="2835.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:17.039233 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:38.030388 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_8"/>
@@ -500,7 +505,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:16 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:37 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -533,12 +538,14 @@
 -->
 
     <vType id="res_bike_int8_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int81" type="res_bike_int8_bicycle" depart="2939.43" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int81" type="res_bike_int8_bicycle" depart="2939.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_bike_int82" type="res_bike_int8_bicycle" depart="2990.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int83" type="res_bike_int8_bicycle" depart="3042.29" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
     <trip id="res_bike_int84" type="res_bike_int8_bicycle" depart="3093.71" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int85" type="res_bike_int8_bicycle" depart="3145.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int86" type="res_bike_int8_bicycle" depart="3196.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
 
-<!-- generated on 2025-08-07 05:47:17.754358 by randomTrips.py v1_22_0+0002-63e50f52594
+<!-- generated on 2025-08-07 09:14:38.755421 by randomTrips.py v1_22_0+0002-63e50f52594
 <configuration>
     <net-file value="osm.net.xml.gz"/>
     <weights-prefix value="random_edge_priority_interval_9"/>
@@ -556,7 +563,7 @@
 </configuration>
 -->
 
-<!-- generated on 2025-08-07 05:47:17 by Eclipse SUMO duarouter Version 1.22.0
+<!-- generated on 2025-08-07 09:14:38 by Eclipse SUMO duarouter Version 1.22.0
 <duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
 
     <input>
@@ -589,14 +596,13 @@
 -->
 
     <vType id="res_bike_int9_bicycle" vClass="bicycle"/>
-    <trip id="res_bike_int91" type="res_bike_int9_bicycle" depart="3278.25" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
-    <trip id="res_bike_int92" type="res_bike_int9_bicycle" depart="3307.50" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int90" type="res_bike_int9_bicycle" depart="3249.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int91" type="res_bike_int9_bicycle" depart="3278.25" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int92" type="res_bike_int9_bicycle" depart="3307.50" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
     <trip id="res_bike_int93" type="res_bike_int9_bicycle" depart="3336.75" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
-    <trip id="res_bike_int95" type="res_bike_int9_bicycle" depart="3395.25" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int94" type="res_bike_int9_bicycle" depart="3366.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
     <trip id="res_bike_int96" type="res_bike_int9_bicycle" depart="3424.50" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
-    <trip id="res_bike_int97" type="res_bike_int9_bicycle" depart="3453.75" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
-    <trip id="res_bike_int98" type="res_bike_int9_bicycle" depart="3483.00" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
-    <trip id="res_bike_int99" type="res_bike_int9_bicycle" depart="3512.25" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
-    <trip id="res_bike_int910" type="res_bike_int9_bicycle" depart="3541.50" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int97" type="res_bike_int9_bicycle" depart="3453.75" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int910" type="res_bike_int9_bicycle" depart="3541.50" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
     <trip id="res_bike_int911" type="res_bike_int9_bicycle" depart="3570.75" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
 </routes>
