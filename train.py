@@ -10,6 +10,7 @@ from src.model import DQN
 from src.simulation import Simulation
 from src.Qlearning import QSimulation
 from src.base_simulation import SimulationBase
+from src.actuated_simulation import ActuatedSimulation
 from src.visualization import Visualization
 from src.intersection import Intersection
 from src.accident_manager import AccidentManager
@@ -99,6 +100,18 @@ if __name__ == "__main__":
         path=path,
         training_steps=config["training_steps"],
         updating_target_network_steps=config["updating_target_network_steps"],
+    )
+
+    # Initialize actuated simulation for comparison
+    simulation_actuated = ActuatedSimulation(
+        agent_cfg=config["agent"],
+        max_steps=config["max_steps"],
+        traffic_lights=config["traffic_lights"],
+        accident_manager=accident_manager,
+        visualization=visualization,
+        epoch=config["training_epochs"],
+        path=path,
+        save_interval=save_interval,
     )
 
     # Load existing Q-table if specified in config
@@ -201,6 +214,51 @@ if __name__ == "__main__":
         print("  Resetting history for base simulation")
         simulation.reset_history()
 
+        print("Running ActuatedSimulation (queue-based baseline)...")
+        set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+        simulation_time_actuated = simulation_actuated.run(episode)
+        # After running the actuated simulation
+        actuated_stats = simulation_actuated.vehicle_tracker.get_current_stats()
+        actuated_completion_rate = (actuated_stats['total_arrived'] / max(actuated_stats['total_departed'], 1)) * 100
+        actuated_total_arrived = actuated_stats['total_arrived']
+        # Extract avg_outflow from actuated simulation history
+        actuated_avg_outflow = 0
+        if hasattr(simulation_actuated, 'history') and 'outflow' in simulation_actuated.history:
+            # Get average outflow from all traffic lights
+            outflow_data = []
+            for tl_id, outflows in simulation_actuated.history['outflow'].items():
+                if outflows:
+                    avg_outflow_tl = sum(outflows) / len(outflows)
+                    outflow_data.append(avg_outflow_tl)
+            if outflow_data:
+                actuated_avg_outflow = sum(outflow_data) / len(outflow_data)
+        
+        # Extract reward from actuated simulation history
+        actuated_total_reward = 0
+        actuated_avg_reward = 0
+        if hasattr(simulation_actuated, 'history') and 'reward' in simulation_actuated.history:
+            reward_data = []
+            for tl_id, rewards in simulation_actuated.history['reward'].items():
+                if rewards:
+                    total_reward_tl = sum(rewards)
+                    actuated_total_reward += total_reward_tl
+                    avg_reward_tl = total_reward_tl / len(rewards)
+                    reward_data.append(avg_reward_tl)
+        
+        print(f"Actuated Simulation Results:")
+        print(f"  Total Departed: {actuated_stats['total_departed']}")
+        print(f"  Total Arrived: {actuated_total_arrived}")
+        print(f"  Completion Rate: {actuated_completion_rate:.2f}%")
+        print(f"  Avg Outflow (from history): {actuated_avg_outflow:.2f}")
+        print(f"  Total Reward: {actuated_total_reward:.2f}")
+
+        print("ActuatedSimulation time:", simulation_time_actuated)
+        # Reset actuated simulation vehicle tracker after its run
+        print("  Resetting vehicle tracker for actuated simulation")
+        simulation_actuated.vehicle_tracker.reset()
+        print("  Resetting history for actuated simulation")
+        simulation_actuated.reset_history()
+
         # print("Running QSimulation (Q-learning)...")
         # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
         # simulation_time_q = simulation_q.run(epsilon, episode)
@@ -269,32 +327,59 @@ if __name__ == "__main__":
             print(f"  Total Reward (for best model): {total_reward:.2f}")
             print(f"  Avg Outflow (vs baseline): {dqn_avg_outflow:.2f}")
             print(f"Comparison:")
-            print(f"  DQN reward: {total_reward:.2f} vs Base reward: {base_total_reward:.2f}")
-            print(f"  DQN avg_outflow: {dqn_avg_outflow:.2f} vs Base avg_outflow: {base_avg_outflow:.2f}")
-            print(f"  DQN total_arrived: {skrl_total_arrived} vs Base total_arrived: {base_total_arrived}")
+            print(f"  DQN reward: {total_reward:.2f} vs Base reward: {base_total_reward:.2f} vs Actuated reward: {actuated_total_reward:.2f}")
+            print(f"  DQN avg_outflow: {dqn_avg_outflow:.2f} vs Base avg_outflow: {base_avg_outflow:.2f} vs Actuated avg_outflow: {actuated_avg_outflow:.2f}")
+            print(f"  DQN total_arrived: {skrl_total_arrived} vs Base total_arrived: {base_total_arrived} vs Actuated total_arrived: {actuated_total_arrived}")
             
             # Compare DQN vs baseline using multiple metrics
-            performance_improvements = 0
+            performance_improvements_vs_base = 0
+            performance_improvements_vs_actuated = 0
+            
+            # DQN vs Base comparison
             if total_reward > base_total_reward:
-                print(f"✅ DQN reward advantage: {total_reward:.2f} > {base_total_reward:.2f}")
-                performance_improvements += 1
+                print(f"✅ DQN vs Base - Reward advantage: {total_reward:.2f} > {base_total_reward:.2f}")
+                performance_improvements_vs_base += 1
             else:
-                print(f"❌ DQN reward disadvantage: {total_reward:.2f} <= {base_total_reward:.2f}")
+                print(f"❌ DQN vs Base - Reward disadvantage: {total_reward:.2f} <= {base_total_reward:.2f}")
                 
             if dqn_avg_outflow > base_avg_outflow:
-                print(f"✅ DQN outflow advantage: {dqn_avg_outflow:.2f} > {base_avg_outflow:.2f}")
-                performance_improvements += 1
+                print(f"✅ DQN vs Base - Outflow advantage: {dqn_avg_outflow:.2f} > {base_avg_outflow:.2f}")
+                performance_improvements_vs_base += 1
             else:
-                print(f"❌ DQN outflow disadvantage: {dqn_avg_outflow:.2f} <= {base_avg_outflow:.2f}")
+                print(f"❌ DQN vs Base - Outflow disadvantage: {dqn_avg_outflow:.2f} <= {base_avg_outflow:.2f}")
                 
             if skrl_total_arrived > base_total_arrived:
-                print(f"✅ DQN arrival advantage: {skrl_total_arrived} > {base_total_arrived}")
-                performance_improvements += 1
+                print(f"✅ DQN vs Base - Arrival advantage: {skrl_total_arrived} > {base_total_arrived}")
+                performance_improvements_vs_base += 1
             else:
-                print(f"❌ DQN arrival disadvantage: {skrl_total_arrived} <= {base_total_arrived}")
+                print(f"❌ DQN vs Base - Arrival disadvantage: {skrl_total_arrived} <= {base_total_arrived}")
+            
+            # DQN vs Actuated comparison
+            if total_reward > actuated_total_reward:
+                print(f"✅ DQN vs Actuated - Reward advantage: {total_reward:.2f} > {actuated_total_reward:.2f}")
+                performance_improvements_vs_actuated += 1
+            else:
+                print(f"❌ DQN vs Actuated - Reward disadvantage: {total_reward:.2f} <= {actuated_total_reward:.2f}")
+                
+            if dqn_avg_outflow > actuated_avg_outflow:
+                print(f"✅ DQN vs Actuated - Outflow advantage: {dqn_avg_outflow:.2f} > {actuated_avg_outflow:.2f}")
+                performance_improvements_vs_actuated += 1
+            else:
+                print(f"❌ DQN vs Actuated - Outflow disadvantage: {dqn_avg_outflow:.2f} <= {actuated_avg_outflow:.2f}")
+                
+            if skrl_total_arrived > actuated_total_arrived:
+                print(f"✅ DQN vs Actuated - Arrival advantage: {skrl_total_arrived} > {actuated_total_arrived}")
+                performance_improvements_vs_actuated += 1
+            else:
+                print(f"❌ DQN vs Actuated - Arrival disadvantage: {skrl_total_arrived} <= {actuated_total_arrived}")
                 
             # Overall performance summary
-            print(f"🏁 Overall Performance: DQN won {performance_improvements}/3 metrics vs Base")
+            print(f"🏁 DQN Performance Summary:")
+            print(f"   vs Base: {performance_improvements_vs_base}/3 metrics won")
+            print(f"   vs Actuated: {performance_improvements_vs_actuated}/3 metrics won")
+            
+            # Use the more challenging comparison (vs actuated) for performance tracking
+            performance_improvements = performance_improvements_vs_actuated
             
             # Save simulation folder if DQN performs better in majority of metrics
             if performance_improvements >= 2:
@@ -321,7 +406,13 @@ if __name__ == "__main__":
                 'base_total_reward': base_total_reward,  # Baseline total reward for comparison
                 'base_avg_reward': base_avg_reward,  # Baseline average reward for comparison
                 'base_total_arrived': base_total_arrived,  # Baseline total arrived for comparison
-                'performance_improvements': performance_improvements  # Number of metrics where DQN outperformed base
+                'actuated_avg_outflow': actuated_avg_outflow,  # Actuated avg outflow for comparison
+                'actuated_total_reward': actuated_total_reward,  # Actuated total reward for comparison
+                'actuated_avg_reward': actuated_avg_reward,  # Actuated average reward for comparison
+                'actuated_total_arrived': actuated_total_arrived,  # Actuated total arrived for comparison
+                'performance_improvements_vs_base': performance_improvements_vs_base,  # Number of metrics where DQN outperformed base
+                'performance_improvements_vs_actuated': performance_improvements_vs_actuated,  # Number of metrics where DQN outperformed actuated
+                'performance_improvements': performance_improvements  # Primary performance metric (vs actuated)
             }
             performance_history.append(current_performance)
             
@@ -407,7 +498,7 @@ if __name__ == "__main__":
                     "waiting_time_avg",
                     "outflow_avg"
                 ],
-                names=["skrl_dqn", "base"],  # Only include actually running simulations
+                names=["skrl_dqn", "base", "actuated"],  # Include all three simulations
             )
             print("Plots at episode", episode, "generated")
 
@@ -415,7 +506,7 @@ if __name__ == "__main__":
             print("Generating traffic light comparison tables...")
             try:
                 # Specify the actual simulation types that are running and saving data
-                available_sim_types = ["baseline", "skrl_dqn"]  # Add q_learning when it's enabled
+                available_sim_types = ["baseline", "skrl_dqn", "actuated"]  # Include all three simulations
                 metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
                 comparison.save_comparison_tables(episode, metrics, simulation_types=available_sim_types)
                 comparison.print_comparison_summary(episode, metrics, simulation_types=available_sim_types)
@@ -436,7 +527,7 @@ if __name__ == "__main__":
             # --- Generate vehicle comparison from logs ---
             print("Generating vehicle comparison from logs...")
             try:
-                visualization.create_vehicle_comparison_from_logs(episode, ["skrl_dqn", "base"])  # Updated for SKRL
+                visualization.create_vehicle_comparison_from_logs(episode, ["skrl_dqn", "base", "actuated"])  # Include all three simulations
                 print("Vehicle comparison from logs generated successfully")
             except Exception as e:
                 print(f"Error generating vehicle comparison from logs: {e}")
