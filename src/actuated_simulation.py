@@ -187,10 +187,8 @@ class ActuatedSimulation(SUMO):
                 st["green_time_remaining"] = self.min_green_time
                 st["phase_start_time"] = self.step
                 print(f"TL {tl_id}: Applied new phase {st['current_phase_index']}: {new_phase_str}")
-            return
-
-        # Skip phase selection logic if still in yellow
-        if st["in_yellow"]:
+            # Collect metrics even during yellow phase
+            self._collect_step_metrics(tl, st)
             return
 
         # Decrement green time
@@ -378,7 +376,7 @@ class ActuatedSimulation(SUMO):
             avg_history[metric] = avg_data
 
         # Save and plot averaged metrics
-        if episode is not None and episode % self.save_interval == 0 and episode > 0:
+        if episode % self.save_interval == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
                 # Save data with correct naming convention for visualization
@@ -392,9 +390,6 @@ class ActuatedSimulation(SUMO):
 
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
-        elif episode is not None:
-            # Always save CSV even if not saving plots
-            self.save_metrics_to_dataframe(episode=episode)
 
     def save_metrics_to_dataframe(self, episode=None):
         """Save metrics per traffic light as pandas DataFrame"""
