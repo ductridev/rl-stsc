@@ -415,12 +415,6 @@ class Simulation(SUMO):
             f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} arrived."
         )
 
-        # Calculate total reward
-        total_reward = sum(
-            np.sum(self.history["reward"][tl["id"]]) for tl in self.traffic_lights
-        )
-        print(f"Total reward: {total_reward} - Epsilon: {epsilon}")
-
         # Save vehicle statistics
         self.vehicle_tracker.print_summary("skrl_dqn")
         self.vehicle_tracker.save_logs(episode, "skrl_dqn")
@@ -433,6 +427,12 @@ class Simulation(SUMO):
 
     def _finalize_phase_skrl(self, tl: Dict, tl_id: str, st: Dict):
         """Finalize phase and store experience in SKRL memory"""
+        self.queue_length[tl_id] = st["queue_length"]
+        self.outflow_rate[tl_id] = st["outflow"]
+        self.travel_delay[tl_id] = st["travel_delay_sum"]
+        self.travel_time[tl_id] = st["travel_time_sum"]
+        self.waiting_time[tl_id] = st["waiting_time"]
+
         # Calculate reward
         reward = self.get_reward(tl_id, st["phase"])
 
@@ -750,9 +750,10 @@ class Simulation(SUMO):
         if episode % self.save_interval == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
+                # Save data with correct naming convention for visualization  
                 self.visualization.save_data(
                     data=data,
-                    filename=f"skrl_dqn_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
+                    filename=f"skrl_dqn_{metric}_avg_episode_{episode}",
                 )
 
             # Save metrics as DataFrame

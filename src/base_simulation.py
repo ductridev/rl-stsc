@@ -122,6 +122,13 @@ class SimulationBase(SUMO):
             # Update phase tracking for reward calculation
             self.phase[tl_id] = current_phase
             st["phase"] = current_phase
+
+            self.queue_length[tl_id] = st["queue_length"]
+            self.outflow_rate[tl_id] = st["outflow"]
+            self.travel_delay[tl_id] = st["travel_delay_sum"]
+            self.travel_time[tl_id] = st["travel_time_sum"]
+            self.waiting_time[tl_id] = st["waiting_time"]
+
             reward = self.get_reward(tl_id, st["phase"])
 
             self.history["reward"][tl_id].append(reward)
@@ -144,13 +151,6 @@ class SimulationBase(SUMO):
         st["step"]["queue"] += sum_queue_length
         st["step"]["waiting"] = sum_waiting_time
 
-        # Update traffic light metrics (same as SKRL simulation for reward calculation)
-        self.outflow_rate[tl_id] = outflow  # Current step outflow
-        self.travel_delay[tl_id] = sum_travel_delay
-        self.travel_time[tl_id] = sum_travel_time
-        self.queue_length[tl_id] = sum_queue_length
-        self.waiting_time[tl_id] = sum_waiting_time
-
         # Update accumulated metrics
         st["outflow"] += outflow
         st["travel_delay_sum"] = sum_travel_delay
@@ -172,7 +172,7 @@ class SimulationBase(SUMO):
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
 
-            # Append outflow and reward before resetting
+            # Append outflow before resetting
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             
             # Reset step counters
