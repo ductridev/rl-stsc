@@ -130,6 +130,7 @@ def import_train_configuration(file_path):
         # Memory configuration
         config['memory_size_min'] = content['memory']['memory_size_min']
         config['memory_size_max'] = content['memory']['memory_size_max']
+        config['sample_size'] = content['memory']['sample_size']
 
         # Agent configuration
         config['agent'] = {}
@@ -137,6 +138,7 @@ def import_train_configuration(file_path):
         config['agent']['gamma'] = content['agent']['gamma']
         config['agent']['num_layers'] = content['agent']['model']['num_layers']
         config['agent']['batch_size'] = content['agent']['model']['batch_size']
+        config['agent']['sample_size'] = content['memory']['sample_size']
         config['agent']['learning_rate'] = content['agent']['model']['learning_rate']
         config['agent']['decay_rate'] = content['agent']['model']['decay_rate']
         config['agent']['min_epsilon'] = content['agent']['model']['min_epsilon']

@@ -303,7 +303,7 @@ class SKRLAgentManager:
             # SKRL agents handle training internally via post_interaction
             # when they have enough samples
             if (
-                len(memory) >= agent.cfg.get("learning_starts", 100)
+                len(memory) >= agent.cfg.get("sample_size", 100)
                 and hasattr(agent, "tensors_names")
                 and agent.tensors_names
             ):
