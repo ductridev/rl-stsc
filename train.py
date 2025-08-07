@@ -186,6 +186,8 @@ if __name__ == "__main__":
                     base_total_reward += total_reward_tl
                     avg_reward_tl = total_reward_tl / len(rewards)
                     reward_data.append(avg_reward_tl)
+            if reward_data:
+                base_avg_reward = sum(reward_data) / len(reward_data)
         
         print(f"Base Simulation Results:")
         print(f"  Total Departed: {base_stats['total_departed']}")
@@ -193,6 +195,7 @@ if __name__ == "__main__":
         print(f"  Completion Rate: {base_completion_rate:.2f}%")
         print(f"  Avg Outflow (from history): {base_avg_outflow:.2f}")
         print(f"  Total Reward: {base_total_reward:.2f}")
+        print(f"  Avg Reward: {base_avg_reward:.2f}")
 
         print("SimulationBase time:", simulation_time_base)
         # Reset base simulation vehicle tracker after its run
@@ -239,14 +242,19 @@ if __name__ == "__main__":
             # Calculate performance metrics
             completion_rate = (skrl_stats['total_arrived'] / max(skrl_stats['total_departed'], 1)) * 100
             
-            # Get reward-based metrics from simulation history
-            total_reward = 0
-            
             # Try to get reward metrics from simulation history
+            dqn_avg_reward = 0
+            dqn_total_reward = 0
             if hasattr(simulation_skrl, 'history') and 'reward' in simulation_skrl.history:
+                reward_data = []
                 for tl_id, rewards in simulation_skrl.history['reward'].items():
                     if rewards:
-                        total_reward += sum(rewards)
+                        total_reward_tl = sum(rewards)
+                        dqn_total_reward += total_reward_tl
+                        avg_reward += dqn_total_reward / len(rewards)
+                        reward_data.append(avg_reward)
+                if reward_data:
+                    dqn_avg_reward = sum(reward_data) / len(reward_data)
             
             # Extract avg_outflow from DQN simulation history
             dqn_avg_outflow = 0
@@ -262,14 +270,15 @@ if __name__ == "__main__":
             
             # DUAL COMPARISON SYSTEM:
             # 1. Use total_reward for DQN vs DQN (best model tracking)
-            combined_score = total_reward
+            combined_score = dqn_total_reward
             
             # 2. Use avg_outflow for base vs DQN comparison
             print(f"DQN Results:")
-            print(f"  Total Reward (for best model): {total_reward:.2f}")
             print(f"  Avg Outflow (vs baseline): {dqn_avg_outflow:.2f}")
+            print(f"  Total Reward: {dqn_total_reward:.2f}")
+            print(f"  Avg Reward: {dqn_avg_reward:.2f}")
             print(f"Comparison:")
-            print(f"  DQN reward: {total_reward:.2f} vs Base reward: {base_total_reward:.2f}")
+            print(f"  DQN reward: {dqn_total_reward:.2f} vs Base reward: {base_total_reward:.2f}")
             print(f"  DQN avg_outflow: {dqn_avg_outflow:.2f} vs Base avg_outflow: {base_avg_outflow:.2f}")
             print(f"  DQN total_arrived: {skrl_total_arrived} vs Base total_arrived: {base_total_arrived}")
             
@@ -374,7 +383,7 @@ if __name__ == "__main__":
                 print(f"Current DQN: Reward={combined_score:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
                 print(f"Current Base: Reward={base_total_reward:.2f}, Outflow={base_avg_outflow:.2f}, Completion={base_completion_rate:.1f}%")
                 print(f"Best DQN:    Reward={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
-                print(f"DQN vs Base: Reward={total_reward:.2f} vs {base_total_reward:.2f}, Outflow={dqn_avg_outflow:.2f} vs {base_avg_outflow:.2f}")
+                print(f"DQN vs Base: Reward={dqn_total_reward:.2f} vs {base_total_reward:.2f}, Outflow={dqn_avg_outflow:.2f} vs {base_avg_outflow:.2f}")
                 
         except AttributeError as e:
             if 'num_atoms' in str(e):
