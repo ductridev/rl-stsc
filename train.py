@@ -223,7 +223,7 @@ if __name__ == "__main__":
             training_time_skrl,
         )
 
-        epsilon = max(min_epsilon, epsilon * decay_rate)
+        epsilon = max(min_epsilon, 1 - (episode / config["total_episodes"]))
 
         # --- Track Performance ---
         # DUAL COMPARISON SYSTEM:
