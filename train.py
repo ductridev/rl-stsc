@@ -251,8 +251,8 @@ if __name__ == "__main__":
                     if rewards:
                         total_reward_tl = sum(rewards)
                         dqn_total_reward += total_reward_tl
-                        avg_reward += dqn_total_reward / len(rewards)
-                        reward_data.append(avg_reward)
+                        avg_reward_tl = dqn_total_reward / len(rewards)
+                        reward_data.append(avg_reward_tl)
                 if reward_data:
                     dqn_avg_reward = sum(reward_data) / len(reward_data)
             
@@ -284,11 +284,11 @@ if __name__ == "__main__":
             
             # Compare DQN vs baseline using multiple metrics
             performance_improvements = 0
-            if total_reward > base_total_reward:
-                print(f"✅ DQN reward advantage: {total_reward:.2f} > {base_total_reward:.2f}")
+            if dqn_total_reward > base_total_reward:
+                print(f"✅ DQN reward advantage: {dqn_total_reward:.2f} > {base_total_reward:.2f}")
                 performance_improvements += 1
             else:
-                print(f"❌ DQN reward disadvantage: {total_reward:.2f} <= {base_total_reward:.2f}")
+                print(f"❌ DQN reward disadvantage: {dqn_total_reward:.2f} <= {base_total_reward:.2f}")
                 
             if dqn_avg_outflow > base_avg_outflow:
                 print(f"✅ DQN outflow advantage: {dqn_avg_outflow:.2f} > {base_avg_outflow:.2f}")
@@ -320,7 +320,7 @@ if __name__ == "__main__":
             current_performance = {
                 'episode': episode,
                 'completion_rate': completion_rate,
-                'total_reward': total_reward,
+                'total_reward': dqn_total_reward,
                 'combined_score': combined_score,  # total_reward for best model tracking
                 'epsilon': epsilon,
                 'total_departed': skrl_stats['total_departed'],
@@ -358,7 +358,7 @@ if __name__ == "__main__":
                 best_performance = current_performance.copy()
                 print(f"\n🏆 NEW BEST PERFORMANCE at Episode {episode}!")
                 print(f"   Completion Rate: {completion_rate:.1f}%")
-                print(f"   Total Reward (Best Model Metric): {total_reward:.2f}")
+                print(f"   Total Reward (Best Model Metric): {dqn_total_reward:.2f}")
                 print(f"   DQN Avg Outflow: {dqn_avg_outflow:.2f}")
                 print(f"   Combined Score (Total Reward): {combined_score:.2f}")
                 
