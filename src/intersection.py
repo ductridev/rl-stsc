@@ -149,7 +149,7 @@ class Intersection:
                         if not os.path.exists(demand_file_name):
                             print(f"Demand file not found: {demand_file_name}")
                             continue  # Skip if demand file is missing
-                        print(f"  Interval {interval_id}: {begin_time}-{end_time}")
+                        # print(f"  Interval {interval_id}: {begin_time}-{end_time}")
                         vehicles_in_interval = int(count / len(intervals))
 
                         if interval_id == len(intervals) - 1:
@@ -159,7 +159,7 @@ class Intersection:
                         route_temp_file = f"osm.res_{prefix}.interval_{interval_id}.rou.xml"
 
                         # Run randomTrips.py
-                        print(f"    Running randomTrips.py for interval {interval_id}")
+                        # print(f"    Running randomTrips.py for interval {interval_id}")
                         try:
                             # Build command arguments properly
                             cmd_args = [
@@ -244,7 +244,7 @@ class Intersection:
                 )
                 os.system(route_cmd)
 
-                print(f"Generated route files: {route_file}, {alt_route_file}")
+                # print(f"Generated route files: {route_file}, {alt_route_file}")
 
             print("All route files generated.")
 
