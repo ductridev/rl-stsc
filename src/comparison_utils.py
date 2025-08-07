@@ -202,7 +202,7 @@ class SimulationComparison:
         
         return ranking_df
 
-    def print_comparison_summary(self, episode: int, simulation_types: List[str] = None):
+    def print_comparison_summary(self, episode: int, metrics: List[str] = None, simulation_types: List[str] = None):
         """
         Print a formatted summary of the comparison results.
         
@@ -214,8 +214,8 @@ class SimulationComparison:
         print(f"SIMULATION COMPARISON SUMMARY - EPISODE {episode}")
         print(f"{'='*60}")
         
-        summary_table = self.create_summary_comparison_table(episode, simulation_types=simulation_types)
-        ranking_df = self.create_performance_ranking(episode, simulation_types=simulation_types)
+        summary_table = self.create_summary_comparison_table(episode, metrics, simulation_types=simulation_types)
+        ranking_df = self.create_performance_ranking(episode, metrics, simulation_types=simulation_types)
         
         if not summary_table.empty:
             print("\nOVERALL PERFORMANCE SUMMARY:")
