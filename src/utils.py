@@ -198,10 +198,10 @@ def import_train_configuration(file_path):
     
 def import_test_configuration(file_path):
     """
-    Import the testing configuration from a INI file.
+    Import the testing configuration from a YAML file.
 
     Args:
-        file_path (str): Path to the INI configuration file.
+        file_path (str): Path to the YAML configuration file.
 
     Returns:
         dict: The testing configuration as a dictionary.
@@ -211,7 +211,7 @@ def import_test_configuration(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"The configuration file {file_path} does not exist.")
 
-    # Read the INI file
+    # Read the YAML file
     import yaml
 
     with open(file_path, 'r') as file:
@@ -226,22 +226,30 @@ def import_test_configuration(file_path):
         config['episode_seed'] = content['simulation']['episode_seed']
         config['interphase_duration'] = content['simulation']['interphase_duration']
 
-        config['agent']['num_states'] = content['agent']['num_states']
-        # # Green duration agent configuration
-        # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
-        # config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
-
-        # # Selector phase agent
-        # config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
-        # config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
+        # Agent configuration
+        config['agent'] = content['agent']
 
         # Testing configuration
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
         config['sumocfg_path'] = content['dir']['sumocfg_path']
-        config['model_to_test'] = content['dir']['model_to_test']
+        config['model_to_test'] = content['dir'].get('model_to_test', 'dqn_model')
+        config['model_folder'] = content['dir']['model_folder']
 
         # Intersection configuration
         config['traffic_lights'] = content['traffic_lights']
+        
+        # Vehicle counts (if exists)
+        if 'vehicle_counts' in content:
+            config['vehicle_counts'] = content['vehicle_counts']
+        
+        # Edge groups (if exists)
+        if 'edge_groups' in content:
+            config['edge_groups'] = content['edge_groups']
+        
+        # Accident configuration (if exists)
+        if 'accident' in content:
+            config['accident'] = content['accident']
 
+        print("Testing configuration loaded successfully.")
         return config

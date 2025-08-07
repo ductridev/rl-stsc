@@ -60,6 +60,9 @@ class Simulation(SUMO):
         self.training_steps = training_steps
         self.updating_target_network_steps = updating_target_network_steps
         self.save_interval = save_interval
+        
+        # Testing mode flag to disable training operations
+        self.testing_mode = False
 
         # Normalizers
         self.outflow_rate_normalizer = Normalizer()
@@ -217,12 +220,16 @@ class Simulation(SUMO):
         )
 
     def train_agents(self):
-        """Train all agents using SKRL"""
+        """Train all agents using SKRL (returns 0 if in testing mode)"""
+        if self.testing_mode:
+            return 0.0
         return self.agent_manager.train_agents(self.step, self.max_steps)
 
     def run(self, epsilon: float, episode: int):
         """Run simulation with SKRL agents"""
         print("Simulation started")
+        if self.testing_mode:
+            print("TESTING MODE: Training disabled")
         print("Simulating...")
         print("---------------------------------------")
 
@@ -397,8 +404,10 @@ class Simulation(SUMO):
                 if self.step > 0 and self.step % 60 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
 
-            # Training
-            if self.step > 0 and self.step % self.training_steps == 0:
+            # Training (skip if in testing mode)
+            if (not self.testing_mode and 
+                self.step > 0 and 
+                self.step % self.training_steps == 0):
                 print(f"Training per {self.training_steps} steps...")
                 train_start = time.time()
 
@@ -442,8 +451,8 @@ class Simulation(SUMO):
         # Check if done
         done = self.step >= self.max_steps
 
-        # Store transition in SKRL memory
-        if st["state"] is not None:
+        # Store transition in SKRL memory (skip if in testing mode)
+        if st["state"] is not None and not self.testing_mode:
             self.store_transition(
                 tl_id=tl_id,
                 state=st["state"],
@@ -453,8 +462,9 @@ class Simulation(SUMO):
                 done=done,
             )
 
-        # Update history
-        self.history["reward"][tl_id].append(reward)
+        if self.step % 60 == 0:
+            # Update history
+            self.history["reward"][tl_id].append(reward)
 
         # Reset phase metrics
         for key in [
@@ -508,8 +518,10 @@ class Simulation(SUMO):
         print("Training completed")
         print("---------------------------------------")
 
-        # Update target networks periodically
-        if episode % self.save_interval == 0 and episode > 0:
+        # Update target networks periodically (skip if in testing mode)
+        if (not self.testing_mode and 
+            episode % self.save_interval == 0 and 
+            episode > 0):
             self.agent_manager.update_target_networks(self.step, self.max_steps)
 
         # Save plots

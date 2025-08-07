@@ -2,12 +2,19 @@ import time
 import traci
 import numpy as np
 import pandas as pd
+import sys
+import os
+
+# Add current directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
 from sim_utils.traffic_metrics import TrafficMetrics
-from src.visualization import Visualization
-from src.normalizer import Normalizer
-from src.sumo import SUMO
-from src.accident_manager import AccidentManager
-from src.vehicle_tracker import VehicleTracker
+from visualization import Visualization
+from normalizer import Normalizer
+from sumo import SUMO
+from accident_manager import AccidentManager
+from vehicle_tracker import VehicleTracker
 
 
 class SimulationBase(SUMO):
