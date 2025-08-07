@@ -77,6 +77,7 @@ if __name__ == "__main__":
             print(f"Error loading SKRL model: {e}. Starting with fresh model.")
 
     simulation = SimulationBase(
+        agent_cfg=config["agent"],
         max_steps=config["max_steps"],
         traffic_lights=config["traffic_lights"],
         accident_manager=accident_manager,
@@ -174,11 +175,24 @@ if __name__ == "__main__":
             if outflow_data:
                 base_avg_outflow = sum(outflow_data) / len(outflow_data)
         
+        # Extract reward from baseline simulation history
+        base_total_reward = 0
+        base_avg_reward = 0
+        if hasattr(simulation, 'history') and 'reward' in simulation.history:
+            reward_data = []
+            for tl_id, rewards in simulation.history['reward'].items():
+                if rewards:
+                    total_reward_tl = sum(rewards)
+                    base_total_reward += total_reward_tl
+                    avg_reward_tl = total_reward_tl / len(rewards)
+                    reward_data.append(avg_reward_tl)
+        
         print(f"Base Simulation Results:")
         print(f"  Total Departed: {base_stats['total_departed']}")
         print(f"  Total Arrived: {base_total_arrived}")
         print(f"  Completion Rate: {base_completion_rate:.2f}%")
         print(f"  Avg Outflow (from history): {base_avg_outflow:.2f}")
+        print(f"  Total Reward: {base_total_reward:.2f}")
 
         print("SimulationBase time:", simulation_time_base)
         # Reset base simulation vehicle tracker after its run
@@ -229,8 +243,8 @@ if __name__ == "__main__":
             total_reward = 0
             
             # Try to get reward metrics from simulation history
-            if hasattr(simulation_skrl, 'history') and 'agent_reward' in simulation_skrl.history:
-                for tl_id, rewards in simulation_skrl.history['agent_reward'].items():
+            if hasattr(simulation_skrl, 'history') and 'reward' in simulation_skrl.history:
+                for tl_id, rewards in simulation_skrl.history['reward'].items():
                     if rewards:
                         total_reward += sum(rewards)
             
@@ -255,11 +269,35 @@ if __name__ == "__main__":
             print(f"  Total Reward (for best model): {total_reward:.2f}")
             print(f"  Avg Outflow (vs baseline): {dqn_avg_outflow:.2f}")
             print(f"Comparison:")
-            print(f"  DQN avg_outflow: {dqn_avg_outflow:.2f}")
-            print(f"  Base avg_outflow: {base_avg_outflow:.2f}")
+            print(f"  DQN reward: {total_reward:.2f} vs Base reward: {base_total_reward:.2f}")
+            print(f"  DQN avg_outflow: {dqn_avg_outflow:.2f} vs Base avg_outflow: {base_avg_outflow:.2f}")
+            print(f"  DQN total_arrived: {skrl_total_arrived} vs Base total_arrived: {base_total_arrived}")
             
-            # Compare DQN vs baseline using avg_outflow
+            # Compare DQN vs baseline using multiple metrics
+            performance_improvements = 0
+            if total_reward > base_total_reward:
+                print(f"✅ DQN reward advantage: {total_reward:.2f} > {base_total_reward:.2f}")
+                performance_improvements += 1
+            else:
+                print(f"❌ DQN reward disadvantage: {total_reward:.2f} <= {base_total_reward:.2f}")
+                
+            if dqn_avg_outflow > base_avg_outflow:
+                print(f"✅ DQN outflow advantage: {dqn_avg_outflow:.2f} > {base_avg_outflow:.2f}")
+                performance_improvements += 1
+            else:
+                print(f"❌ DQN outflow disadvantage: {dqn_avg_outflow:.2f} <= {base_avg_outflow:.2f}")
+                
             if skrl_total_arrived > base_total_arrived:
+                print(f"✅ DQN arrival advantage: {skrl_total_arrived} > {base_total_arrived}")
+                performance_improvements += 1
+            else:
+                print(f"❌ DQN arrival disadvantage: {skrl_total_arrived} <= {base_total_arrived}")
+                
+            # Overall performance summary
+            print(f"🏁 Overall Performance: DQN won {performance_improvements}/3 metrics vs Base")
+            
+            # Save simulation folder if DQN performs better in majority of metrics
+            if performance_improvements >= 2:
                 dest_folder = f"{simulation_path}_better_SKRL_ep{episode}"
                 # Remove the destination if it already exists to avoid errors
                 if os.path.exists(dest_folder):
@@ -279,7 +317,11 @@ if __name__ == "__main__":
                 'total_departed': skrl_stats['total_departed'],
                 'total_arrived': skrl_stats['total_arrived'],
                 'dqn_avg_outflow': dqn_avg_outflow,  # DQN avg outflow for baseline comparison
-                'base_avg_outflow': base_avg_outflow  # Baseline avg outflow for comparison
+                'base_avg_outflow': base_avg_outflow,  # Baseline avg outflow for comparison
+                'base_total_reward': base_total_reward,  # Baseline total reward for comparison
+                'base_avg_reward': base_avg_reward,  # Baseline average reward for comparison
+                'base_total_arrived': base_total_arrived,  # Baseline total arrived for comparison
+                'performance_improvements': performance_improvements  # Number of metrics where DQN outperformed base
             }
             performance_history.append(current_performance)
             
@@ -329,9 +371,10 @@ if __name__ == "__main__":
             # Print current vs best performance every save_interval episodes
             if episode % save_interval == 0 and episode > 0:
                 print(f"\n📊 Performance Summary - Episode {episode}")
-                print(f"Current: Reward={combined_score:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
-                print(f"Best:    Reward={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
-                print(f"Baseline vs DQN: Base_Outflow={base_avg_outflow:.2f} vs DQN_Outflow={dqn_avg_outflow:.2f}")
+                print(f"Current DQN: Reward={combined_score:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
+                print(f"Current Base: Reward={base_total_reward:.2f}, Outflow={base_avg_outflow:.2f}, Completion={base_completion_rate:.1f}%")
+                print(f"Best DQN:    Reward={best_performance['combined_score']:.2f}, Episode={best_performance['episode']}, Completion={best_performance['completion_rate']:.1f}%")
+                print(f"DQN vs Base: Reward={total_reward:.2f} vs {base_total_reward:.2f}, Outflow={dqn_avg_outflow:.2f} vs {base_avg_outflow:.2f}")
                 
         except AttributeError as e:
             if 'num_atoms' in str(e):
@@ -375,7 +418,7 @@ if __name__ == "__main__":
                 available_sim_types = ["baseline", "skrl_dqn"]  # Add q_learning when it's enabled
                 metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
                 comparison.save_comparison_tables(episode, metrics, simulation_types=available_sim_types)
-                comparison.print_comparison_summary(episode, simulation_types=available_sim_types)
+                comparison.print_comparison_summary(episode, metrics, simulation_types=available_sim_types)
                 print("Traffic light comparison tables generated successfully")
             except Exception as e:
                 print(f"Error generating comparison tables: {e}")
@@ -453,24 +496,26 @@ if __name__ == "__main__":
             ax1.text(0.02, 0.98, f"Best: {best_performance['completion_rate']:.1f}% (Ep {best_performance['episode']})", 
                      transform=ax1.transAxes, verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
             
-            # Plot 2: Combined Score
-            ax2.plot(episodes, performance_df['combined_score'], 'g-', linewidth=2)
-            ax2.axhline(y=best_performance['combined_score'], color='r', linestyle='--', alpha=0.7)
+            # Plot 2: Reward Comparison
+            ax2.plot(episodes, performance_df['total_reward'], 'g-', linewidth=2, label='DQN Reward')
+            ax2.plot(episodes, performance_df['base_total_reward'], 'orange', linewidth=2, label='Base Reward')
+            ax2.axhline(y=best_performance['combined_score'], color='r', linestyle='--', alpha=0.7, label='Best DQN')
             ax2.set_xlabel('Episode')
-            ax2.set_ylabel('Combined Score')
-            ax2.set_title('Overall Performance Score')
+            ax2.set_ylabel('Total Reward')
+            ax2.set_title('Reward Comparison: DQN vs Base')
             ax2.grid(True, alpha=0.3)
-            ax2.text(0.02, 0.98, f"Best: {best_performance['combined_score']:.1f} (Ep {best_performance['episode']})", 
+            ax2.legend()
+            ax2.text(0.02, 0.98, f"Best DQN: {best_performance['combined_score']:.1f} (Ep {best_performance['episode']})", 
                      transform=ax2.transAxes, verticalalignment='top', bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
             
-            # Plot 3: Travel Time
-            ax3.plot(episodes, performance_df['avg_travel_time'], 'orange', linewidth=2)
-            if best_performance['avg_travel_time'] > 0:
-                ax3.axhline(y=best_performance['avg_travel_time'], color='r', linestyle='--', alpha=0.7)
+            # Plot 3: Outflow Comparison
+            ax3.plot(episodes, performance_df['dqn_avg_outflow'], 'purple', linewidth=2, label='DQN Outflow')
+            ax3.plot(episodes, performance_df['base_avg_outflow'], 'brown', linewidth=2, label='Base Outflow')
             ax3.set_xlabel('Episode')
-            ax3.set_ylabel('Avg Travel Time')
-            ax3.set_title('Average Travel Time')
+            ax3.set_ylabel('Avg Outflow')
+            ax3.set_title('Outflow Comparison: DQN vs Base')
             ax3.grid(True, alpha=0.3)
+            ax3.legend()
             
             # Plot 4: Epsilon Decay
             ax4.plot(episodes, performance_df['epsilon'], 'purple', linewidth=2)

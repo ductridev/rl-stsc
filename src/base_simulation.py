@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sim_utils.traffic_metrics import TrafficMetrics
 from src.visualization import Visualization
+from src.normalizer import Normalizer
 from src.sumo import SUMO
 from src.accident_manager import AccidentManager
 from src.vehicle_tracker import VehicleTracker
@@ -12,6 +13,7 @@ from src.vehicle_tracker import VehicleTracker
 class SimulationBase(SUMO):
     def __init__(
         self,
+        agent_cfg,
         max_steps,
         traffic_lights,
         accident_manager: AccidentManager,
@@ -21,6 +23,7 @@ class SimulationBase(SUMO):
         save_interval=10,
     ):
         self.max_steps = max_steps
+        self.agent_cfg = agent_cfg
         self.traffic_lights = traffic_lights
         self.accident_manager = accident_manager
         self.visualization = visualization
@@ -31,15 +34,25 @@ class SimulationBase(SUMO):
         # Initialize VehicleTracker for logging vehicle statistics
         self.vehicle_tracker = VehicleTracker(path=self.path)
 
+        # Add normalizers for reward calculation (same as SKRL simulation)
+        self.outflow_rate_normalizer = Normalizer()
+        self.queue_length_normalizer = Normalizer()
+        self.travel_time_normalizer = Normalizer()
+        self.travel_delay_normalizer = Normalizer()
+        self.waiting_time_normalizer = Normalizer()
+
         self.step = 0
 
+        # Traffic metrics (same structure as SKRL simulation)
         self.queue_length = {}
         self.outflow_rate = {}
         self.travel_delay = {}
         self.travel_time = {}
         self.waiting_time = {}
+        self.phase = {}  # Track current phase for switch penalty
 
         self.history = {
+            "reward": {},
             "travel_delay": {},
             "travel_time": {},
             "density": {},
@@ -58,6 +71,7 @@ class SimulationBase(SUMO):
             self.travel_delay[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
             self.waiting_time[traffic_light_id] = 0
+            self.phase[traffic_light_id] = traffic_light["phase"][0]  # Initialize with first phase
 
             for key in self.history:
                 self.history[key][traffic_light_id] = []
@@ -101,11 +115,16 @@ class SimulationBase(SUMO):
         # 1) Detect outflow: vehicles that left since last step
         current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
         if current_phase != st["phase"]:
-            # Phase change detected, reset old vehicle IDs
+            # Phase change detected, reset old vehicle IDs and update phase tracking
             st["old_vehicle_ids"] = TrafficMetrics.get_vehicles_in_phase(
                 tl, current_phase
             )
+            # Update phase tracking for reward calculation
+            self.phase[tl_id] = current_phase
             st["phase"] = current_phase
+            reward = self.get_reward(tl_id, st["phase"])
+
+            self.history["reward"][tl_id].append(reward)
 
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
         outflow = sum(1 for v in st["old_vehicle_ids"] if v not in new_ids)
@@ -125,6 +144,14 @@ class SimulationBase(SUMO):
         st["step"]["queue"] += sum_queue_length
         st["step"]["waiting"] = sum_waiting_time
 
+        # Update traffic light metrics (same as SKRL simulation for reward calculation)
+        self.outflow_rate[tl_id] = outflow  # Current step outflow
+        self.travel_delay[tl_id] = sum_travel_delay
+        self.travel_time[tl_id] = sum_travel_time
+        self.queue_length[tl_id] = sum_queue_length
+        self.waiting_time[tl_id] = sum_waiting_time
+
+        # Update accumulated metrics
         st["outflow"] += outflow
         st["travel_delay_sum"] = sum_travel_delay
         st["travel_time_sum"] = sum_travel_time
@@ -133,6 +160,7 @@ class SimulationBase(SUMO):
 
         # 3) Every 60 steps, flush step‐averages into history
         if self.step % 60 == 0:
+            
             for key, hist in [
                 ("delay", "travel_delay"),
                 ("time", "travel_time"),
@@ -144,7 +172,10 @@ class SimulationBase(SUMO):
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
 
+            # Append outflow and reward before resetting
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
+            
+            # Reset step counters
             st["step"]["outflow"] = 0
 
     def run(self, episode):
@@ -226,9 +257,10 @@ class SimulationBase(SUMO):
         if episode % self.save_interval == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
+                # Save data with correct naming convention for visualization
                 self.visualization.save_data(
                     data=data,
-                    filename=f"base_{metric}_avg{'_episode_' + str(episode) if episode is not None else ''}",
+                    filename=f"base_{metric}_avg_episode_{episode}",
                 )
 
             # Save metrics DataFrame
@@ -394,6 +426,34 @@ class SimulationBase(SUMO):
             total_waiting_time += traci.lane.getWaitingTime(lane)
 
         return total_waiting_time
+
+    def get_reward(self, tl_id: str, phase: str) -> float:
+        """Calculate reward for a traffic light action (adapted from SKRL simulation)"""
+        weight = self.agent_cfg.get(
+            "weight",
+            {
+                "outflow_rate": 1.0,
+                "delay": -1.0,
+                "waiting_time": -1.0,
+                "switch_phase": -0.1,
+                "travel_time": -1.0,
+                "queue_length": -1.0,
+            },
+        )
+
+        return (
+            weight["outflow_rate"]
+            * self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
+            + weight["delay"]
+            * self.travel_delay_normalizer.normalize(self.travel_delay[tl_id])
+            + weight["waiting_time"]
+            * self.waiting_time_normalizer.normalize(self.waiting_time[tl_id])
+            - 5
+            + weight["travel_time"]
+            * self.travel_time_normalizer.normalize(self.travel_time[tl_id])
+            + weight["queue_length"]
+            * self.queue_length_normalizer.normalize(self.queue_length[tl_id])
+        )
 
     def reset_history(self):
         for key in self.history:
