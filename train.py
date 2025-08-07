@@ -65,7 +65,7 @@ if __name__ == "__main__":
     )
 
     # Load existing SKRL model if specified in config
-    start_episode = 0
+    start_episode = 1
     if config.get("load_model_name") and config["load_model_name"] is not None:
         model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + ".pth"
         try:
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     performance_history = []
 
     while episode < config["total_episodes"]:
-        print("\n----- Episode", str(episode + 1), "of", str(config["total_episodes"]))
+        print("\n----- Episode", str(episode), "of", str(config["total_episodes"]))
         print("Generating routes...")
         # Run the build routes file command
 
@@ -375,7 +375,7 @@ if __name__ == "__main__":
                 available_sim_types = ["baseline", "skrl_dqn"]  # Add q_learning when it's enabled
                 metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
                 comparison.save_comparison_tables(episode, metrics, simulation_types=available_sim_types)
-                comparison.print_comparison_summary(episode, metrics, simulation_types=available_sim_types)
+                comparison.print_comparison_summary(episode, simulation_types=available_sim_types)
                 print("Traffic light comparison tables generated successfully")
             except Exception as e:
                 print(f"Error generating comparison tables: {e}")
