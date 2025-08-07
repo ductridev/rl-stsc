@@ -621,19 +621,59 @@ class Simulation(SUMO):
             },
         )
 
-        return (
-            weight["outflow_rate"]
-            * self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
-            + weight["delay"]
-            * self.travel_delay_normalizer.normalize(self.travel_delay[tl_id])
-            + weight["waiting_time"]
-            * self.waiting_time_normalizer.normalize(self.waiting_time[tl_id])
-            + weight["switch_phase"] * (int)(self.phase[tl_id] != phase)
-            + weight["travel_time"]
-            * self.travel_time_normalizer.normalize(self.travel_time[tl_id])
-            + weight["queue_length"]
-            * self.queue_length_normalizer.normalize(self.queue_length[tl_id])
-        )
+        # DEBUG: Calculate individual components
+        # print(f"\n=== REWARD DEBUG for TL: {tl_id} ===")
+        # print(f"Current phase: {phase}, Previous phase: {self.phase[tl_id]}")
+        
+        # Raw values
+        # print(f"Raw values:")
+        # print(f"  outflow_rate: {self.outflow_rate[tl_id]}")
+        # print(f"  travel_delay: {self.travel_delay[tl_id]}")
+        # print(f"  waiting_time: {self.waiting_time[tl_id]}")
+        # print(f"  travel_time: {self.travel_time[tl_id]}")
+        # print(f"  queue_length: {self.queue_length[tl_id]}")
+        # print(f"  phase_switch: {self.phase[tl_id] != phase}")
+        
+        # Normalized values
+        outflow_norm = self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
+        delay_norm = self.travel_delay_normalizer.normalize(self.travel_delay[tl_id])
+        waiting_norm = self.waiting_time_normalizer.normalize(self.waiting_time[tl_id])
+        travel_norm = self.travel_time_normalizer.normalize(self.travel_time[tl_id])
+        queue_norm = self.queue_length_normalizer.normalize(self.queue_length[tl_id])
+        switch_penalty = (int)(self.phase[tl_id] != phase)
+        
+        # print(f"Normalized values:")
+        # print(f"  outflow_rate_norm: {outflow_norm:.4f}")
+        # print(f"  delay_norm: {delay_norm:.4f}")
+        # print(f"  waiting_time_norm: {waiting_norm:.4f}")
+        # print(f"  travel_time_norm: {travel_norm:.4f}")
+        # print(f"  queue_length_norm: {queue_norm:.4f}")
+        # print(f"  switch_penalty: {switch_penalty}")
+        
+        # Weighted components
+        outflow_component = weight["outflow_rate"] * outflow_norm
+        delay_component = weight["delay"] * delay_norm
+        waiting_component = weight["waiting_time"] * waiting_norm
+        switch_component = weight["switch_phase"] * switch_penalty
+        travel_component = weight["travel_time"] * travel_norm
+        queue_component = weight["queue_length"] * queue_norm
+        
+        # print(f"Weighted components:")
+        # print(f"  outflow: {weight['outflow_rate']:.2f} × {outflow_norm:.4f} = {outflow_component:.4f}")
+        # print(f"  delay: {weight['delay']:.2f} × {delay_norm:.4f} = {delay_component:.4f}")
+        # print(f"  waiting: {weight['waiting_time']:.2f} × {waiting_norm:.4f} = {waiting_component:.4f}")
+        # print(f"  switch: {weight['switch_phase']:.2f} × {switch_penalty} = {switch_component:.4f}")
+        # print(f"  travel: {weight['travel_time']:.2f} × {travel_norm:.4f} = {travel_component:.4f}")
+        # print(f"  queue: {weight['queue_length']:.2f} × {queue_norm:.4f} = {queue_component:.4f}")
+        
+        # Total reward
+        total_reward = (outflow_component + delay_component + waiting_component + 
+                       switch_component + travel_component + queue_component)
+        
+        # print(f"TOTAL REWARD: {total_reward:.4f}")
+        # print(f"=== END REWARD DEBUG ===\n")
+
+        return total_reward
 
     def get_movements_from_phase(self, tl: Dict, phase_str: str) -> List[str]:
         """Get movement detectors from a phase"""
