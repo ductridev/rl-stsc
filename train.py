@@ -699,7 +699,7 @@ def main():
     """
     Main training function - orchestrates the entire training process.
     """
-    print("Starting Multi-Configuration DQN Training with Baseline Comparisons")
+    print("Starting Multi-Configuration DQN Training with Alternating Configurations")
     print("=" * 80)
     
     # Initialize shared variables
@@ -721,151 +721,167 @@ def main():
         'total_departed': 0
     }
     
-    # Configuration files to train with the same model
-    config_files = ["config/training_testngatu6x1EastWestOverflow.yaml", "config/training_testngatu6x1.yaml"]
+    config_files = [
+        "config/training_testngatu6x1EastWestOverflow.yaml", 
+        "config/training_testngatu6x1.yaml",
+    ]
+    
+    # Load all configurations and determine total episodes
+    configs = []
+    max_episodes_per_config = 0
+    for config_file in config_files:
+        config = import_train_configuration(config_file)
+        configs.append((config_file, config))
+        max_episodes_per_config = max(max_episodes_per_config, config["total_episodes"])
+    
+    print(f"\nALTERNATING CONFIGURATION TRAINING:")
+    print(f"   Configurations: {len(config_files)}")
+    print(f"   Max episodes per config: {max_episodes_per_config}")
+    print(f"   Pattern: Episode 1→Config 1, Episode 2→Config 2, Episode 3→Config 3, Episode 4→Config 1, etc.")
+    print(f"   Each config gets equal training opportunities distributed across episodes")
+    print("=" * 80)
     
     # Run initial baseline simulations
     baseline_results_before = run_baseline_simulations(config_files, shared_path, shared_visualization, "before_training")
     baseline_results = {'before_training': baseline_results_before}
     
-    # DQN Training Phase
-    print("\nSTARTING DQN TRAINING ACROSS ALL CONFIGURATIONS")
+    # Initialize tracking for each configuration
+    config_trackers = {}
+    for i, (config_file, config) in enumerate(configs):
+        config_name = config_file.split('/')[-1].replace('.yaml', '')
+        config_trackers[i] = {
+            'config_file': config_file,
+            'config_name': config_name,
+            'config': config,
+            'config_episode': 1,
+            'performance_history': [],
+            'best_performance': {
+                'episode': -1,
+                'config_episode': -1,
+                'completion_rate': -1,
+                'total_reward': -float('inf'),
+                'combined_score': -float('inf'),
+                'config_file': config_file,
+                'total_arrived': 0,
+                'total_departed': 0,
+                'dqn_avg_outflow': 0
+            },
+            'training_start_time': datetime.datetime.now(),
+            'completed': False
+        }
+    
+    # Initialize DQN simulation with first config
+    first_config_file, first_config = configs[0]
+    shared_simulation_skrl, shared_path, shared_visualization = initialize_dqn_simulation(
+        first_config, shared_simulation_skrl, shared_path, shared_visualization, 0
+    )
+    
+    print("\nSTARTING ALTERNATING DQN TRAINING")
     print("=" * 80)
     
-    for config_idx, config_file in enumerate(config_files):
-        print(f"\n{'='*60}")
-        print(f"Processing configuration {config_idx + 1}/{len(config_files)}: {config_file}")
-        print(f"{'='*60}")
+    # Main training loop - alternate between configurations
+    while any(not tracker['completed'] for tracker in config_trackers.values()):
+        # Determine which configuration to use for this episode
+        config_idx = (global_episode - 1) % len(config_files)
+        current_tracker = config_trackers[config_idx]
         
-        # Load configuration
-        config = import_train_configuration(config_file)
+        # Skip if this configuration has completed all episodes
+        if current_tracker['completed']:
+            # Find next available configuration
+            for i in range(len(config_files)):
+                next_idx = (config_idx + i) % len(config_files)
+                if not config_trackers[next_idx]['completed']:
+                    config_idx = next_idx
+                    current_tracker = config_trackers[config_idx]
+                    break
+            else:
+                # All configurations completed
+                break
         
-        # Initialize/update DQN simulation
+        config_file = current_tracker['config_file']
+        config = current_tracker['config']
+        config_episode = current_tracker['config_episode']
+        
+        print(f"\n{'='*80}")
+        print(f"GLOBAL EPISODE {global_episode}: Using Config {config_idx + 1}/{len(config_files)}")
+        print(f"Config: {config_file}")
+        print(f"Config Episode: {config_episode}/{config['total_episodes']}")
+        print(f"{'='*80}")
+        
+        # Update simulation with current configuration parameters
         shared_simulation_skrl, shared_path, shared_visualization = initialize_dqn_simulation(
-            config, shared_simulation_skrl, shared_path, shared_visualization, 
-            config_idx
+            config, shared_simulation_skrl, shared_path, shared_visualization, config_idx
         )
         
-        # Initialize Q-learning simulation for comparison
-        agent_memory_q = MemoryPalace(
-            max_size_per_palace=config["memory_size_max"], 
-            min_size_to_sample=config["memory_size_min"]
+        # Train one episode with current configuration
+        performance_metrics = train_dqn_episode(
+            shared_simulation_skrl, global_episode, config_episode, config_file, 
+            config, {}
         )
         
-        simulation_q = QSimulation(
-            memory=agent_memory_q,
-            visualization=shared_visualization,
-            agent_cfg=config["agent"],
-            max_steps=config["max_steps"],
-            traffic_lights=config["traffic_lights"],
-            interphase_duration=config["interphase_duration"],
-            accident_manager=AccidentManager(
-                start_step=config["start_step"],
-                duration=config["duration"],
-                junction_id_list=config["junction_id_list"],
-            ),
-            epoch=config["training_epochs"],
-            path=shared_path,
-            training_steps=config["training_steps"],
-            updating_target_network_steps=config["updating_target_network_steps"],
+        # Evaluate and save best model if needed
+        current_tracker['best_performance'], global_best_performance = evaluate_and_save_best_model(
+            performance_metrics, current_tracker['best_performance'], global_best_performance,
+            config_file, shared_simulation_skrl, shared_path, global_episode, config_episode
         )
         
-        # Initialize comparison utility
-        comparison = SimulationComparison(path=shared_path)
+        # Store performance data for this configuration
+        current_tracker['performance_history'].append(performance_metrics)
         
-        # Training loop for this configuration
-        config_episode = 1
+        # Save comparison plots at intervals
         save_interval = config.get("save_interval", 10)
-        
-        # Track best performance for this configuration
-        config_best_performance = {
-            'episode': -1,
-            'config_episode': -1,
-            'completion_rate': -1,
-            'total_reward': -float('inf'),
-            'combined_score': -float('inf'),
-            'config_file': config_file,
-            'total_arrived': 0,
-            'total_departed': 0,
-            'dqn_avg_outflow': 0
-        }
-        config_performance_history = []
-        
-        print(f"SKRL DQN Training Starting:")
-        print(f"   SKRL handles epsilon-greedy exploration internally")
-        print(f"   No manual epsilon decay needed - SKRL manages this automatically")
-        
-        timestamp_start = datetime.datetime.now()
-        
-        # Training episodes for this configuration
-        while config_episode <= config["total_episodes"]:
-            # Train one episode
-            performance_metrics = train_dqn_episode(
-                shared_simulation_skrl, global_episode, config_episode, config_file, 
-                config, {}
+        if global_episode % save_interval == 0 and global_episode > 0:
+            print(f"Generating plots at global episode {global_episode}...")
+            shared_visualization.save_plot(
+                episode=global_episode,
+                metrics=["reward_avg", "queue_length_avg", "travel_delay_avg", "waiting_time_avg", "outflow_avg"],
+                names=["skrl_dqn"],
             )
-            
-            # Evaluate and save best model if needed
-            config_best_performance, global_best_performance = evaluate_and_save_best_model(
-                performance_metrics, config_best_performance, global_best_performance,
-                config_file, shared_simulation_skrl, shared_path, global_episode, config_episode
-            )
-            
-            # Store performance data
-            config_performance_history.append(performance_metrics)
-            
-            # Save comparison plots at intervals
-            if config_episode % save_interval == 0 and config_episode > 0:
-                print(f"Generating plots at config episode {config_episode} (global {global_episode})...")
-                shared_visualization.save_plot(
-                    episode=global_episode,
-                    metrics=["reward_avg", "queue_length_avg", "travel_delay_avg", "waiting_time_avg", "outflow_avg"],
-                    names=["skrl_dqn"],
-                )
-                print(f"Plots at global episode {global_episode} generated")
-            
-            # Save model at intervals
-            if global_episode % save_interval == 0 and global_episode > 0:
-                shared_simulation_skrl.save_model(global_episode)
-                print(f"SKRL DQN model saved at global episode {global_episode} (config ep {config_episode})")
-            
-            # Increment counters
-            config_episode += 1
-            global_episode += 1
+            print(f"Plots at global episode {global_episode} generated")
         
-        # Store results for this configuration
+        # Save model at intervals
+        if global_episode % save_interval == 0 and global_episode > 0:
+            shared_simulation_skrl.save_model(global_episode)
+            print(f"SKRL DQN model saved at global episode {global_episode}")
+        
+        # Update episode counters for current configuration
+        current_tracker['config_episode'] += 1
+        
+        # Check if this configuration has completed all episodes
+        if current_tracker['config_episode'] > config['total_episodes']:
+            current_tracker['completed'] = True
+            current_tracker['training_end_time'] = datetime.datetime.now()
+            print(f"\nConfiguration {config_file} COMPLETED after {config['total_episodes']} episodes")
+        
+        # Increment global episode counter
+        global_episode += 1
+    
+    # Create summary results for all configurations
+    for tracker in config_trackers.values():
         config_summary = {
-            'config_file': config_file,
-            'config_name': config_file.split('/')[-1].replace('.yaml', ''),
-            'final_config_episode': config_episode - 1,
+            'config_file': tracker['config_file'],
+            'config_name': tracker['config_name'],
+            'final_config_episode': tracker['config_episode'] - 1,
             'final_global_episode': global_episode - 1,
-            'best_episode': config_best_performance['episode'],
-            'best_completion_rate': config_best_performance['completion_rate'],
-            'best_total_reward': config_best_performance['total_reward'],
-            'best_dqn_avg_outflow': config_best_performance.get('dqn_avg_outflow', 0),
-            'best_total_arrived': config_best_performance.get('total_arrived', 0),
-            'best_total_departed': config_best_performance.get('total_departed', 0),
-            'training_start_time': timestamp_start,
-            'training_end_time': datetime.datetime.now()
+            'best_episode': tracker['best_performance']['episode'],
+            'best_completion_rate': tracker['best_performance']['completion_rate'],
+            'best_total_reward': tracker['best_performance']['total_reward'],
+            'best_dqn_avg_outflow': tracker['best_performance'].get('dqn_avg_outflow', 0),
+            'best_total_arrived': tracker['best_performance'].get('total_arrived', 0),
+            'best_total_departed': tracker['best_performance'].get('total_departed', 0),
+            'training_start_time': tracker['training_start_time'],
+            'training_end_time': tracker.get('training_end_time', datetime.datetime.now())
         }
         all_config_results.append(config_summary)
         
         # Save performance history for this config
-        if config_performance_history:
-            performance_df = pd.DataFrame(config_performance_history)
-            config_name = config_file.split('/')[-1].replace('.yaml', '')
-            performance_csv = shared_path + f"performance_history_{config_name}.csv"
+        if tracker['performance_history']:
+            performance_df = pd.DataFrame(tracker['performance_history'])
+            performance_csv = shared_path + f"performance_history_{tracker['config_name']}.csv"
             performance_df.to_csv(performance_csv, index=False)
             print(f"Performance history saved: {performance_csv}")
-        
-        # Save final Q-table
-        simulation_q.save_q_table(shared_path, episode="final")
-        print(f"Final Q-table saved for config: {config_file}")
-        
-        print(f"\nCompleted training for config: {config_file}")
-        print(f"   Final config episode: {config_episode-1}")
-        print(f"   Current global episode: {global_episode-1}")
-        print(f"   SKRL manages epsilon-greedy exploration automatically")
+    
+    print(f"\nALL CONFIGURATIONS COMPLETED - Total global episodes: {global_episode - 1}")
     
     # Run final baseline simulations for comparison
     baseline_results_after = run_baseline_simulations(config_files, shared_path, shared_visualization, "after_training")
@@ -879,13 +895,20 @@ def main():
                              baseline_results)
     
     # Final summary
-    print("\nMULTI-CONFIGURATION TRAINING WITH BASELINE COMPARISONS COMPLETED!")
+    print("\nMULTI-CONFIGURATION ALTERNATING TRAINING COMPLETED!")
     print("=" * 85)
     print("TRAINING STRUCTURE:")
     print("   1. Baseline simulations run BEFORE DQN training (initial measurements)")
-    print(f"   2. DQN training with SKRL-managed exploration")  
+    print(f"   2. DQN training with ALTERNATING configurations each episode")  
     print("   3. Baseline simulations run AFTER DQN training (final comparison)")
     print("   4. Comprehensive performance analysis completed")
+    print()
+    print("ALTERNATING PATTERN USED:")
+    for i, config_file in enumerate(config_files):
+        config_name = config_file.split('/')[-1].replace('.yaml', '')
+        print(f"   Config {i+1}: {config_name}")
+    print(f"   Episodes alternated: 1→Config 1, 2→Config 2, 3→Config 3, 4→Config 1, 5→Config 2, etc.")
+    print(f"   Total configurations: {len(config_files)}")
     print()
     print("BEST DQN PERFORMANCE:")
     print(f"   Configuration: {global_best_performance['config_file']}")
