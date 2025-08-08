@@ -141,7 +141,7 @@ class SKRLAgentManager:
             )
 
             # Create tensors dictionary and use create_tensor to register the tensor names properly
-            print(f"🔧 Initializing memory for {tl_id}...")
+            print(f"Initializing memory for {tl_id}...")
 
             # SKRL requires tensors to be registered using create_tensor
             memory.create_tensor(
@@ -155,7 +155,7 @@ class SKRLAgentManager:
             memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
             memory.create_tensor(name="truncated", size=1, dtype=torch.bool)
 
-            print(f"✅ Memory tensors registered: {memory.get_tensor_names()}")
+            print(f"Memory tensors registered: {memory.get_tensor_names()}")
 
             self.memories[tl_id] = memory
 
@@ -393,18 +393,87 @@ class SKRLAgentManager:
             torch.save(agent.models["q_network"].state_dict(), model_path)
 
     def load_models(self, path: str, episode: Optional[int] = None):
-        """Load all SKRL models"""
+        """Load all SKRL models with improved file detection"""
+        import glob
+        
+        loaded_count = 0
         for tl_id, agent in self.agents.items():
-            if episode is not None:
-                model_path = f"{path}/skrl_model_{tl_id}_episode_{episode}.pt"
-            else:
-                model_path = f"{path.replace('.pt', '')}_{tl_id}.pt"
+            model_loaded = False
+            
+            # Try different loading strategies
             try:
-                agent.models["q_network"].load_state_dict(torch.load(model_path))
-                agent.models["target_q_network"].load_state_dict(torch.load(model_path))
-                print(f"Loaded model for {tl_id}")
-            except FileNotFoundError:
-                print(f"Model file not found: {model_path}")
+                if episode is not None:
+                    if episode == "final":
+                        # Try to load final episode model
+                        model_patterns = [
+                            f"{path}/skrl_model_{tl_id}_episode_final.pt",
+                            f"{path}/skrl_model_{tl_id}_FINAL.pt"
+                        ]
+                    else:
+                        # Try to load specific episode or BEST model
+                        model_patterns = [
+                            f"{path}/skrl_model_{tl_id}_episode_{episode}.pt",
+                            f"{path}/skrl_model_{tl_id}_episode_{episode}_BEST.pt"
+                        ]
+                else:
+                    # Try to load in order of preference
+                    model_patterns = [
+                        f"{path}/skrl_model_{tl_id}_GLOBAL_BEST.pt",
+                        f"{path}/skrl_model_{tl_id}_CURRENT_BEST.pt",
+                        f"{path.rstrip('/')}/skrl_model_{tl_id}_GLOBAL_BEST.pt",
+                        f"{path.rstrip('/')}/skrl_model_{tl_id}_CURRENT_BEST.pt"
+                    ]
+                    
+                    # Also try to find any BEST models with episode numbers
+                    best_files = glob.glob(f"{path.rstrip('/')}/skrl_model_{tl_id}_episode_*_BEST.pt")
+                    if best_files:
+                        # Sort by episode number (extract from filename)
+                        try:
+                            best_files.sort(key=lambda x: int(x.split("_episode_")[1].split("_")[0]), reverse=True)
+                            model_patterns.insert(0, best_files[0])  # Add latest BEST model at the front
+                        except (ValueError, IndexError):
+                            model_patterns.extend(best_files)
+                    
+                    # Finally, try any model for this traffic light
+                    any_models = glob.glob(f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt")
+                    if any_models:
+                        model_patterns.extend(any_models)
+                
+                # Try each pattern until one works
+                for model_path in model_patterns:
+                    if os.path.exists(model_path):
+                        try:
+                            # Load the state dict
+                            state_dict = torch.load(model_path, map_location=self.device)
+                            agent.models["q_network"].load_state_dict(state_dict)
+                            agent.models["target_q_network"].load_state_dict(state_dict)
+                            
+                            print(f"Loaded model for {tl_id} from: {os.path.basename(model_path)}")
+                            model_loaded = True
+                            loaded_count += 1
+                            break
+                        except Exception as e:
+                            print(f"Failed to load {model_path}: {e}")
+                            continue
+                
+                if not model_loaded:
+                    print(f"No suitable model found for {tl_id} in {path}")
+                    # List available files for debugging
+                    available_files = glob.glob(f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt")
+                    if available_files:
+                        print(f"   Available files: {[os.path.basename(f) for f in available_files]}")
+                    else:
+                        print(f"   No .pt files found for {tl_id}")
+                        
+            except Exception as e:
+                print(f"Error loading model for {tl_id}: {e}")
+        
+        if loaded_count > 0:
+            print(f"Successfully loaded models for {loaded_count}/{len(self.agents)} traffic lights")
+        else:
+            raise FileNotFoundError(f"Failed to load any models from {path}")
+        
+        return loaded_count
 
     def save_checkpoints(
         self, path: str, episode: Optional[int] = None, epsilon: Optional[float] = None
