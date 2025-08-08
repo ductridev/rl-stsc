@@ -356,9 +356,11 @@ class Simulation(SUMO):
             self.vehicle_tracker.update_stats(self.step)
 
             # Update DESRA traffic parameters for real-time adaptation
-            current_time = traci.simulation.getTime()
-            for det in self.all_detectors:
-                self.desra.update_traffic_parameters(det, current_time)
+            # Only update every 10 steps to reduce computational overhead
+            if self.step % 10 == 0:
+                current_time = traci.simulation.getTime()
+                for det in self.all_detectors:
+                    self.desra.update_traffic_parameters(det, current_time)
 
             # Print stats periodically
             if self.step % 1000 == 0:
@@ -469,9 +471,8 @@ class Simulation(SUMO):
                 done=done,
             )
 
-        if self.step % 60 == 0:
-            # Update history
-            self.history["reward"][tl_id].append(reward)
+        # Always record reward when phase ends (not just every 60 steps)
+        self.history["reward"][tl_id].append(reward)
 
         # Reset phase metrics
         for key in [
@@ -534,9 +535,20 @@ class Simulation(SUMO):
         # Save plots
         self.save_plot(episode=episode)
 
-        # Reset for next episode
+        # Reset step counter for next episode
         self.step = 0
-        # self.reset_history()
+        
+        # Clear arrival buffers to prevent memory leak
+        self.clear_arrival_buffers()
+        
+        # Clear DESRA buffers to prevent memory accumulation
+        if hasattr(self.desra, 'clear_buffers'):
+            self.desra.clear_buffers()
+            
+        # Clear agent memories periodically to prevent accumulation
+        if episode % 5 == 0:  # Clear every 5 episodes to balance performance and memory
+            if hasattr(self.agent_manager, 'clear_memories'):
+                self.agent_manager.clear_memories()
 
         return 0.0  # Return dummy training time
 
@@ -545,6 +557,12 @@ class Simulation(SUMO):
         for key in self.history:
             for tl_id in self.history[key]:
                 self.history[key][tl_id] = []
+
+    def clear_arrival_buffers(self):
+        """Clear arrival buffers to prevent memory accumulation"""
+        for det in self.arrival_buffers:
+            self.arrival_buffers[det].clear()
+        print("Cleared arrival buffers to prevent memory leaks")
 
     def save_model(self, episode: int):
         """Save SKRL models"""

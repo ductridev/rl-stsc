@@ -495,3 +495,11 @@ class SKRLAgentManager:
     def models(self):
         """Property to access SKRL models for compatibility"""
         return {tl_id: agent.models for tl_id, agent in self.agents.items()}
+
+    def clear_memories(self):
+        """Clear all agent memories to prevent accumulation between episodes"""
+        print("Clearing agent memories to prevent memory leaks...")
+        for tl_id, agent in self.agents.items():
+            # SKRL memory doesn't have a direct clear method, but we can reset the internal pointer
+            agent.memory.reset()
+        print("Agent memories cleared")

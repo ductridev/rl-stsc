@@ -475,3 +475,21 @@ class DESRA(SUMO):
         else:
             # no downstream links → assume full storage available
             return traci.lanearea.getLength(detector_id)
+
+    def clear_buffers(self):
+        """Clear all DESRA buffers to prevent memory accumulation between episodes"""
+        # Clear rolling buffers
+        self.vehicle_counts.clear()
+        self.occupancies.clear()
+        self.flow_rates.clear()
+        self.densities.clear()
+        
+        # Reset time tracking
+        self.last_update_time.clear()
+        
+        # Reset estimated parameters to defaults
+        self.estimated_saturation_flow.clear()
+        self.estimated_critical_density.clear()
+        self.estimated_jam_density.clear()
+        
+        print("Cleared DESRA buffers to prevent memory leaks")
