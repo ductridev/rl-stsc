@@ -12,7 +12,7 @@ sys.path.insert(0, current_dir)
 from sim_utils.traffic_metrics import TrafficMetrics
 from visualization import Visualization
 from normalizer import Normalizer
-from sumo import SUMO
+from .sumo import SUMO
 from accident_manager import AccidentManager
 from vehicle_tracker import VehicleTracker
 
