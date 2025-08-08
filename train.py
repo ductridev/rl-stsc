@@ -1,4 +1,5 @@
-import libtraci as traci
+import libsumo as traci
+import torch
 from src.memory import ReplayMemory
 from src.memory_palace import MemoryPalace
 from src.utils import (
@@ -122,7 +123,7 @@ if __name__ == "__main__":
         )
 
         # Load existing SKRL model if specified in config (only for first config)
-        start_episode = global_episode
+        start_episode = 1  # Reset episode counter for each configuration
         if config_idx == 0 and config.get("load_model_name") and config["load_model_name"] is not None:
             model_load_path = set_load_model_path(config["models_path_name"]) + config["load_model_name"] + ".pth"
             try:
@@ -198,11 +199,14 @@ if __name__ == "__main__":
             'completion_rate': -1,
             'total_reward': -float('inf'),
             'combined_score': -float('inf'),
-            'config_file': config_file
+            'config_file': config_file,
+            'total_arrived': 0,
+            'total_departed': 0,
+            'dqn_avg_outflow': 0
         }
         config_performance_history = []
 
-        while episode < config["total_episodes"]:
+        while episode <= config["total_episodes"]:
             print("\n----- Episode", str(episode), "of", str(config["total_episodes"]))
             # Run the build routes file command
             # Turn off when don't need route generation
@@ -467,23 +471,57 @@ if __name__ == "__main__":
                 }
                 config_performance_history.append(current_performance)
                 
-                # Check if this is the best performance so far
-                if combined_score > config_best_performance['combined_score']:
+                # Check if this is the best performance using 3-metric voting system
+                metrics_won = 0
+                metric_details = []
+                
+                # Metric 1: Total Reward (higher is better)
+                if dqn_total_reward > config_best_performance['total_reward']:
+                    metrics_won += 1
+                    metric_details.append(f"Reward: {dqn_total_reward:.2f} > {config_best_performance['total_reward']:.2f}")
+                else:
+                    metric_details.append(f" Reward: {dqn_total_reward:.2f} <= {config_best_performance['total_reward']:.2f}")
+                
+                # Metric 2: Completion Rate (higher is better)
+                if completion_rate > config_best_performance['completion_rate']:
+                    metrics_won += 1
+                    metric_details.append(f"Completion: {completion_rate:.1f}% > {config_best_performance['completion_rate']:.1f}%")
+                else:
+                    metric_details.append(f"Completion: {completion_rate:.1f}% <= {config_best_performance['completion_rate']:.1f}%")
+                
+                # Metric 3: Average Outflow (higher is better)
+                if dqn_avg_outflow > config_best_performance.get('dqn_avg_outflow', 0):
+                    metrics_won += 1
+                    metric_details.append(f"Outflow: {dqn_avg_outflow:.2f} > {config_best_performance.get('dqn_avg_outflow', 0):.2f}")
+                else:
+                    metric_details.append(f"Outflow: {dqn_avg_outflow:.2f} <= {config_best_performance.get('dqn_avg_outflow', 0):.2f}")
+                
+                print(f"\n3-Metric Performance Comparison - Episode {episode}:")
+                for detail in metric_details:
+                    print(f"   {detail}")
+                print(f"   Result: Won {metrics_won}/3 metrics")
+                
+                # Save model if it wins majority of metrics (2 or more out of 3)
+                if metrics_won >= 2:
                     # Clean up old best model files first
                     model_save_name = config.get("save_model_name", "dqn_model")
                     
                     # Remove old best files if they exist
                     if config_best_performance['episode'] != -1:  # If there was a previous best
-                        old_best_model = path + f"{model_save_name}_BEST_ep{config_best_performance['episode']}.pth"
-                        old_best_checkpoint = path + f"{model_save_name}_BEST_ep{config_best_performance['episode']}_checkpoint.pth"
+                        # Remove old best model files for all traffic lights
+                        import glob
+                        old_best_pattern = path + f"skrl_model_*_episode_{config_best_performance['episode']}_BEST.pt"
+                        old_checkpoint_pattern = path + f"skrl_model_*_episode_{config_best_performance['episode']}_BEST_checkpoint.pt"
                         
                         try:
-                            if os.path.exists(old_best_model):
-                                os.remove(old_best_model)
-                                print(f"   Removed old best model: ep{config_best_performance['episode']}")
-                            if os.path.exists(old_best_checkpoint):
-                                os.remove(old_best_checkpoint)
-                                print(f"   Removed old best checkpoint: ep{config_best_performance['episode']}")
+                            # Remove old best model files
+                            for old_file in glob.glob(old_best_pattern):
+                                os.remove(old_file)
+                                print(f"   Removed old best model: {os.path.basename(old_file)}")
+                            
+                            for old_file in glob.glob(old_checkpoint_pattern):
+                                os.remove(old_file)
+                                print(f"   Removed old best checkpoint: {os.path.basename(old_file)}")
                         except Exception as e:
                             print(f"   Could not remove old best files: {e}")
                     
@@ -491,46 +529,85 @@ if __name__ == "__main__":
                     config_best_performance = current_performance.copy()
                     config_best_performance['config_file'] = config_file
                     print(f"\nNEW BEST PERFORMANCE for {config_file} at Episode {episode}!")
+                    print(f"   Won {metrics_won}/3 metrics - Majority Victory!")
+                    print(f"   Reward: {dqn_total_reward:.2f}")
                     print(f"   Completion Rate: {completion_rate:.1f}%")
-                    print(f"   Total Reward (Best Model Metric): {dqn_total_reward:.2f}")
-                    print(f"   DQN Avg Outflow: {dqn_avg_outflow:.2f}")
-                    print(f"   Combined Score (Total Reward): {combined_score:.2f}")
+                    print(f"   Avg Outflow: {dqn_avg_outflow:.2f}")
                     
-                    # Check if this is also the global best across all configs
-                    if combined_score > global_best_performance['combined_score']:
+                    # Check if this is also the global best using same 3-metric system
+                    global_metrics_won = 0
+                    
+                    # Compare against global best
+                    if dqn_total_reward > global_best_performance['total_reward']:
+                        global_metrics_won += 1
+                    if completion_rate > global_best_performance['completion_rate']:
+                        global_metrics_won += 1
+                    if dqn_avg_outflow > global_best_performance.get('dqn_avg_outflow', 0):
+                        global_metrics_won += 1
+                    
+                    if global_metrics_won >= 2:
                         global_best_performance = current_performance.copy()
                         global_best_performance['config_file'] = config_file
                         global_best_performance['dqn_avg_outflow'] = dqn_avg_outflow
-                        print(f"   This is also the GLOBAL BEST across all configurations!")
+                        print(f"   This is also the GLOBAL BEST across all configurations! ({global_metrics_won}/3 metrics)")
                     
-                    # Create new best model files
-                    best_model_path = path + f"{model_save_name}_BEST_ep{episode}.pt"
-                    best_checkpoint_path = path + f"{model_save_name}_BEST_ep{episode}_checkpoint.pt"
+                    # Save BEST model files in .pt format
+                    print(f"   Saving BEST models in .pt format...")
                     
-                    # Save SKRL model as best (save immediately when new best is found)
+                    # Save current best models with BEST suffix
+                    for tl_id in simulation_skrl.agent_manager.agents.keys():
+                        agent = simulation_skrl.agent_manager.agents[tl_id]
+                        
+                        # Best model with episode number
+                        best_model_path = path + f"skrl_model_{tl_id}_episode_{episode}_BEST.pt"
+                        torch.save(agent.models["q_network"].state_dict(), best_model_path)
+                        print(f"     {os.path.basename(best_model_path)}")
+                        
+                        # Best checkpoint with episode number
+                        best_checkpoint_path = path + f"skrl_model_{tl_id}_episode_{episode}_BEST_checkpoint.pt"
+                        checkpoint = {
+                            "model_state_dict": agent.models["q_network"].state_dict(),
+                            "target_model_state_dict": agent.models["target_q_network"].state_dict(),
+                            "episode": episode,
+                            "epsilon": epsilon,
+                            "reward": dqn_total_reward,
+                            "completion_rate": completion_rate,
+                            "avg_outflow": dqn_avg_outflow,
+                            "metrics_won": metrics_won,
+                            "config_file": config_file
+                        }
+                        torch.save(checkpoint, best_checkpoint_path)
+                        print(f"     {os.path.basename(best_checkpoint_path)}")
+                        
+                        # Current best (overwrite previous)
+                        current_best_model = path + f"skrl_model_{tl_id}_CURRENT_BEST.pt"
+                        torch.save(agent.models["q_network"].state_dict(), current_best_model)
+                        
+                        current_best_checkpoint = path + f"skrl_model_{tl_id}_CURRENT_BEST_checkpoint.pt"
+                        torch.save(checkpoint, current_best_checkpoint)
+                        
+                        # Global best (overwrite previous) 
+                        if global_metrics_won >= 2:
+                            global_best_model = path + f"skrl_model_{tl_id}_GLOBAL_BEST.pt"
+                            torch.save(agent.models["q_network"].state_dict(), global_best_model)
+                            
+                            global_best_checkpoint = path + f"skrl_model_{tl_id}_GLOBAL_BEST_checkpoint.pt"
+                            torch.save(checkpoint, global_best_checkpoint)
+                    
+                    # Also save using the standard method for compatibility
                     simulation_skrl.save_model(episode)
-                    print(f"   Best SKRL model saved: ep{episode}")
-                    
-                    # Always update the "CURRENT" best files (overwrite)
-                    current_best_model = path + f"{model_save_name}_BEST_CURRENT.pt"
-                    current_best_checkpoint = path + f"{model_save_name}_BEST_CURRENT_checkpoint.pt"
-                    
-                    # Save additional copy with episode number for reference
-                    simulation_skrl.save_model(episode)  # This will save with the episode number
-                    print(f"   Current best updated: ep{episode}")
-                    
-                    # Save a copy as the global best (overwrite any previous global best)
-                    global_best_model = path + f"{model_save_name}_GLOBAL_BEST.pt"
-                    global_best_checkpoint = path + f"{model_save_name}_GLOBAL_BEST_checkpoint.pt"
-                    simulation_skrl.save_model(episode)
-                    print(f"   Global best model saved: ep{episode}")
+                    print(f"   Standard SKRL models also saved for episode {episode}")
+                else:
+                    print(f"   Not saving: Only won {metrics_won}/3 metrics (need 2+ for majority)")
                 
                 # Print current vs best performance every episode
-                print(f"\n📊 Performance Summary - Episode {episode}")
-                print(f"Current DQN: Reward={combined_score:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
+                print(f"\nPerformance Summary - Episode {episode}")
+                print(f"Current DQN: Reward={dqn_total_reward:.2f}, Outflow={dqn_avg_outflow:.2f}, Completion={completion_rate:.1f}%")
                 # print(f"Current Actuated: Reward={actuated_total_reward:.2f}, Outflow={actuated_avg_outflow:.2f}, Completion={actuated_completion_rate:.1f}%")
-                print(f"Best DQN:    Reward={config_best_performance['combined_score']:.2f}, Episode={config_best_performance['episode']}, Completion={config_best_performance['completion_rate']:.1f}%")
-                print(f"Global Best: Reward={global_best_performance['combined_score']:.2f}, Episode={global_best_performance['episode']}, Config={global_best_performance.get('config_file', 'N/A')}")
+                print(f"Best DQN:    Reward={config_best_performance['total_reward']:.2f}, Episode={config_best_performance['episode']}, Completion={config_best_performance['completion_rate']:.1f}%")
+                print(f"             Outflow={config_best_performance.get('dqn_avg_outflow', 0):.2f} (Won {metrics_won if 'metrics_won' in locals() else 'N/A'}/3 metrics this episode)")
+                print(f"Global Best: Reward={global_best_performance['total_reward']:.2f}, Episode={global_best_performance['episode']}, Config={global_best_performance.get('config_file', 'N/A')}")
+                print(f"             Outflow={global_best_performance.get('dqn_avg_outflow', 0):.2f}, Completion={global_best_performance['completion_rate']:.1f}%")
                 # print(f"DQN vs Actuated: Reward={dqn_total_reward:.2f} vs {actuated_total_reward:.2f}, Outflow={dqn_avg_outflow:.2f} vs {actuated_avg_outflow:.2f}")
                 # print(f"Current Base: Reward={base_total_reward:.2f}, Outflow={base_avg_outflow:.2f}, Completion={base_completion_rate:.1f}%")
                 # print(f"DQN vs Base: Reward={dqn_total_reward:.2f} vs {base_total_reward:.2f}, Outflow={dqn_avg_outflow:.2f} vs {base_avg_outflow:.2f}")
@@ -629,7 +706,30 @@ if __name__ == "__main__":
         print(f"\nCompleted training for config: {config_file}")
         print(f"   Final episode: {episode-1}")
         print(f"   Final epsilon: {epsilon:.4f}")
-        print(f"   Config best performance: Episode {config_best_performance['episode']}, Score {config_best_performance['combined_score']:.2f}")
+        print(f"   Config best performance: Episode {config_best_performance['episode']}, Score {config_best_performance['total_reward']:.2f}")
+
+        # Show saved model files summary
+        print(f"\nSAVED MODEL FILES SUMMARY:")
+        try:
+            import glob
+            model_patterns = [
+                (f"*_BEST.pt", "Best Models"),
+                (f"*_BEST_checkpoint.pt", "Best Checkpoints"), 
+                (f"*_CURRENT_BEST.pt", "Current Best Models"),
+                (f"*_GLOBAL_BEST.pt", "Global Best Models"),
+                (f"skrl_model_*_episode_*.pt", "Standard Episode Models")
+            ]
+            
+            for pattern, description in model_patterns:
+                files = glob.glob(path + pattern)
+                if files:
+                    print(f"   {description}: {len(files)} files")
+                    for file in files[-3:]:  # Show last 3 files
+                        print(f"     - {os.path.basename(file)}")
+                    if len(files) > 3:
+                        print(f"     ... and {len(files) - 3} more")
+        except Exception as e:
+            print(f"   Could not list model files: {e}")
 
         # Store results for this configuration
         config_summary = {
@@ -641,8 +741,8 @@ if __name__ == "__main__":
             'best_completion_rate': config_best_performance['completion_rate'],
             'best_total_reward': config_best_performance['combined_score'],
             'best_dqn_avg_outflow': config_best_performance.get('dqn_avg_outflow', 0),
-            'best_total_arrived': config_best_performance['total_arrived'],
-            'best_total_departed': config_best_performance['total_departed'],
+            'best_total_arrived': config_best_performance.get('total_arrived', 0),
+            'best_total_departed': config_best_performance.get('total_departed', 0),
             'training_start_time': timestamp_start,
             'training_end_time': datetime.datetime.now()
         }
@@ -653,13 +753,15 @@ if __name__ == "__main__":
         print("----- Session info saved at:", path)
         
         # Print best performance summary for this config
-        print(f"\nBEST PERFORMANCE FOR {config_file}")
-        print("=" * 50)
+        print(f"\nBEST PERFORMANCE FOR {config_file} (3-Metric Voting System)")
+        print("=" * 60)
         print(f"Best Episode: {config_best_performance['episode']}")
-        print(f"Best Completion Rate: {config_best_performance['completion_rate']:.2f}%")
-        print(f"Best Total Reward (Model Selection): {config_best_performance['combined_score']:.2f}")
-        print(f"Best DQN Avg Outflow: {config_best_performance.get('dqn_avg_outflow', 'N/A')}")
+        print(f"Metrics that Won:")
+        print(f"   Total Reward: {config_best_performance['total_reward']:.2f}")
+        print(f"   Completion Rate: {config_best_performance['completion_rate']:.2f}%")
+        print(f"   Avg Outflow: {config_best_performance.get('dqn_avg_outflow', 'N/A')}")
         print(f"Vehicles: {config_best_performance['total_arrived']}/{config_best_performance['total_departed']}")
+        print(f"Note: Model saved when winning ≥2 out of 3 metrics")
         
         # Save performance history to CSV for this config
         if config_performance_history:
@@ -788,9 +890,41 @@ if __name__ == "__main__":
     
     # Save final shared model
     if shared_simulation_skrl is not None:
-        print(f"\n💾 Saving final shared DQN model...")
+        print(f"\nSaving final shared DQN model...")
         shared_simulation_skrl.save_model(global_episode - 1)
-        print(f"✅ Final shared DQN model saved at episode {global_episode - 1}")
+        
+        # Also save final models in .pt format with descriptive names
+        print(f"   Saving final models in .pt format...")
+        final_episode = global_episode - 1
+        
+        for tl_id in shared_simulation_skrl.agent_manager.agents.keys():
+            agent = shared_simulation_skrl.agent_manager.agents[tl_id]
+            
+            # Final model
+            final_model_path = shared_path + f"skrl_model_{tl_id}_FINAL_episode_{final_episode}.pt"
+            torch.save(agent.models["q_network"].state_dict(), final_model_path)
+            
+            # Final checkpoint with comprehensive metadata
+            final_checkpoint_path = shared_path + f"skrl_model_{tl_id}_FINAL_episode_{final_episode}_checkpoint.pt"
+            final_checkpoint = {
+                "model_state_dict": agent.models["q_network"].state_dict(),
+                "target_model_state_dict": agent.models["target_q_network"].state_dict(),
+                "episode": final_episode,
+                "epsilon": global_epsilon,
+                "global_best_reward": global_best_performance['total_reward'],
+                "global_best_completion_rate": global_best_performance['completion_rate'],
+                "global_best_avg_outflow": global_best_performance.get('dqn_avg_outflow', 0),
+                "global_best_config": global_best_performance['config_file'],
+                "total_configs_trained": len(config_files),
+                "training_completion_time": datetime.datetime.now().isoformat(),
+                "model_selection_method": "3-Metric Voting System",
+                "selection_threshold": ">=2 out of 3 metrics must improve"
+            }
+            torch.save(final_checkpoint, final_checkpoint_path)
+            print(f"     {os.path.basename(final_model_path)}")
+            print(f"     {os.path.basename(final_checkpoint_path)}")
+        
+        print(f"Final shared DQN model saved at episode {global_episode - 1}")
     
     # ==================== COMPREHENSIVE RESULTS SUMMARY ====================
     print(f"\n{'COMPREHENSIVE RESULTS SUMMARY':^80}")
@@ -802,25 +936,26 @@ if __name__ == "__main__":
         training_duration = config['training_end_time'] - config['training_start_time']
         total_training_time += training_duration
     
-    print(f"📊 OVERALL TRAINING STATISTICS:")
+    print(f"OVERALL TRAINING STATISTICS:")
     print(f"   Total configurations trained: {len(config_files)}")
     print(f"   Total episodes completed: {global_episode - 1}")
     print(f"   Total training time: {total_training_time}")
     print(f"   Average training time per config: {total_training_time / len(config_files)}")
     
     # Best performance across all configurations
-    print(f"\nGLOBAL BEST PERFORMANCE (Across All Configurations):")
-    print("-" * 60)
+    print(f"\nGLOBAL BEST PERFORMANCE (3-Metric Voting System):")
+    print("-" * 70)
     print(f"Best Configuration: {global_best_performance['config_file']}")
     print(f"   Episode: {global_best_performance['episode']}")
-    print(f"   Completion Rate: {global_best_performance['completion_rate']:.2f}%")
-    print(f"   Total Reward: {global_best_performance['combined_score']:.2f}")
-    print(f"   Avg Outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}")
+    print(f"   Won majority (≥2/3) of these metrics:")
+    print(f"      Total Reward: {global_best_performance['total_reward']:.2f}")
+    print(f"      Completion Rate: {global_best_performance['completion_rate']:.2f}%")
+    print(f"      Avg Outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}")
     print(f"   Vehicles: {global_best_performance['total_arrived']}/{global_best_performance['total_departed']}")
     print(f"   Epsilon at best: {global_best_performance.get('epsilon', 'N/A'):.6f}")
     
     # Configuration-by-configuration breakdown
-    print(f"\n📋 PERFORMANCE BY CONFIGURATION:")
+    print(f"\nPERFORMANCE BY CONFIGURATION:")
     print("-" * 80)
     
     for i, config in enumerate(all_config_results, 1):
@@ -828,7 +963,7 @@ if __name__ == "__main__":
         training_duration = config['training_end_time'] - config['training_start_time']
         
         # Mark if this is the global best
-        global_best_marker = " 🌟 GLOBAL BEST" if config['config_file'] == global_best_performance['config_file'] else ""
+        global_best_marker = " GLOBAL BEST" if config['config_file'] == global_best_performance['config_file'] else ""
         
         print(f"{i}. {config_name}{global_best_marker}")
         print(f"   File: {config['config_file']}")
@@ -841,19 +976,21 @@ if __name__ == "__main__":
         print(f"   Final epsilon: {config['final_epsilon']:.6f}")
         print()
     
-    # Performance comparison table
-    print(f"PERFORMANCE COMPARISON TABLE:")
-    print("-" * 80)
-    print(f"{'Config':<25} {'Best Episode':<12} {'Completion%':<12} {'Reward':<12} {'Outflow':<10}")
-    print("-" * 80)
+    # Performance comparison table  
+    print(f"PERFORMANCE COMPARISON TABLE (3-Metric Voting System):")
+    print("-" * 85)
+    print(f"{'Config':<25} {'Best Episode':<12} {'Completion%':<12} {'Reward':<12} {'Outflow':<10} {'Status':<8}")
+    print("-" * 85)
     
     for config in all_config_results:
         config_name = config['config_name'][:22] + "..." if len(config['config_name']) > 25 else config['config_name']
-        is_best = "[BEST]" if config['config_file'] == global_best_performance['config_file'] else "  "
+        is_best = "[BEST]" if config['config_file'] == global_best_performance['config_file'] else "     "
+        status = "BEST" if config['config_file'] == global_best_performance['config_file'] else "     "
         
-        print(f"{is_best}{config_name:<23} {config['best_episode']:<12} {config['best_completion_rate']:<11.1f}% {config['best_total_reward']:<11.1f} {config['best_dqn_avg_outflow']:<9.1f}")
+        print(f"{is_best}{config_name:<20} {config['best_episode']:<12} {config['best_completion_rate']:<11.1f}% {config['best_total_reward']:<11.1f} {config['best_dqn_avg_outflow']:<9.1f} {status:<8}")
     
-    print("-" * 80)
+    print("-" * 85)
+    print("Note: Models saved when winning ≥2 out of 3 metrics (Reward, Completion Rate, Outflow)")
     
     # Save comprehensive results to file
     results_summary_file = shared_path + "comprehensive_results_summary.txt"
@@ -864,13 +1001,15 @@ if __name__ == "__main__":
             f.write(f"Training completed: {datetime.datetime.now()}\n")
             f.write(f"Total configurations: {len(config_files)}\n")
             f.write(f"Total episodes: {global_episode - 1}\n")
-            f.write(f"Total training time: {total_training_time}\n\n")
+            f.write(f"Total training time: {total_training_time}\n")
+            f.write(f"Model Selection: 3-Metric Voting System (≥2/3 metrics must improve)\n")
+            f.write(f"Metrics: Total Reward, Completion Rate, Average Outflow\n\n")
             
-            f.write("GLOBAL BEST PERFORMANCE:\n")
+            f.write("GLOBAL BEST PERFORMANCE (3-Metric Voting System):\n")
             f.write(f"Configuration: {global_best_performance['config_file']}\n")
             f.write(f"Episode: {global_best_performance['episode']}\n")
+            f.write(f"Total Reward: {global_best_performance['total_reward']:.2f}\n")
             f.write(f"Completion Rate: {global_best_performance['completion_rate']:.2f}%\n")
-            f.write(f"Total Reward: {global_best_performance['combined_score']:.2f}\n")
             f.write(f"Avg Outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}\n")
             f.write(f"Vehicles: {global_best_performance['total_arrived']}/{global_best_performance['total_departed']}\n\n")
             
@@ -880,10 +1019,12 @@ if __name__ == "__main__":
                 f.write(f"\nConfig: {config['config_name']}\n")
                 f.write(f"  File: {config['config_file']}\n")
                 f.write(f"  Best Episode: {config['best_episode']}\n")
-                f.write(f"  Best Completion Rate: {config['best_completion_rate']:.2f}%\n")
                 f.write(f"  Best Total Reward: {config['best_total_reward']:.2f}\n")
+                f.write(f"  Best Completion Rate: {config['best_completion_rate']:.2f}%\n")
                 f.write(f"  Best Avg Outflow: {config['best_dqn_avg_outflow']:.2f}\n")
                 f.write(f"  Training Duration: {config['training_end_time'] - config['training_start_time']}\n")
+            
+            f.write(f"\nNOTE: Models were saved only when they achieved majority wins (≥2/3) across all three metrics.\n")
         
         print(f"Comprehensive results summary saved: {results_summary_file}")
     except Exception as e:
@@ -897,15 +1038,18 @@ if __name__ == "__main__":
                 'Config_Name': config['config_name'],
                 'Config_File': config['config_file'],
                 'Best_Episode': config['best_episode'],
-                'Best_Completion_Rate': config['best_completion_rate'],
                 'Best_Total_Reward': config['best_total_reward'],
+                'Best_Completion_Rate': config['best_completion_rate'],
                 'Best_Avg_Outflow': config['best_dqn_avg_outflow'],
                 'Best_Total_Arrived': config['best_total_arrived'],
-                'Best_Total_Departed': config['best_total_departed'],
+                'Best_Total_departed': config['best_total_departed'],
                 'Final_Episode': config['final_episode'],
                 'Final_Epsilon': config['final_epsilon'],
                 'Training_Duration_Seconds': (config['training_end_time'] - config['training_start_time']).total_seconds(),
-                'Is_Global_Best': config['config_file'] == global_best_performance['config_file']
+                'Is_Global_Best': config['config_file'] == global_best_performance['config_file'],
+                'Model_Selection_Method': '3-Metric_Voting_System',
+                'Metrics_Used': 'Total_Reward,Completion_Rate,Avg_Outflow',
+                'Selection_Threshold': 'Majority_Win_2_of_3_Metrics'
             } for config in all_config_results
         ])
         
@@ -915,9 +1059,64 @@ if __name__ == "__main__":
     except Exception as e:
         print(f" Could not save performance comparison CSV: {e}")
     
+    # Create comprehensive model inventory
+    print(f"\nCOMPREHENSIVE MODEL INVENTORY")
+    print("=" * 70)
+    try:
+        import glob
+        
+        all_models = glob.glob(shared_path + "*.pt")
+        if all_models:
+            model_categories = {
+                "Best Performance Models": [f for f in all_models if "_BEST" in f and "CURRENT" not in f and "GLOBAL" not in f],
+                "Global Best Models": [f for f in all_models if "GLOBAL_BEST" in f],
+                "Current Best Models": [f for f in all_models if "CURRENT_BEST" in f],
+                "Standard Episode Models": [f for f in all_models if "episode_" in f and "BEST" not in f and "FINAL" not in f],
+                "Final Models": [f for f in all_models if "FINAL" in f],
+            }
+            
+            total_models = 0
+            for category, files in model_categories.items():
+                if files:
+                    print(f"\n{category}: {len(files)} files")
+                    total_models += len(files)
+                    # Show a few examples
+                    for file in files[:3]:
+                        size_mb = os.path.getsize(file) / (1024 * 1024)
+                        print(f"  {os.path.basename(file)} ({size_mb:.2f} MB)")
+                    if len(files) > 3:
+                        print(f"  ... and {len(files) - 3} more files")
+            
+            print(f"\nTOTAL MODELS SAVED: {total_models} .pt files")
+            total_size_mb = sum(os.path.getsize(f) for f in all_models) / (1024 * 1024)
+            print(f"TOTAL SIZE: {total_size_mb:.2f} MB")
+            
+            # Best model recommendations
+            print(f"\nRECOMMENDED MODELS FOR INFERENCE:")
+            global_best_files = [f for f in all_models if "GLOBAL_BEST" in f and "checkpoint" not in f]
+            if global_best_files:
+                print(f"   Primary: Global Best Models (won ≥2/3 metrics)")
+                for file in global_best_files:
+                    print(f"     {os.path.basename(file)}")
+            
+            current_best_files = [f for f in all_models if "CURRENT_BEST" in f and "checkpoint" not in f]
+            if current_best_files:
+                print(f"   Alternative: Current Best Models (latest best per config)")
+                for file in current_best_files[:2]:  # Show first 2
+                    print(f"    {os.path.basename(file)}")
+        else:
+            print("No .pt model files found!")
+    
+    except Exception as e:
+        print(f"Could not create model inventory: {e}")
+    
+    print("=" * 70)
+
     # Final success message
     print(f"\nMULTI-CONFIGURATION TRAINING SESSION COMPLETED SUCCESSFULLY! 🎊")
     print(f"Best performance achieved with: {global_best_performance['config_file']}")
-    print(f"Best reward: {global_best_performance['combined_score']:.2f}")
+    print(f"Best reward: {global_best_performance['total_reward']:.2f}")
     print(f"Best completion rate: {global_best_performance['completion_rate']:.2f}%")
-    print("=" * 80)
+    print(f"Best outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}")
+    print(f"Model selected using 3-metric voting system (≥2/3 metrics must improve)")
+    print("=" * 85)
