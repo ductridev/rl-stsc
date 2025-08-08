@@ -12,7 +12,7 @@ memory:
 model:
   training_epochs: 20
   save_model_name: "dqn_testngatu_model" # Name for saving the model
-  load_model_name: null # Set to model name to load existing model, null to start fresh
+  load_model_name: "models/model_14" # Set to model path to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
   save_interval: 2 # Save model every N episodes
   training_steps: 300
@@ -63,7 +63,7 @@ agent:
     outflow_rate: 1
     delay: -0.25
     travel_time: -1
-    waiting_time: -0.25
+    waiting_time: -1
     switch_phase: -5
 
 vehicle_counts:
