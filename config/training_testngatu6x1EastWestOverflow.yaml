@@ -1,6 +1,6 @@
 simulation:
   gui: False
-  total_episodes: 100
+  total_episodes: 25
   max_steps: 3600
   interphase_duration: 3
 
@@ -10,7 +10,7 @@ memory:
   sample_size: 300
 
 model:
-  training_epochs: 1000
+  training_epochs: 20
   save_model_name: "dqn_testngatu_model" # Name for saving the model
   load_model_name: null # Set to model name to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
@@ -21,7 +21,7 @@ model:
 agent:
   rbf_components: 100   
   rbf_gamma: 0.5 
-  gamma: 0.8
+  gamma: 0.95
   num_states: 32 # Per-phase features (max 10 phases × 3 features) + current_phase + DESRA_phase
   model:
     # Model architecture type

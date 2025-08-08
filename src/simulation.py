@@ -6,7 +6,7 @@ Refactored to use separate modules for better organization.
 import numpy as np
 import torch
 import time
-import traci
+import libtraci as traci
 from collections import defaultdict, deque
 from typing import Dict, List, Any, Tuple
 import sys
@@ -19,7 +19,7 @@ sys.path.insert(0, current_dir)
 from visualization import Visualization
 from normalizer import Normalizer
 from desra import DESRA
-from sumo import SUMO
+from .sumo import SUMO
 from accident_manager import AccidentManager
 from vehicle_tracker import VehicleTracker
 from agents.skrl_agent_manager import SKRLAgentManager
@@ -109,21 +109,9 @@ class Simulation(SUMO):
             "waiting_time": {},
         }
 
-        # Initialize state
-        self.initState()
-
         # Setup device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
-
-        # Setup SKRL agent manager
-        self.agent_manager = SKRLAgentManager(
-            simulation_instance=self,
-            agent_cfg=self.agent_cfg,
-            traffic_lights=self.traffic_lights,
-            updating_target_network_steps=self.updating_target_network_steps,
-            device=self.device,
-        )
 
         # DESRA setup
         self.desra = DESRA(interphase_duration=self.interphase_duration)
@@ -142,6 +130,9 @@ class Simulation(SUMO):
 
         # For backward compatibility with training script
         self.agent = self  # Point to self so training script can access methods
+
+        # Initialize state
+        self.initState()
 
     @property
     def agents(self):
@@ -199,11 +190,25 @@ class Simulation(SUMO):
                 for det in self.get_movements_from_phase(traffic_light, phase):
                     _ = self.arrival_buffers[det]
 
+        # Setup SKRL agent manager
+        self.agent_manager = SKRLAgentManager(
+            simulation_instance=self,
+            agent_cfg=self.agent_cfg,
+            traffic_lights=self.traffic_lights,
+            updating_target_network_steps=self.updating_target_network_steps,
+            device=self.device,
+        )
+
     def select_action(
-        self, tl_id: str, state: np.ndarray, epsilon: float
+        self, tl_id: str, state: np.ndarray, epsilon: float, desra_phase_idx: str
     ) -> Tuple[float, int]:
         """Select action using SKRL agent manager"""
-        return self.agent_manager.select_action(tl_id, state, epsilon)
+        random_val = np.random.random()
+        # Standard epsilon-greedy for other models
+        if random_val < epsilon:
+            return random_val, desra_phase_idx
+        else:
+            return random_val, self.agent_manager.select_action(tl_id, state, self.step, self.max_steps)
 
     def store_transition(
         self,
@@ -216,14 +221,14 @@ class Simulation(SUMO):
     ):
         """Store transition in agent's memory"""
         self.agent_manager.store_transition(
-            tl_id, state, action, reward, next_state, done
+            tl_id, state, action, reward, next_state, done, self.step, self.max_steps
         )
 
-    def train_agents(self):
+    def train_agents(self, tl_id):
         """Train all agents using SKRL (returns 0 if in testing mode)"""
         if self.testing_mode:
             return 0.0
-        return self.agent_manager.train_agents(self.step, self.max_steps)
+        return self.agent_manager.train_agents(tl_id, self.step, self.max_steps)
 
     def run(self, epsilon: float, episode: int):
         """Run simulation with SKRL agents"""
@@ -303,11 +308,13 @@ class Simulation(SUMO):
                 state["interphase"] = False
 
                 # Get current state
-                current_state = self.get_state(tl, state["phase"])
+                current_state, desra_phase_idx = self.get_state(tl, state["phase"])
+
+                self.agent_manager.pre_interaction(tl_id, self.step, self.max_steps)
 
                 # Select action using SKRL agent
                 random_val, action_idx = self.select_action(
-                    tl_id, current_state, epsilon
+                    tl_id, current_state, epsilon, desra_phase_idx
                 )
 
                 # Convert action to phase
@@ -342,6 +349,8 @@ class Simulation(SUMO):
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
             self.step += 1
+            for tl in self.traffic_lights:
+                self.agent_manager.update_step(tl["id"], self.step, self.max_steps)
 
             # Update vehicle tracking
             self.vehicle_tracker.update_stats(self.step)
@@ -404,19 +413,17 @@ class Simulation(SUMO):
                 if self.step > 0 and self.step % 60 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
 
-            # Training (skip if in testing mode)
-            if (not self.testing_mode and 
-                self.step > 0 and 
-                self.step % self.training_steps == 0):
-                print(f"Training per {self.training_steps} steps...")
-                train_start = time.time()
+                # Training (skip if in testing mode)
+                if (not self.testing_mode and 
+                    self.step > 0 and 
+                    self.step % self.training_steps == 0):
+                    print(f"Training per {self.training_steps} steps...")
+                    train_start = time.time()
 
-                loss = 0.0
-                for _ in range(self.epoch):
-                    loss += self.train_agents()
+                    loss = self.train_agents(tl_id)
 
-                print(f"Loss: {loss}")
-                print(f"Training took {time.time() - train_start:.2f}s")
+                    print(f"Loss: {loss}")
+                    print(f"Training took {time.time() - train_start:.2f}s")
 
         traci.close()
         sim_time = time.time() - start_time
@@ -446,7 +453,7 @@ class Simulation(SUMO):
         reward = self.get_reward(tl_id, st["phase"])
 
         # Get next state
-        next_state = self.get_state(tl, st["phase"])
+        next_state, desra_phase_idx = self.get_state(tl, st["phase"])
 
         # Check if done
         done = self.step >= self.max_steps
@@ -519,10 +526,10 @@ class Simulation(SUMO):
         print("---------------------------------------")
 
         # Update target networks periodically (skip if in testing mode)
-        if (not self.testing_mode and 
-            episode % self.save_interval == 0 and 
-            episode > 0):
-            self.agent_manager.update_target_networks(self.step, self.max_steps)
+        # if (not self.testing_mode and 
+        #     episode % self.save_interval == 0 and 
+        #     episode > 0):
+        #     self.agent_manager.update_target_networks(self.step, self.max_steps)
 
         # Save plots
         self.save_plot(episode=episode)
@@ -617,7 +624,7 @@ class Simulation(SUMO):
             len(state_vector) == self.agent_cfg["num_states"]
         ), f"State vector length {len(state_vector)} does not match input_dim {self.agent_cfg['num_states']}"
 
-        return np.array(state_vector, dtype=np.float32)
+        return np.array(state_vector, dtype=np.float32), desra_phase_idx
 
     def get_reward(self, tl_id: str, phase: str) -> float:
         """Calculate reward for a traffic light action"""

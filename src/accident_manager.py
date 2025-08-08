@@ -1,4 +1,4 @@
-import traci
+import libtraci as traci
 import random
 from shapely.geometry import Point, Polygon
 

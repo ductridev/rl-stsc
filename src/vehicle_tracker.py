@@ -3,7 +3,7 @@ Vehicle Tracker for SUMO Traffic Simulation
 Tracks vehicle statistics by type (bike, car, truck) during simulation.
 """
 
-import traci
+import libtraci as traci
 import numpy as np
 from collections import defaultdict
 import json

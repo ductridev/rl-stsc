@@ -1,6 +1,6 @@
 from src.sumo import SUMO
 
-import traci
+import libtraci as traci
 import numpy as np
 from collections import defaultdict, deque
 import math

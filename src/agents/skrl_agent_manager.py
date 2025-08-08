@@ -142,15 +142,19 @@ class SKRLAgentManager:
 
             # Create tensors dictionary and use create_tensor to register the tensor names properly
             print(f"🔧 Initializing memory for {tl_id}...")
-            
+
             # SKRL requires tensors to be registered using create_tensor
-            memory.create_tensor(name="states", size=observation_space_size, dtype=torch.float32)
+            memory.create_tensor(
+                name="states", size=observation_space_size, dtype=torch.float32
+            )
             memory.create_tensor(name="actions", size=1, dtype=torch.long)
             memory.create_tensor(name="rewards", size=1, dtype=torch.float32)
-            memory.create_tensor(name="next_states", size=observation_space_size, dtype=torch.float32)
+            memory.create_tensor(
+                name="next_states", size=observation_space_size, dtype=torch.float32
+            )
             memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
             memory.create_tensor(name="truncated", size=1, dtype=torch.bool)
-            
+
             print(f"✅ Memory tensors registered: {memory.get_tensor_names()}")
 
             self.memories[tl_id] = memory
@@ -163,38 +167,53 @@ class SKRLAgentManager:
 
             # Setup DQN agent configuration
             dqn_cfg = DQN_DEFAULT_CONFIG.copy()
-            
+
             # Update with our specific configuration
-            dqn_cfg.update({
-                "learning_rate": self.agent_cfg.get("model", {}).get("learning_rate", 0.001),
-                "discount_factor": self.agent_cfg.get("gamma", 0.99),  # Use correct SKRL parameter name
-                "batch_size": self.agent_cfg.get("model", {}).get("batch_size", 32),
-                "learning_starts": 100,  # Start learning after 100 samples
-                "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
-                "exploration": {
-                    "initial_epsilon": 1.0,
-                    "final_epsilon": 0.01,
-                    "timesteps": 1000
-                },
-                "polyak": 0.01,
-                "gradient_steps": 1,
-                "update_interval": 1,
-                # Ensure experiment settings are properly configured
-                "experiment": {
-                    "directory": "",
-                    "experiment_name": "",
-                    "write_interval": 0,  # Disable writing (was "auto")
-                    "checkpoint_interval": 0,  # Disable checkpointing (was "auto")
-                    "store_separately": False,
-                    "wandb": False,
-                    "wandb_kwargs": {}
+            dqn_cfg.update(
+                {
+                    "learning_rate": self.agent_cfg.get("model", {}).get(
+                        "learning_rate", 0.001
+                    ),
+                    "discount_factor": self.agent_cfg.get(
+                        "gamma", 0.99
+                    ),  # Use correct SKRL parameter name
+                    "batch_size": self.agent_cfg.get("model", {}).get("batch_size", 32),
+                    "learning_starts": 300,  # Start learning after 300 steps
+                    "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
+                    "exploration": {
+                        "initial_epsilon": self.agent_cfg.get("model", {}).get(
+                            "epsilon", 1
+                        ),
+                        "final_epsilon": self.agent_cfg.get("model", {}).get(
+                            "min_epsilon", 0.001
+                        ),
+                        "timesteps": 3600,
+                    },
+                    "polyak": 0.01,
+                    "gradient_steps": 5,
+                    "update_interval": 300,
+                    # Ensure experiment settings are properly configured
+                    "experiment": {
+                        "directory": "",
+                        "experiment_name": "",
+                        "write_interval": 1200,
+                        "checkpoint_interval": 1200,
+                        "store_separately": True,
+                        "wandb": False,
+                        "wandb_kwargs": {},
+                    },
                 }
-            })
-            
+            )
+
             # Remove any conflicting legacy parameters
             legacy_params = [
-                "epsilon_initial", "epsilon_final", "epsilon_decay_episodes", 
-                "target_network_update_freq", "memory_size", "gradient_clipping", "gamma"
+                "epsilon_initial",
+                "epsilon_final",
+                "epsilon_decay_episodes",
+                "target_network_update_freq",
+                "memory_size",
+                "gradient_clipping",
+                "gamma",
             ]
             for param in legacy_params:
                 if param in dqn_cfg:
@@ -223,41 +242,53 @@ class SKRLAgentManager:
 
             self.agents[tl_id] = agent
 
-    def select_action(
-        self, tl_id: str, state: np.ndarray, epsilon: float
-    ) -> Tuple[float, int]:
-        """Select action using SKRL agent"""
+    def pre_interaction(self, tl_id: str, step: int, max_steps: int):
         agent = self.agents[tl_id]
 
-        # Convert state to tensor
+        agent.pre_interaction(timestep=step, timesteps=max_steps)
+
+    def select_action(
+        self, tl_id: str, state: np.ndarray, step: int, max_steps: int
+    ) -> int:
+        """Select action using SKRL agent"""
+        agent = self.agents[tl_id]
+        
+        # Convert state to tensor with proper shape for SKRL
         state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-
-        # For noisy networks, reset noise before action selection
-        model_type = self.agent_cfg.get("model", {}).get("type", "qnetwork")
-        if model_type == "noisy" and hasattr(agent.models["q_network"], "reset_noise"):
-            agent.models["q_network"].reset_noise()
-
-        # Use epsilon-greedy action selection (for noisy networks, noise provides exploration)
-        if model_type == "noisy":
-            # Noisy networks don't need epsilon-greedy as noise provides exploration
-            with torch.no_grad():
-                # Get Q-values and handle different loss types (including quantile regression)
-                q_values = agent.models["q_network"].get_q_values(state_tensor)
-                action = q_values.argmax().item()
-            random_val = 0.0
+        
+        # SKRL's DQN agent.act() returns: (tensor([[action]], device='cuda:0'), None, None)
+        action_result = agent.act(state_tensor, timestep=step, timesteps=max_steps)
+        
+        # Extract action from the tuple - first element is the action tensor
+        if isinstance(action_result, tuple) and len(action_result) >= 1:
+            action_tensor = action_result[0]  # Get tensor([[0]], device='cuda:0')
         else:
-            # Standard epsilon-greedy for other models
-            if np.random.random() < epsilon:
-                action = np.random.randint(0, self.sim.num_actions[tl_id])
-                random_val = epsilon
-            else:
-                with torch.no_grad():
-                    # Get Q-values and handle different loss types (including quantile regression)
-                    q_values = agent.models["q_network"].get_q_values(state_tensor)
-                    action = q_values.argmax().item()
-                random_val = 0.0
-
-        return random_val, action
+            action_tensor = action_result
+            
+        # Convert tensor to int - handle 2D tensor case
+        if isinstance(action_tensor, torch.Tensor):
+            # For tensor([[0]]) format, we need [0][0] to get the scalar
+            if action_tensor.dim() == 2:  # 2D tensor like [[0]]
+                return action_tensor[0][0].item()
+            elif action_tensor.dim() == 1:  # 1D tensor like [0]
+                return action_tensor[0].item()
+            elif action_tensor.dim() == 0:  # Scalar tensor
+                return action_tensor.item()
+            else:  # Multi-dimensional tensor
+                return action_tensor.flatten()[0].item()
+        elif isinstance(action_tensor, (int, float, np.integer, np.floating)):
+            return int(action_tensor)
+        else:
+            # Last resort: try to convert to int
+            return int(action_tensor)
+            # Last resort: try to convert to int
+            return int(action_tensor)
+    
+    def update_step(self, tl_id: str, step: int, max_steps: int):
+        """Update step for the agent"""
+        agent = self.agents[tl_id]
+        if len(agent.memory) > 0:
+            agent._update(timestep=step, timesteps=max_steps)
 
     def store_transition(
         self,
@@ -267,10 +298,10 @@ class SKRLAgentManager:
         reward: float,
         next_state: np.ndarray,
         done: bool,
+        step: int,
+        max_steps: int,
     ):
         """Store transition in agent's memory"""
-        memory = self.memories[tl_id]
-
         # Convert to tensors
         state_tensor = torch.FloatTensor(state).to(self.device)
         next_state_tensor = torch.FloatTensor(next_state).to(self.device)
@@ -278,75 +309,79 @@ class SKRLAgentManager:
         reward_tensor = torch.FloatTensor([reward]).to(self.device)
         done_tensor = torch.BoolTensor([done]).to(self.device)
 
-        # Store in memory
-        memory.add_samples(
+        agent = self.agents[tl_id]
+        agent.record_transition(
             states=state_tensor.unsqueeze(0),
             actions=action_tensor.unsqueeze(0),
             rewards=reward_tensor.unsqueeze(0),
             next_states=next_state_tensor.unsqueeze(0),
             terminated=done_tensor.unsqueeze(0),
             truncated=torch.BoolTensor([False]).to(self.device).unsqueeze(0),
+            infos=None,
+            timestep=step,
+            timesteps=max_steps,
         )
 
-    def train_agents(self, step: int, max_steps: int) -> float:
+    def train_agents(self, tl_id: str, step: int, max_steps: int) -> float:
         """Train all agents using SKRL"""
-        total_loss = 0.0
-        num_trained = 0
+        agent = self.agents[tl_id]
+        total_loss = 0
 
-        for tl_id, agent in self.agents.items():
-            memory = self.memories[tl_id]
+        # Call post_interaction which handles the training step internally
+        agent.post_interaction(timestep=step, timesteps=max_steps)
 
-            # Check if we have enough samples
-            if len(memory) < self.agent_cfg.get("model", {}).get("batch_size", 32):
-                continue
+        # Try to extract loss information if available from the agent
+        # SKRL DQN agents store their losses in different ways
+        if hasattr(agent, "tracking_data") and agent.tracking_data:
+            # Get the latest loss from tracking data
+            for key, value in agent.tracking_data.items():
+                if (
+                    "loss" in key.lower()
+                    and isinstance(value, (list, tuple))
+                    and value
+                ):
+                    latest_loss = (
+                        value[-1]
+                        if isinstance(value[-1], (int, float))
+                        else (
+                            value[-1].item()
+                            if hasattr(value[-1], "item")
+                            else 0
+                        )
+                    )
+                    total_loss += latest_loss
+                    break
+        elif hasattr(agent, "_q_loss") and agent._q_loss is not None:
+            # Some SKRL agents store loss in _q_loss
+            loss_val = (
+                agent._q_loss.item()
+                if hasattr(agent._q_loss, "item")
+                else agent._q_loss
+            )
+            total_loss += loss_val
+        elif hasattr(agent, "_losses") and agent._losses:
+            # SKRL agents typically store losses in a dictionary
+            for loss_name, loss_value in agent._losses.items():
+                if isinstance(loss_value, (int, float)):
+                    total_loss += loss_value
+                elif hasattr(loss_value, "item"):  # torch tensor
+                    total_loss += loss_value.item()
 
-            # SKRL agents handle training internally via post_interaction
-            # when they have enough samples
-            if (
-                len(memory) >= agent.cfg.get("sample_size", 100)
-                and hasattr(agent, "tensors_names")
-                and agent.tensors_names
-            ):
-                # Call post_interaction which handles the training step internally
-                agent.post_interaction(timestep=step, timesteps=max_steps)
-                num_trained += 1
-                
-                # Try to extract loss information if available from the agent
-                # SKRL DQN agents store their losses in different ways
-                if hasattr(agent, 'tracking_data') and agent.tracking_data:
-                    # Get the latest loss from tracking data
-                    for key, value in agent.tracking_data.items():
-                        if 'loss' in key.lower() and isinstance(value, (list, tuple)) and value:
-                            latest_loss = value[-1] if isinstance(value[-1], (int, float)) else value[-1].item() if hasattr(value[-1], 'item') else 0
-                            total_loss += latest_loss
-                            break
-                elif hasattr(agent, '_q_loss') and agent._q_loss is not None:
-                    # Some SKRL agents store loss in _q_loss
-                    loss_val = agent._q_loss.item() if hasattr(agent._q_loss, 'item') else agent._q_loss
-                    total_loss += loss_val
-                elif hasattr(agent, '_losses') and agent._losses:
-                    # SKRL agents typically store losses in a dictionary
-                    for loss_name, loss_value in agent._losses.items():
-                        if isinstance(loss_value, (int, float)):
-                            total_loss += loss_value
-                        elif hasattr(loss_value, 'item'):  # torch tensor
-                            total_loss += loss_value.item()
+        return total_loss
 
-        return total_loss / max(num_trained, 1)
-
-    def update_target_networks(self, step: int, max_steps: int):
-        """Update target networks for all agents"""
-        for tl_id, agent in self.agents.items():
-            memory = self.memories[tl_id]
-            # Only update if we have enough samples and agent is properly configured
-            if (
-                len(memory) >= self.agent_cfg.get("model", {}).get("batch_size", 32)
-                and hasattr(agent, "tensors_names")
-                and agent.tensors_names
-            ):
-                # For SKRL agents, target network updates are handled automatically
-                # during post_interaction based on update frequency
-                agent.post_interaction(timestep=step, timesteps=max_steps)
+    # def update_target_networks(self, step: int, max_steps: int):
+    #     """Update target networks for all agents"""
+    #     for tl_id, agent in self.agents.items():
+    #         memory = self.memories[tl_id]
+    #         # Only update if we have enough samples and agent is properly configured
+    #         if (
+    #             len(memory) >= self.agent_cfg.get("model", {}).get("batch_size", 32)
+    #             and hasattr(agent, "tensors_names")
+    #             and agent.tensors_names
+    #         ):
+    #             # For SKRL agents, target network updates are handled automatically
+    #             # during post_interaction based on update frequency
+    #             agent.post_interaction(timestep=step, timesteps=max_steps)
 
     def save_models(self, path: str, episode: Optional[int] = None):
         """Save all SKRL models"""
@@ -371,7 +406,9 @@ class SKRLAgentManager:
             except FileNotFoundError:
                 print(f"Model file not found: {model_path}")
 
-    def save_checkpoints(self, path: str, episode: Optional[int] = None, epsilon: Optional[float] = None):
+    def save_checkpoints(
+        self, path: str, episode: Optional[int] = None, epsilon: Optional[float] = None
+    ):
         """Save all SKRL model checkpoints"""
         for tl_id, agent in self.agents.items():
             checkpoint_path = f"{path.replace('.pt', '')}_{tl_id}_checkpoint.pt"
