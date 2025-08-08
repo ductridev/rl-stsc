@@ -12,7 +12,7 @@ from src.accident_manager import AccidentManager
 from src.base_simulation import SimulationBase
 from src.actuated_simulation import ActuatedSimulation
 from src.simulation import Simulation
-import traci
+import libsumo as traci
 import glob
 import re
 
@@ -253,22 +253,60 @@ def test_dqn_simulation(config, path):
     
     # Load the trained model
     try:
-        # Extract episode number for loading
-        if episode_info == "best":
-            load_episode = 0  # Best model is typically saved as episode 0
-        elif episode_info == "final":
-            load_episode = "final"
-        elif episode_info == "latest":
-            load_episode = 0
-        elif isinstance(episode_info, int):
-            load_episode = episode_info
-        else:
-            load_episode = 0
-            
-        print(f"Loading model with episode parameter: {load_episode}")
-        dqn_simulation.load_model(episode=load_episode)
+        # Load the model directly using the found file path
+        print(f"Loading model from: {model_file_path}")
+        
+        # Load model state dict directly into the agent's neural networks
+        import torch
+        model_state = torch.load(model_file_path, map_location=dqn_simulation.device)
+        
+        # Get the first (and likely only) traffic light agent
+        agent_manager = dqn_simulation.agent_manager
+        if agent_manager.agents:
+            # Load the model into all traffic light agents
+            for tl_id, agent in agent_manager.agents.items():
+                try:
+                    # Try to load the state dict directly
+                    if isinstance(model_state, dict):
+                        # If the model state is a dictionary, try to find the right keys
+                        if "model_state_dict" in model_state:
+                            state_dict = model_state["model_state_dict"]
+                        else:
+                            state_dict = model_state
+                    else:
+                        state_dict = model_state
+                    
+                    # Load into both q_network and target_q_network
+                    agent.models["q_network"].load_state_dict(state_dict)
+                    agent.models["target_q_network"].load_state_dict(state_dict)
+                    print(f"Successfully loaded model for traffic light: {tl_id}")
+                    
+                except Exception as load_error:
+                    print(f"Failed to load model for {tl_id}: {load_error}")
+                    # Try the old method as fallback
+                    try:
+                        # Extract episode number for loading
+                        if episode_info == "best":
+                            load_episode = 0  # Best model is typically saved as episode 0
+                        elif episode_info == "final":
+                            load_episode = "final"
+                        elif episode_info == "latest":
+                            load_episode = 0
+                        elif isinstance(episode_info, int):
+                            load_episode = episode_info
+                        else:
+                            load_episode = 0
+                            
+                        print(f"Fallback: Loading model with episode parameter: {load_episode}")
+                        dqn_simulation.load_model(episode=load_episode)
+                        break  # Exit the loop if fallback succeeds
+                    except Exception as fallback_error:
+                        print(f"Fallback method also failed: {fallback_error}")
+                        raise load_error
+                        
         print(f"Successfully loaded DQN model: {os.path.basename(model_file_path)}")
         print("DQN simulation configured in TESTING MODE - no training will occur")
+        
     except Exception as e:
         print(f"Error loading DQN model: {e}")
         print(f"Tried to load: {model_file_path}")
