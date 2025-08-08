@@ -7,6 +7,19 @@ simulation:
 agent:
   num_states: 32 # Per-phase features (max 10 phases × 3 features) + current_phase + DESRA_phase
   
+  # Model configuration (must match training configuration)
+  model:
+    type: "qnetwork"
+    num_layers: 32
+    hidden_size: 256
+    use_attention: true
+    loss_type: "qr" # Quantile regression (must match training)
+    num_quantiles: 100 # Must match training
+    v_min: -10.0
+    v_max: 10.0
+    dropout_rate: 0.2
+    batch_norm: true
+  
   # Actuated control parameters (for actuated simulation)
   min_green_time: 20
   max_green_time: 60
@@ -55,7 +68,7 @@ dir:
   models_path_name: "models/"
   sumocfg_file_name: "simulations/testmodel6x1/osm.sumocfg"
   sumocfg_path: "simulations/testmodel6x1"
-  model_folder: "model_12"
+  model_folder: "model_14"
 
 traffic_lights:
   # - traffic_light_1:
