@@ -200,26 +200,55 @@ def test_dqn_simulation(config, path):
     
     # Get model folder from config
     model_folder = config['model_folder']  # Default to model_13
-    model_folder_path = os.path.join("models", model_folder)
     
-    print(f"Looking for DQN models in: {model_folder_path}")
+    # Check if model_folder is pointing directly to a .pt file
+    if model_folder.endswith('.pt'):
+        # Direct .pt file path specified
+        model_file_path = model_folder
+        episode_info = "direct"
+        print(f"Using direct .pt model file: {model_file_path}")
+        
+        # Check if the file exists
+        if not os.path.exists(model_file_path):
+            # If not found, try prepending "models/" if not already there
+            if not model_file_path.startswith('models/'):
+                model_file_path_with_models = os.path.join('models', model_file_path)
+                if os.path.exists(model_file_path_with_models):
+                    model_file_path = model_file_path_with_models
+                    print(f"Found model file at: {model_file_path}")
+                else:
+                    print(f"Error: Direct model file not found: {model_folder}")
+                    print(f"Also checked: {model_file_path_with_models}")
+                    print("Please check the file path in your configuration.")
+                    return
+            else:
+                print(f"Error: Direct model file not found: {model_file_path}")
+                print("Please check the file path in your configuration.")
+                return
+    else:
+        # Traditional folder-based model loading
+        model_folder_path = os.path.join("models", model_folder)
+        print(f"Looking for DQN models in: {model_folder_path}")
+        
+        # Auto-find the best model file
+        model_file_path, episode_info = find_best_model_file(model_folder_path)
+        
+        if model_file_path is None:
+            print(f"Warning: No DQN model files found in {model_folder_path}")
+            print("Available model folders:")
+            models_dir = "models"
+            if os.path.exists(models_dir):
+                for item in os.listdir(models_dir):
+                    item_path = os.path.join(models_dir, item)
+                    if os.path.isdir(item_path):
+                        pth_files = glob.glob(os.path.join(item_path, "*.pth"))
+                        pt_files = glob.glob(os.path.join(item_path, "*.pt"))
+                        total_files = len(pth_files) + len(pt_files)
+                        print(f"  - {item}: {total_files} model files (.pth + .pt)")
+            print("Skipping DQN simulation. Train a model first or check the model_folder in config.")
+            return
     
-    # Auto-find the best model file
-    model_file_path, episode_info = find_best_model_file(model_folder_path)
-    
-    if model_file_path is None:
-        print(f"Warning: No DQN model files found in {model_folder_path}")
-        print("Available model folders:")
-        models_dir = "models"
-        if os.path.exists(models_dir):
-            for item in os.listdir(models_dir):
-                item_path = os.path.join(models_dir, item)
-                if os.path.isdir(item_path):
-                    pth_files = glob.glob(os.path.join(item_path, "*.pth"))
-                    print(f"  - {item}: {len(pth_files)} .pth files")
-        print("Skipping DQN simulation. Train a model first or check the model_folder in config.")
-        return
-    
+    # Common path for both direct .pt files and found model files
     print(f"Using model: {model_file_path}")
     
     visualization = Visualization(path=path, dpi=100)
@@ -258,8 +287,8 @@ def test_dqn_simulation(config, path):
         
         # Load model state dict directly into the agent's neural networks
         import torch
-        model_state = torch.load(model_file_path, map_location=dqn_simulation.device)
-        
+        model_state = torch.load(model_file_path, map_location=dqn_simulation.device, weights_only=False)
+
         # Get the first (and likely only) traffic light agent
         agent_manager = dqn_simulation.agent_manager
         if agent_manager.agents:
@@ -346,7 +375,7 @@ def main():
                        action='store_true',
                        help='Enable SUMO GUI')
     parser.add_argument('--model-folder', '-m',
-                       help='Model folder to use for DQN simulation (e.g., model_11, model_12). Overrides config setting.')
+                       help='Model folder or direct .pt file path to use for DQN simulation (e.g., model_11, model_12, or models/model_14/skrl_model_NgatuNorthEast_GLOBAL_BEST.pt). Overrides config setting.')
     
     args = parser.parse_args()
     
@@ -361,13 +390,19 @@ def main():
     # Override model folder if specified via command line
     if args.model_folder:
         config["model_folder"] = args.model_folder
-        print(f"Using model folder from command line: {args.model_folder}")
+        if args.model_folder.endswith('.pt'):
+            print(f"Using direct .pt model file from command line: {args.model_folder}")
+        else:
+            print(f"Using model folder from command line: {args.model_folder}")
     elif "model_folder" not in config:
         # Set default if not in config
         config["model_folder"] = "model_13"
         print(f"Using default model folder: model_13")
     else:
-        print(f"Using model folder from config: {config['model_folder']}")
+        if config["model_folder"].endswith('.pt'):
+            print(f"Using direct .pt model file from config: {config['model_folder']}")
+        else:
+            print(f"Using model folder from config: {config['model_folder']}")
     
     # Set up testing path
     path = set_test_path(config["models_path_name"])
@@ -390,38 +425,39 @@ def main():
     print("="*50)
     
     simulation_path = config["sumo_cfg_file"].split("/")[1]
-    demand_levels = ['low', 'medium', 'high']
+    # demand_levels = ['low', 'medium', 'high']
     
-    for demand_level in demand_levels:
-        print(f"\nGenerating routes for {demand_level} demand level...")
-        Intersection.generate_residential_demand_routes(
-            config,
-            simulation_path,
-            demand_level=demand_level,
-            enable_bicycle=True,
-            enable_pedestrian=True,
-            enable_motorcycle=True,
-            enable_passenger=True,
-            enable_truck=True,
-        )
+    # for demand_level in demand_levels:
+        # if args.config != "config/testing_testngatu6x1EastWestOverflow.yaml":
+        #     print(f"\nGenerating routes for {demand_level} demand level...")
+        #     Intersection.generate_residential_demand_routes(
+        #         config,
+        #         simulation_path,
+        #         demand_level=demand_level,
+        #         enable_bicycle=True,
+        #         enable_pedestrian=True,
+        #         enable_motorcycle=True,
+        #         enable_passenger=True,
+        #         enable_truck=True,
+        #     )
     
-        # Run selected simulations
-        overall_start = time.time()
-        
-        try:
-            if 'base' in simulations_to_run:
-                test_base_simulation(config, path)
-                
-            if 'actuated' in simulations_to_run:
-                test_actuated_simulation(config, path)
-                
-            if 'dqn' in simulations_to_run:
-                test_dqn_simulation(config, path)
-                
-        except Exception as e:
-            print(f"Error during testing: {e}")
-            import traceback
-            traceback.print_exc()
+    # Run selected simulations
+    overall_start = time.time()
+    
+    try:
+        if 'base' in simulations_to_run:
+            test_base_simulation(config, path)
+            
+        if 'actuated' in simulations_to_run:
+            test_actuated_simulation(config, path)
+            
+        if 'dqn' in simulations_to_run:
+            test_dqn_simulation(config, path)
+            
+    except Exception as e:
+        print(f"Error during testing: {e}")
+        import traceback
+        traceback.print_exc()
     
     overall_time = time.time() - overall_start
     
