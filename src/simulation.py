@@ -6,7 +6,7 @@ Refactored to use separate modules for better organization.
 import numpy as np
 import torch
 import time
-import libtraci as traci
+import libsumo as traci
 from collections import defaultdict, deque
 from typing import Dict, List, Any, Tuple
 import sys
@@ -657,7 +657,7 @@ class Simulation(SUMO):
         outflow_norm = self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
         delay_norm = self.travel_delay_normalizer.normalize(self.travel_delay[tl_id])
         waiting_norm = self.waiting_time_normalizer.normalize(self.waiting_time[tl_id])
-        travel_norm = self.travel_time_normalizer.normalize(self.travel_time[tl_id])
+        # travel_norm = self.travel_time_normalizer.normalize(self.travel_time[tl_id])
         queue_norm = self.queue_length_normalizer.normalize(self.queue_length[tl_id])
         switch_penalty = (int)(self.phase[tl_id] != phase)
         
@@ -674,7 +674,7 @@ class Simulation(SUMO):
         delay_component = weight["delay"] * delay_norm
         waiting_component = weight["waiting_time"] * waiting_norm
         switch_component = weight["switch_phase"] * switch_penalty
-        travel_component = weight["travel_time"] * travel_norm
+        # travel_component = weight["travel_time"] * travel_norm
         queue_component = weight["queue_length"] * queue_norm
         
         # print(f"Weighted components:")
@@ -687,7 +687,7 @@ class Simulation(SUMO):
         
         # Total reward
         total_reward = (outflow_component + delay_component + waiting_component + 
-                       switch_component + travel_component + queue_component)
+                       switch_component + queue_component)
         
         # print(f"TOTAL REWARD: {total_reward:.4f}")
         # print(f"=== END REWARD DEBUG ===\n")

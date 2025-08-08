@@ -3,7 +3,7 @@ Traffic metrics calculation utilities.
 """
 
 import numpy as np
-import libtraci as traci
+import libsumo as traci
 from typing import Dict, List
 
 
