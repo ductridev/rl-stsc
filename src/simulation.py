@@ -153,9 +153,9 @@ class Simulation(SUMO):
         """Save all SKRL models to a path"""
         self.agent_manager.save_models(path)
 
-    def save_checkpoint(self, path: str, episode: int = None, epsilon: float = None):
+    def save_checkpoint(self, path: str, episode: int = None):
         """Save all SKRL model checkpoints"""
-        self.agent_manager.save_checkpoints(path, episode, epsilon)
+        self.agent_manager.save_checkpoints(path, episode)
 
     def initState(self):
         """Initialize simulation state for all traffic lights"""
@@ -200,15 +200,10 @@ class Simulation(SUMO):
         )
 
     def select_action(
-        self, tl_id: str, state: np.ndarray, epsilon: float, desra_phase_idx: str
+        self, tl_id: str, state: np.ndarray, desra_phase_idx: str
     ) -> Tuple[float, int]:
         """Select action using SKRL agent manager"""
-        random_val = np.random.random()
-        # Standard epsilon-greedy for other models
-        if random_val < epsilon:
-            return random_val, desra_phase_idx
-        else:
-            return random_val, self.agent_manager.select_action(tl_id, state, self.step, self.max_steps)
+        return self.agent_manager.select_action(tl_id, state, self.step, self.max_steps)
 
     def store_transition(
         self,
@@ -230,7 +225,7 @@ class Simulation(SUMO):
             return 0.0
         return self.agent_manager.train_agents(tl_id, self.step, self.max_steps)
 
-    def run(self, epsilon: float, episode: int):
+    def run(self, episode: int):
         """Run simulation with SKRL agents"""
         print("Simulation started")
         if self.testing_mode:
@@ -313,8 +308,8 @@ class Simulation(SUMO):
                 self.agent_manager.pre_interaction(tl_id, self.step, self.max_steps)
 
                 # Select action using SKRL agent
-                random_val, action_idx = self.select_action(
-                    tl_id, current_state, epsilon, desra_phase_idx
+                action_idx = self.select_action(
+                    tl_id, current_state, desra_phase_idx
                 )
 
                 # Convert action to phase
@@ -441,7 +436,7 @@ class Simulation(SUMO):
         # Print DESRA parameter summary
         self.print_desra_summary()
 
-        return sim_time, self._finalize_episode(epsilon, episode)
+        return sim_time, self._finalize_episode(episode)
 
     def _finalize_phase_skrl(self, tl: Dict, tl_id: str, st: Dict):
         """Finalize phase and store experience in SKRL memory"""
@@ -521,7 +516,7 @@ class Simulation(SUMO):
         self.history["outflow"][tl_id].append(st["step_outflow_sum"])
         st["step_outflow_sum"] = 0
 
-    def _finalize_episode(self, epsilon: float, episode: int):
+    def _finalize_episode(self, episode: int):
         """Finalize episode and handle plotting/saving"""
         print("Training completed")
         print("---------------------------------------")

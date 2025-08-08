@@ -32,61 +32,6 @@ import os
 import glob
 
 
-def calculate_global_epsilon_parameters(config_files):
-    """
-    Calculate global epsilon decay parameters based on total episodes across all configurations.
-    
-    Args:
-        config_files: List of configuration file paths
-        
-    Returns:
-        dict: Dictionary containing global epsilon parameters
-    """
-    print("\nGLOBAL EPSILON DECAY CALCULATION:")
-    
-    # Load first config to get initial epsilon parameters
-    first_config = import_train_configuration(config_files[0])
-    global_start_epsilon = first_config["agent"]["epsilon"]
-    global_min_epsilon = first_config["agent"]["min_epsilon"]
-    
-    # Calculate total episodes across all configurations
-    total_episodes_all_configs = 0
-    config_episode_counts = []
-    for config_file in config_files:
-        config = import_train_configuration(config_file)
-        config_episodes = config["total_episodes"]
-        config_episode_counts.append(config_episodes)
-        total_episodes_all_configs += config_episodes
-    
-    # Calculate decay rate for epsilon to reach min_epsilon at the FINAL episode
-    global_decay_rate = (global_min_epsilon / global_start_epsilon) ** (1.0 / total_episodes_all_configs)
-    
-    print(f"   Total episodes across all configs: {total_episodes_all_configs}")
-    print(f"   Config episode breakdown: {dict(zip(config_files, config_episode_counts))}")
-    print(f"   Global start epsilon: {global_start_epsilon:.6f}")
-    print(f"   Global min epsilon: {global_min_epsilon:.6f}")
-    print(f"   Calculated global decay rate: {global_decay_rate:.8f}")
-    print(f"   Expected epsilon at episode {total_episodes_all_configs}: {global_start_epsilon * (global_decay_rate ** total_episodes_all_configs):.6f}")
-    print("   This ensures smooth decay across ALL configurations!")
-    
-    # Verification: Test epsilon calculation with example episodes
-    print("\nEPSILON DECAY VERIFICATION:")
-    test_episodes = [1, 10, 25, 30, 45, total_episodes_all_configs]
-    for ep in test_episodes:
-        if ep <= total_episodes_all_configs:
-            expected_eps = global_start_epsilon * (global_decay_rate ** ep)
-            print(f"   Episode {ep:2d}: {expected_eps:.6f}")
-    print(f"   Epsilon decays smoothly from {global_start_epsilon:.6f} to {global_min_epsilon:.6f} over {total_episodes_all_configs} episodes")
-    
-    return {
-        'global_start_epsilon': global_start_epsilon,
-        'global_min_epsilon': global_min_epsilon,
-        'global_decay_rate': global_decay_rate,
-        'total_episodes_all_configs': total_episodes_all_configs,
-        'config_episode_counts': config_episode_counts
-    }
-
-
 def generate_routes_if_needed(config_file, config):
     """
     Generate routes for simulation if needed based on configuration.
@@ -262,7 +207,7 @@ def run_baseline_simulations(config_files, shared_path, shared_visualization, ph
 
 
 def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, shared_visualization, 
-                             global_epsilon_params, config_idx):
+                             config_idx):
     """
     Initialize or update DQN simulation components.
     
@@ -271,11 +216,10 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
         shared_simulation_skrl: Existing shared simulation (None for first config)
         shared_path: Shared path for saving results
         shared_visualization: Shared visualization object
-        global_epsilon_params: Global epsilon parameters
         config_idx: Configuration index
         
     Returns:
-        tuple: (simulation_skrl, shared_path, shared_visualization, global_epsilon)
+        tuple: (simulation_skrl, shared_path, shared_visualization)
     """
     # Initialize shared components only once
     if shared_simulation_skrl is None:
@@ -309,23 +253,6 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
             save_interval=save_interval,
         )
         
-        # Set initial epsilon based on whether we're loading a pretrained model
-        if config.get("load_model_name") and config["load_model_name"] is not None:
-            epsilon_reduction_factor = config.get("continue_epsilon_factor", 0.3)
-            reduced_epsilon = global_epsilon_params['global_min_epsilon'] + \
-                            (global_epsilon_params['global_start_epsilon'] - global_epsilon_params['global_min_epsilon']) * epsilon_reduction_factor
-            global_epsilon = max(global_epsilon_params['global_min_epsilon'], reduced_epsilon)
-            print("PRETRAINED MODEL DETECTED - CONTINUED TRAINING MODE")
-            print(f"   Global start epsilon: {global_epsilon_params['global_start_epsilon']:.6f}")
-            print(f"   Reduction factor: {epsilon_reduction_factor:.2f}")
-            print(f"   Reduced epsilon: {global_epsilon:.6f}")
-            print("   This allows less exploration since model has prior knowledge")
-        else:
-            global_epsilon = global_epsilon_params['global_start_epsilon']
-            print("FRESH TRAINING MODE")
-            print(f"   Using global start epsilon: {global_epsilon:.6f}")
-            print(f"   Will decay smoothly across all {global_epsilon_params['total_episodes_all_configs']} episodes")
-        
         print(f"Shared DQN model initialized with first config")
     else:
         # Update existing simulation with new config parameters
@@ -344,30 +271,25 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
         shared_simulation_skrl.updating_target_network_steps = config["updating_target_network_steps"]
         shared_simulation_skrl.save_interval = config.get("save_interval", 10)
         print(f"Shared DQN model updated with new config parameters")
-        
-        # Use existing global_epsilon (passed from previous iteration)
-        global_epsilon = None  # Will be set by caller
     
-    return shared_simulation_skrl, shared_path, shared_visualization, global_epsilon
+    return shared_simulation_skrl, shared_path, shared_visualization
 
 
-def train_dqn_episode(simulation_skrl, epsilon, global_episode, config_episode, config_file, config, 
-                     global_epsilon_params, global_episode_tracker):
+def train_dqn_episode(simulation_skrl, global_episode, config_episode, config_file, config, 
+                     global_episode_tracker):
     """
     Run a single DQN training episode.
     
     Args:
         simulation_skrl: DQN simulation object
-        epsilon: Current epsilon value
         global_episode: Global episode counter
         config_episode: Config-specific episode counter
         config_file: Configuration file path
         config: Configuration dictionary
-        global_epsilon_params: Global epsilon parameters
         global_episode_tracker: Dictionary to track global episode info
         
     Returns:
-        tuple: (new_epsilon, performance_metrics)
+        tuple: (performance_metrics)
     """
     print(f"\n----- Config Episode {config_episode} of {config['total_episodes']} (Global: {global_episode}) -----")
     
@@ -381,22 +303,8 @@ def train_dqn_episode(simulation_skrl, epsilon, global_episode, config_episode, 
     if gui_enabled:
         print(f"GUI enabled for config episode {config_episode} (global {global_episode}) - Visual monitoring")
     
-    simulation_time_skrl, training_time_skrl = simulation_skrl.run(epsilon, global_episode)
+    simulation_time_skrl, training_time_skrl = simulation_skrl.run(global_episode)
     print(f"Simulation (SKRL DQN) time: {simulation_time_skrl}, Training time: {training_time_skrl}")
-    
-    # Apply global epsilon decay - ensures smooth decay across ALL configurations
-    new_epsilon = max(global_epsilon_params['global_min_epsilon'], 
-                     epsilon * global_epsilon_params['global_decay_rate'])
-    
-    # Debug epsilon progress
-    if global_episode % 5 == 0:
-        expected_epsilon = global_epsilon_params['global_start_epsilon'] * \
-                          (global_epsilon_params['global_decay_rate'] ** global_episode)
-        print(f"   Epsilon Progress Check (Global Episode {global_episode}):")
-        print(f"     Current: {new_epsilon:.6f}")
-        print(f"     Expected: {expected_epsilon:.6f}")
-        print(f"     Min target: {global_epsilon_params['global_min_epsilon']:.6f}")
-        print(f"     Episodes remaining: {global_epsilon_params['total_episodes_all_configs'] - global_episode}")
     
     # Extract performance metrics
     try:
@@ -440,7 +348,6 @@ def train_dqn_episode(simulation_skrl, epsilon, global_episode, config_episode, 
             'completion_rate': completion_rate,
             'total_reward': dqn_total_reward,
             'combined_score': dqn_total_reward,
-            'epsilon': new_epsilon,
             'total_departed': skrl_stats['total_departed'],
             'total_arrived': skrl_stats['total_arrived'],
             'dqn_avg_outflow': dqn_avg_outflow,
@@ -451,7 +358,6 @@ def train_dqn_episode(simulation_skrl, epsilon, global_episode, config_episode, 
         performance_metrics = {
             'episode': global_episode,
             'config_episode': config_episode,
-            'epsilon': new_epsilon
         }
     
     # Reset vehicle trackers after performance tracking
@@ -462,7 +368,7 @@ def train_dqn_episode(simulation_skrl, epsilon, global_episode, config_episode, 
     simulation_skrl.reset_history()
     print("  Note: History and buffers are now automatically cleared in simulation._finalize_episode()")
     
-    return new_epsilon, performance_metrics
+    return performance_metrics
 
 
 def evaluate_and_save_best_model(performance_metrics, config_best_performance, global_best_performance,
@@ -590,7 +496,6 @@ def save_best_model_files(simulation_skrl, path, global_episode, config_episode,
             "target_model_state_dict": agent.models["target_q_network"].state_dict(),
             "global_episode": global_episode,
             "config_episode": config_episode,
-            "epsilon": performance_metrics.get('epsilon', 0),
             "reward": performance_metrics.get('total_reward', 0),
             "completion_rate": performance_metrics.get('completion_rate', 0),
             "avg_outflow": performance_metrics.get('dqn_avg_outflow', 0),
@@ -726,7 +631,7 @@ def compare_baselines_with_dqn(baseline_results, all_config_results):
 
 
 def save_comprehensive_results(all_config_results, global_best_performance, shared_path, 
-                             global_epsilon_params, baseline_results):
+                             baseline_results):
     """
     Save comprehensive training results to files.
     
@@ -734,7 +639,6 @@ def save_comprehensive_results(all_config_results, global_best_performance, shar
         all_config_results: List of configuration results
         global_best_performance: Global best performance metrics
         shared_path: Path for saving results
-        global_epsilon_params: Global epsilon parameters
         baseline_results: Baseline comparison results
     """
     # Save results summary to file
@@ -745,8 +649,6 @@ def save_comprehensive_results(all_config_results, global_best_performance, shar
             f.write("=" * 50 + "\n\n")
             f.write(f"Training completed: {datetime.datetime.now()}\n")
             f.write(f"Total configurations: {len(all_config_results)}\n")
-            f.write(f"Total episodes: {global_epsilon_params['total_episodes_all_configs']}\n")
-            f.write(f"Epsilon decay: {global_epsilon_params['global_start_epsilon']:.6f} to {global_epsilon_params['global_min_epsilon']:.6f}\n")
             f.write(f"Model Selection: 3-Metric Voting System (>=2/3 metrics must improve)\n\n")
             
             f.write("GLOBAL BEST PERFORMANCE:\n")
@@ -805,7 +707,6 @@ def main():
     shared_visualization = None
     shared_path = None
     global_episode = 1
-    global_epsilon = None
     
     # Track results across all configurations
     all_config_results = []
@@ -822,9 +723,6 @@ def main():
     
     # Configuration files to train with the same model
     config_files = ["config/training_testngatu6x1EastWestOverflow.yaml", "config/training_testngatu6x1.yaml"]
-    
-    # Calculate global epsilon decay parameters
-    global_epsilon_params = calculate_global_epsilon_parameters(config_files)
     
     # Run initial baseline simulations
     baseline_results_before = run_baseline_simulations(config_files, shared_path, shared_visualization, "before_training")
@@ -843,13 +741,10 @@ def main():
         config = import_train_configuration(config_file)
         
         # Initialize/update DQN simulation
-        shared_simulation_skrl, shared_path, shared_visualization, init_epsilon = initialize_dqn_simulation(
+        shared_simulation_skrl, shared_path, shared_visualization = initialize_dqn_simulation(
             config, shared_simulation_skrl, shared_path, shared_visualization, 
-            global_epsilon_params, config_idx
+            config_idx
         )
-        
-        if init_epsilon is not None:
-            global_epsilon = init_epsilon
         
         # Initialize Q-learning simulation for comparison
         agent_memory_q = MemoryPalace(
@@ -880,7 +775,6 @@ def main():
         
         # Training loop for this configuration
         config_episode = 1
-        epsilon = global_epsilon
         save_interval = config.get("save_interval", 10)
         
         # Track best performance for this configuration
@@ -897,21 +791,18 @@ def main():
         }
         config_performance_history = []
         
-        print(f"EPSILON SUMMARY:")
-        print(f"   GLOBAL start epsilon: {global_epsilon_params['global_start_epsilon']:.6f} (consistent across all configs)")
-        print(f"   GLOBAL min epsilon: {global_epsilon_params['global_min_epsilon']:.6f} (consistent across all configs)")
-        print(f"   GLOBAL decay rate: {global_epsilon_params['global_decay_rate']:.8f} (calculated for {global_epsilon_params['total_episodes_all_configs']} total episodes)")
-        print(f"   Current epsilon for this config: {epsilon:.6f}")
-        print(f"   Source: Global epsilon (smooth decay across all {global_epsilon_params['total_episodes_all_configs']} episodes)")
+        print(f"SKRL DQN Training Starting:")
+        print(f"   SKRL handles epsilon-greedy exploration internally")
+        print(f"   No manual epsilon decay needed - SKRL manages this automatically")
         
         timestamp_start = datetime.datetime.now()
         
         # Training episodes for this configuration
         while config_episode <= config["total_episodes"]:
             # Train one episode
-            epsilon, performance_metrics = train_dqn_episode(
-                shared_simulation_skrl, epsilon, global_episode, config_episode, config_file, 
-                config, global_epsilon_params, {}
+            performance_metrics = train_dqn_episode(
+                shared_simulation_skrl, global_episode, config_episode, config_file, 
+                config, {}
             )
             
             # Evaluate and save best model if needed
@@ -942,16 +833,12 @@ def main():
             config_episode += 1
             global_episode += 1
         
-        # Update global epsilon for next configuration
-        global_epsilon = epsilon
-        
         # Store results for this configuration
         config_summary = {
             'config_file': config_file,
             'config_name': config_file.split('/')[-1].replace('.yaml', ''),
             'final_config_episode': config_episode - 1,
             'final_global_episode': global_episode - 1,
-            'final_epsilon': epsilon,
             'best_episode': config_best_performance['episode'],
             'best_completion_rate': config_best_performance['completion_rate'],
             'best_total_reward': config_best_performance['total_reward'],
@@ -978,7 +865,7 @@ def main():
         print(f"\nCompleted training for config: {config_file}")
         print(f"   Final config episode: {config_episode-1}")
         print(f"   Current global episode: {global_episode-1}")
-        print(f"   Epsilon continues smoothly: {epsilon:.6f} (decay across {global_epsilon_params['total_episodes_all_configs']} total episodes)")
+        print(f"   SKRL manages epsilon-greedy exploration automatically")
     
     # Run final baseline simulations for comparison
     baseline_results_after = run_baseline_simulations(config_files, shared_path, shared_visualization, "after_training")
@@ -989,14 +876,14 @@ def main():
     
     # Save comprehensive results
     save_comprehensive_results(all_config_results, global_best_performance, shared_path, 
-                             global_epsilon_params, baseline_results)
+                             baseline_results)
     
     # Final summary
     print("\nMULTI-CONFIGURATION TRAINING WITH BASELINE COMPARISONS COMPLETED!")
     print("=" * 85)
     print("TRAINING STRUCTURE:")
     print("   1. Baseline simulations run BEFORE DQN training (initial measurements)")
-    print(f"   2. DQN training across all {global_epsilon_params['total_episodes_all_configs']} episodes")  
+    print(f"   2. DQN training with SKRL-managed exploration")  
     print("   3. Baseline simulations run AFTER DQN training (final comparison)")
     print("   4. Comprehensive performance analysis completed")
     print()
@@ -1007,7 +894,7 @@ def main():
     print(f"   Total Reward: {global_best_performance['total_reward']:.1f}")
     print(f"   Avg Outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}")
     print()
-    print(f"EPSILON DECAY: Smooth across all {global_epsilon_params['total_episodes_all_configs']} episodes")
+    print(f"EXPLORATION: SKRL handles epsilon-greedy exploration automatically")
     print(f"All results saved to: {shared_path}")
     print("Baseline comparisons available in comprehensive analysis above")
     print("=" * 85)

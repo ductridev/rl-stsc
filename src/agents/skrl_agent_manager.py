@@ -476,7 +476,7 @@ class SKRLAgentManager:
         return loaded_count
 
     def save_checkpoints(
-        self, path: str, episode: Optional[int] = None, epsilon: Optional[float] = None
+        self, path: str, episode: Optional[int] = None
     ):
         """Save all SKRL model checkpoints"""
         for tl_id, agent in self.agents.items():
@@ -487,7 +487,6 @@ class SKRLAgentManager:
                     "target_q_network"
                 ].state_dict(),
                 "episode": episode,
-                "epsilon": epsilon,
             }
             torch.save(checkpoint, checkpoint_path)
 
