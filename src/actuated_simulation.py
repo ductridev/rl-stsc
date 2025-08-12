@@ -31,7 +31,6 @@ class ActuatedSimulation(SUMO):
         path=None,
         save_interval=10,
         min_green_time=20,  # Minimum green time before phase can change
-        max_green_time=60,  # Maximum green time before forced phase change
         detection_threshold=2,  # Minimum queue difference to trigger phase change
     ):
         self.max_steps = max_steps
@@ -45,7 +44,6 @@ class ActuatedSimulation(SUMO):
 
         # Actuated control parameters
         self.min_green_time = min_green_time
-        self.max_green_time = max_green_time
         self.detection_threshold = detection_threshold
         self.interphase_duration = 3  # Yellow time between phases
 
@@ -164,8 +162,8 @@ class ActuatedSimulation(SUMO):
         current_queue_length = phase_queues[current_phase_idx]
         
         # Debug output
-        print(f"TL {tl['id']}: Phase queues: {phase_queues}")
-        print(f"Current phase {current_phase_idx} queue: {current_queue_length}, Best phase {best_phase_idx} queue: {best_queue_length}")
+        # print(f"TL {tl['id']}: Phase queues: {phase_queues}")
+        # print(f"Current phase {current_phase_idx} queue: {current_queue_length}, Best phase {best_phase_idx} queue: {best_queue_length}")
         
         # Only switch if the difference is significant enough
         if (best_phase_idx != current_phase_idx and 
@@ -193,7 +191,7 @@ class ActuatedSimulation(SUMO):
                 st["phase"] = new_phase_str
                 st["green_time_remaining"] = self.min_green_time
                 st["phase_start_time"] = self.step
-                print(f"TL {tl_id}: Applied new phase {st['current_phase_index']}: {new_phase_str}")
+                # print(f"TL {tl_id}: Applied new phase {st['current_phase_index']}: {new_phase_str}")
             # Collect metrics even during yellow phase
             self._collect_step_metrics(tl, st)
             return
@@ -204,21 +202,12 @@ class ActuatedSimulation(SUMO):
 
         # Check if we should consider changing phase
         should_check_phase = (
-            st["green_time_remaining"] == 0 or  # Minimum green time expired
-            (self.step - st["phase_start_time"]) >= self.max_green_time  # Maximum green time reached
+            st["green_time_remaining"] == 0
         )
 
         if should_check_phase:
             # Determine best phase based on queue lengths
             new_phase_idx, should_switch = self.select_best_phase(tl, st["current_phase_index"])
-            
-            # Force switch if maximum green time reached
-            if (self.step - st["phase_start_time"]) >= self.max_green_time:
-                should_switch = True
-                # If no better phase found, cycle to next phase
-                if new_phase_idx == st["current_phase_index"]:
-                    new_phase_idx = (st["current_phase_index"] + 1) % len(tl["phase"])
-                    print(f"TL {tl_id}: Max green time reached, cycling to phase {new_phase_idx}")
 
             if should_switch and new_phase_idx != st["current_phase_index"]:
                 # Start yellow phase transition
@@ -230,7 +219,7 @@ class ActuatedSimulation(SUMO):
                 current_phase = st["phase"]
                 yellow_phase = current_phase.replace("G", "y")
                 traci.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
-                print(f"TL {tl_id}: Starting yellow transition to phase {new_phase_idx}")
+                # print(f"TL {tl_id}: Starting yellow transition to phase {new_phase_idx}")
                 
                 # Calculate reward for the completed phase
                 self._update_metrics_and_reward(tl, st)
