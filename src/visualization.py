@@ -9,13 +9,13 @@ class Visualization:
     A class for visualizing training data and saving plots.
     """
 
-    def __init__(self, path, dpi):
+    def __init__(self, path, dpi=150):
         """
         Initialize the Visualization class with a path and DPI for saving plots.
 
         Args:
             path (str): Path to save the plots.
-            dpi (int): Dots per inch for the saved plots.
+            dpi (int): Dots per inch for the saved plots (default: 150).
         """
         self.path = path
         self.dpi = dpi
@@ -132,7 +132,7 @@ class Visualization:
             metrics = ["reward", "queue_length", "travel_delay", "waiting_time", "outflow"]
 
         if names is None:
-            names = ["baseline", "skrl_dqn"]
+            names = ["baseline", "skrl_dqn", "actuacted"]
 
         for metric in metrics:
             print(f"Generating plot for metric: {metric}")
@@ -188,7 +188,7 @@ class Visualization:
         """
         # Load data from CSV files
         data = {}
-        colors = {"qlearning": "blue", "dqn": "red", "base": "green"}
+        colors = {"qlearning": "blue", "skrl_dqn": "red", "actuated": "green"}
 
         print(f"Loading vehicle data for episode {episode}...")
 
@@ -370,3 +370,191 @@ class Visualization:
                     f"Completion={completion_rate:>5.1f}%, "
                     f"Max Load={max_running:>3}"
                 )
+
+    def plot_completed_travel_time_comparison(self, results, episode=None, save_path=None):
+        """
+        Create comparison plots for average total travel time of completed vehicles.
+        
+        Args:
+            results (dict): Results dictionary with completion tracker data for each method
+            episode (int): Episode number for labeling
+            save_path (str): Optional custom save path, defaults to self.path
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        if save_path is None:
+            save_path = self.path
+        
+        # Extract data from results
+        methods = []
+        completed_counts = []
+        avg_travel_times = []
+        colors = ['#2E86AB', '#A23B72', '#F18F01']  # Blue, Purple, Orange
+        
+        method_mapping = {
+            'actuated': 'Research Actuated',
+            'baseline': 'Baseline (Fixed)', 
+            'dqn': 'SKRL DQN'
+        }
+        
+        for method_key in ['actuated', 'baseline', 'dqn']:
+            if method_key in results and 'completion_tracker' in results[method_key]:
+                completion_data = results[method_key]['completion_tracker']
+                methods.append(method_mapping[method_key])
+                completed_counts.append(completion_data['completed_count'])
+                avg_travel_times.append(completion_data['avg_travel_time'])
+        
+        if not methods:
+            print("No completion tracker data available for plotting")
+            return
+        
+        # Create figure with subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Plot 1: Completed Vehicle Count
+        bars1 = ax1.bar(methods, completed_counts, color=colors[:len(methods)], alpha=0.7)
+        ax1.set_title('Number of Completed Vehicles', fontsize=14, fontweight='bold')
+        ax1.set_ylabel('Completed Vehicle Count', fontsize=12)
+        ax1.grid(True, alpha=0.3)
+        
+        # Add value labels on bars
+        max_count = max(completed_counts) if completed_counts else 0
+        count_offset = max_count * 0.01 if max_count > 0 else 1.0  # Default offset if all zero
+        
+        for bar, count in zip(bars1, completed_counts):
+            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + count_offset,
+                    f'{count}', ha='center', va='bottom', fontweight='bold')
+        
+        # Plot 2: Average Total Travel Time
+        bars2 = ax2.bar(methods, avg_travel_times, color=colors[:len(methods)], alpha=0.7)
+        ax2.set_title('Average Total Travel Time', fontsize=14, fontweight='bold')
+        ax2.set_ylabel('Average Travel Time (seconds)', fontsize=12)
+        ax2.grid(True, alpha=0.3)
+        
+        # Add value labels on bars
+        max_time = max(avg_travel_times) if avg_travel_times else 0
+        label_offset = max_time * 0.01 if max_time > 0 else 1.0  # Default offset if all zero
+        
+        for bar, time_val in zip(bars2, avg_travel_times):
+            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + label_offset,
+                    f'{time_val:.1f}s', ha='center', va='bottom', fontweight='bold')
+        
+        # Highlight best performance (only if we have positive travel times)
+        if avg_travel_times:
+            positive_times = [t for t in avg_travel_times if t > 0]
+            if positive_times:  # Only highlight if there are positive travel times
+                # Find the index of the minimum positive time in the original list
+                min_positive_time = min(positive_times)
+                best_idx = avg_travel_times.index(min_positive_time)
+                bars2[best_idx].set_edgecolor('gold')
+                bars2[best_idx].set_linewidth(3)
+        
+        # Overall title
+        episode_text = f" - Episode {episode}" if episode is not None else ""
+        fig.suptitle(f'Completed Vehicle Travel Time Comparison{episode_text}', 
+                    fontsize=16, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        # Save plot
+        filename = f"completed_travel_time_comparison_ep{episode}.png" if episode else "completed_travel_time_comparison.png"
+        plot_path = os.path.join(save_path, filename)
+        plt.savefig(plot_path, dpi=self.dpi, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Completion tracker comparison plot saved: {plot_path}")
+        
+        return plot_path
+    
+    def plot_travel_time_improvements(self, results, episode=None, save_path=None):
+        """
+        Create a plot showing travel time improvements relative to baseline.
+        
+        Args:
+            results (dict): Results dictionary with completion tracker data
+            episode (int): Episode number for labeling
+            save_path (str): Optional custom save path
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        if save_path is None:
+            save_path = self.path
+            
+        if 'baseline' not in results or 'completion_tracker' not in results['baseline']:
+            print("No baseline data available for improvement calculation")
+            return
+            
+        baseline_time = results['baseline']['completion_tracker']['avg_travel_time']
+        if baseline_time <= 0:
+            print("Invalid baseline travel time for improvement calculation")
+            return
+        
+        # Calculate improvements
+        methods = []
+        improvements = []
+        colors = []
+        
+        method_data = {
+            'actuated': ('Research Actuated', '#A23B72'),
+            'dqn': ('SKRL DQN', '#2E86AB')
+        }
+        
+        for method_key, (method_name, color) in method_data.items():
+            if method_key in results and 'completion_tracker' in results[method_key]:
+                method_time = results[method_key]['completion_tracker']['avg_travel_time']
+                if method_time > 0:
+                    improvement = ((baseline_time - method_time) / baseline_time) * 100
+                    methods.append(method_name)
+                    improvements.append(improvement)
+                    colors.append(color if improvement > 0 else '#FF6B6B')  # Red for negative
+        
+        if not methods:
+            print("No improvement data available for plotting")
+            return
+        
+        # Create plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        bars = ax.bar(methods, improvements, color=colors, alpha=0.7)
+        
+        # Add horizontal line at 0%
+        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+        
+        # Customize plot
+        ax.set_title('Travel Time Improvement vs Baseline', fontsize=14, fontweight='bold')
+        ax.set_ylabel('Improvement (%)', fontsize=12)
+        ax.grid(True, alpha=0.3)
+        
+        # Add value labels on bars
+        if improvements:
+            improvement_range = max(improvements) - min(improvements)
+            offset_factor = improvement_range * 0.01 if improvement_range > 0 else 1.0
+        else:
+            offset_factor = 1.0
+            
+        for bar, improvement in zip(bars, improvements):
+            y_pos = bar.get_height() + offset_factor
+            if improvement < 0:
+                y_pos = bar.get_height() - offset_factor
+            ax.text(bar.get_x() + bar.get_width()/2, y_pos,
+                   f'{improvement:+.1f}%', ha='center', va='bottom' if improvement >= 0 else 'top',
+                   fontweight='bold')
+        
+        # Overall title
+        episode_text = f" - Episode {episode}" if episode is not None else ""
+        ax.set_title(f'Travel Time Improvement vs Baseline{episode_text}', 
+                    fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        
+        # Save plot
+        filename = f"travel_time_improvements_ep{episode}.png" if episode else "travel_time_improvements.png"
+        plot_path = os.path.join(save_path, filename)
+        plt.savefig(plot_path, dpi=self.dpi, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Travel time improvements plot saved: {plot_path}")
+        
+        return plot_path
