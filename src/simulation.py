@@ -527,12 +527,9 @@ class Simulation(SUMO):
                 current_phase = st["phase"]
 
                 # Calculate metrics
-                if self.testing_mode:
-                    new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-                    outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
-                    st["old_vehicle_ids"] = new_ids
-                    st["step_outflow_sum"] += outflow
-                    st["outflow"] += outflow
+                new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+                outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
+                st["old_vehicle_ids"] = new_ids
 
                 sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
                 sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
@@ -543,6 +540,7 @@ class Simulation(SUMO):
                 stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
 
                 # Update metrics
+                st["step_outflow_sum"] += outflow
                 st["step_travel_delay_sum"] += sum_travel_delay
                 st["step_travel_time_sum"] += sum_travel_time
                 st["step_density_sum"] += sum_density
@@ -550,6 +548,7 @@ class Simulation(SUMO):
                 st["step_waiting_time_sum"] += mean_waiting_time
                 st["step_stopped_vehicles_sum"] += stopped_vehicles_count
 
+                st["outflow"] += outflow
                 st["travel_delay_sum"] = sum_travel_delay
                 st["travel_time_sum"] = sum_travel_time
                 st["queue_length"] = sum_queue_length
@@ -847,7 +846,7 @@ class Simulation(SUMO):
             return 0.0
             
         current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
-        current_local_queue = TrafficMetrics.get_queue_length(tl_data["id"])
+        current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):

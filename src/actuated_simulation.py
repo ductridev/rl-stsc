@@ -203,7 +203,7 @@ class ActuatedSimulation(SUMO):
             # Start extension period
             st["waiting_for_extension"] = True
             st["extension_counter"] = self.extension_time
-            print(f"TL {tl_id}: Starting extension period ({self.extension_time}s)")
+            # print(f"TL {tl_id}: Starting extension period ({self.extension_time}s)")
         
         # Check for vehicle detection during extension
         if vehicles_detected:
@@ -259,7 +259,7 @@ class ActuatedSimulation(SUMO):
         # Check if maximum green time exceeded (force switch)
         phase_duration = self.step - st["phase_start_time"]
         if phase_duration >= self.max_green_time:
-            print(f"TL {tl_id}: Maximum green time ({self.max_green_time}s) reached - forcing phase change")
+            # print(f"TL {tl_id}: Maximum green time ({self.max_green_time}s) reached - forcing phase change")
             should_continue = False
             reason = "max_green_exceeded"
         else:
@@ -270,7 +270,7 @@ class ActuatedSimulation(SUMO):
             # Time to switch phases
             new_phase_idx = self.select_next_phase(tl, st["current_phase_index"])
             
-            print(f"TL {tl_id}: Switching from phase {st['current_phase_index']} to {new_phase_idx} (reason: {reason})")
+            # print(f"TL {tl_id}: Switching from phase {st['current_phase_index']} to {new_phase_idx} (reason: {reason})")
             
             # Calculate reward for the completed phase
             self._update_metrics_and_reward(tl, st)
@@ -321,12 +321,9 @@ class ActuatedSimulation(SUMO):
         current_phase = st["phase"]
 
         # Calculate metrics
-        if self.testing_mode:
-            new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-            outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
-            st["old_vehicle_ids"] = new_ids
-            st["step"]["outflow"] += outflow
-            st["outflow"] += outflow
+        new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+        outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
+        st["old_vehicle_ids"] = new_ids
 
         sum_travel_delay = self.get_sum_travel_delay(tl)
         sum_travel_time = self.get_sum_travel_time(tl)
@@ -337,6 +334,7 @@ class ActuatedSimulation(SUMO):
         stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
         
         # Accumulate into both TL‐level and step‐level metrics
+        st["step"]["outflow"] += outflow
         st["step"]["delay"] += sum_travel_delay
         st["step"]["time"] += sum_travel_time
         st["step"]["density"] += sum_density
@@ -345,6 +343,7 @@ class ActuatedSimulation(SUMO):
         st["step"]["stopped_vehicles"] += stopped_vehicles_count
 
         # Update accumulated metrics
+        st["outflow"] += outflow
         st["travel_delay_sum"] = sum_travel_delay
         st["travel_time_sum"] = sum_travel_time
         st["queue_length"] = sum_queue_length

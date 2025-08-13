@@ -154,12 +154,9 @@ class SimulationBase(SUMO):
 
             self.history["reward"][tl_id].append(reward)
 
-        if self.testing_mode:
-            new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-            outflow = sum(1 for v in st["old_vehicle_ids"] if v not in new_ids)
-            st["old_vehicle_ids"] = new_ids
-            st["step"]["outflow"] += outflow
-            st["outflow"] += outflow
+        new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+        outflow = sum(1 for v in st["old_vehicle_ids"] if v not in new_ids)
+        st["old_vehicle_ids"] = new_ids
 
         sum_travel_delay = self.get_sum_travel_delay(tl)
         sum_travel_time = self.get_sum_travel_time(tl)
@@ -170,6 +167,7 @@ class SimulationBase(SUMO):
         stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
         
         # 2) Accumulate into both TL‐level and step‐level metrics
+        st["step"]["outflow"] += outflow
         st["step"]["delay"] += sum_travel_delay
         st["step"]["time"] += sum_travel_time  # FIX: accumulate instead of assign
         st["step"]["density"] += sum_density
@@ -178,6 +176,7 @@ class SimulationBase(SUMO):
         st["step"]["stopped_vehicles"] += stopped_vehicles_count
 
         # Update accumulated metrics
+        st["outflow"] += outflow
         st["travel_delay_sum"] = sum_travel_delay
         st["travel_time_sum"] = sum_travel_time
         st["queue_length"] = sum_queue_length
