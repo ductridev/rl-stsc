@@ -2,6 +2,7 @@
 Multi-simulation testing script for traffic signal control.
 Supports testing with Base (SUMO default), Actuated (queue-based), and DQN simulations.
 """
+import libsumo as traci
 import argparse
 import time
 import os
@@ -12,44 +13,89 @@ from src.accident_manager import AccidentManager
 from src.base_simulation import SimulationBase
 from src.actuated_simulation import ActuatedSimulation
 from src.simulation import Simulation
-import libsumo as traci
 import glob
 import re
 
 
-def find_best_model_file(model_folder_path):
+def find_best_model_file(model_folder_path, traffic_light_id=None, specific_filename=None):
     """
-    Automatically find the best .pth model file in the specified folder.
-    Looks for files with patterns like:
-    - *_BEST_CURRENT.pth (highest priority - current best model)
-    - *_BEST_ep*.pth (best model from specific episodes)
-    - *_final.pth 
-    - *_episode_*.pth (finds the highest episode number)
+    Automatically find the best SKRL model file in the specified folder.
+    Looks for SKRL model files with patterns like:
+    - skrl_model_{tl_id}_GLOBAL_BEST.pt (highest priority - global best model)
+    - skrl_model_{tl_id}_CURRENT_BEST.pt (current best model)
+    - skrl_model_{tl_id}_episode_*_BEST.pt (episode-specific best models)
+    - skrl_model_{tl_id}_episode_*.pt (episode-specific models)
     
     Args:
         model_folder_path (str): Path to the model folder
+        traffic_light_id (str): Traffic light ID to match in model filenames
+        specific_filename (str): Specific filename to look for (overrides automatic search)
         
     Returns:
         tuple: (best_model_path, episode_number) or (None, None) if no model found
     """
     if not os.path.exists(model_folder_path):
+        print(f"Model folder does not exist: {model_folder_path}")
         return None, None
     
-    # Priority 1: Look for *_BEST_CURRENT.pth files (current best model)
-    current_best_files = glob.glob(os.path.join(model_folder_path, "*_BEST_CURRENT.pth"))
+    # If a specific filename is provided, look for it directly
+    if specific_filename:
+        specific_path = os.path.join(model_folder_path, specific_filename)
+        if os.path.exists(specific_path):
+            print(f"Found specific model file: {specific_filename}")
+            # Try to extract episode info from filename
+            if "_episode_" in specific_filename:
+                match = re.search(r'episode_(\d+)', specific_filename)
+                if match:
+                    episode_info = int(match.group(1))
+                else:
+                    episode_info = "specific"
+            elif "GLOBAL_BEST" in specific_filename:
+                episode_info = "global_best"
+            elif "CURRENT_BEST" in specific_filename:
+                episode_info = "current_best"
+            elif "_BEST" in specific_filename:
+                episode_info = "best"
+            else:
+                episode_info = "specific"
+            return specific_path, episode_info
+        else:
+            print(f"Specific model file not found: {specific_filename}")
+            print(f"Available files in {model_folder_path}:")
+            for file in os.listdir(model_folder_path):
+                if file.endswith('.pt'):
+                    print(f"  - {file}")
+            return None, None
+    
+    # If traffic light ID is provided, use it to filter models
+    if traffic_light_id:
+        pattern_prefix = f"skrl_model_{traffic_light_id}_"
+    else:
+        pattern_prefix = "skrl_model_*_"
+    
+    print(f"Searching for models in: {model_folder_path}")
+    print(f"Using pattern prefix: {pattern_prefix}")
+    
+    # Priority 1: Look for GLOBAL_BEST model
+    global_best_files = glob.glob(os.path.join(model_folder_path, f"{pattern_prefix}GLOBAL_BEST.pt"))
+    if global_best_files:
+        best_file = max(global_best_files, key=os.path.getmtime)
+        print(f"Found global best model: {os.path.basename(best_file)}")
+        return best_file, "global_best"
+    
+    # Priority 2: Look for CURRENT_BEST model
+    current_best_files = glob.glob(os.path.join(model_folder_path, f"{pattern_prefix}CURRENT_BEST.pt"))
     if current_best_files:
-        # If multiple current best files, take the most recent one
         best_file = max(current_best_files, key=os.path.getmtime)
         print(f"Found current best model: {os.path.basename(best_file)}")
-        return best_file, "best"
+        return best_file, "current_best"
     
-    # Priority 2: Look for *_BEST_ep*.pth files (episode-specific best models)
-    best_episode_files = glob.glob(os.path.join(model_folder_path, "*_BEST_ep*.pth"))
+    # Priority 3: Look for episode-specific BEST models
+    best_episode_files = glob.glob(os.path.join(model_folder_path, f"{pattern_prefix}episode_*_BEST.pt"))
     if best_episode_files:
-        # Extract episode numbers and find the highest one
         episode_numbers = []
         for file in best_episode_files:
-            match = re.search(r'_BEST_ep(\d+)', os.path.basename(file))
+            match = re.search(r'episode_(\d+)_BEST', os.path.basename(file))
             if match:
                 episode_numbers.append((int(match.group(1)), file))
         
@@ -58,22 +104,17 @@ def find_best_model_file(model_folder_path):
             episode_numbers.sort(key=lambda x: x[0], reverse=True)
             highest_episode, best_file = episode_numbers[0]
             print(f"Found best episode model: {os.path.basename(best_file)} (episode {highest_episode})")
-            return best_file, "best"
+            return best_file, highest_episode
     
-    # Priority 3: Look for *_final.pth files
-    final_files = glob.glob(os.path.join(model_folder_path, "*_final.pth"))
-    if final_files:
-        final_file = max(final_files, key=os.path.getmtime)
-        print(f"Found final model: {os.path.basename(final_file)}")
-        return final_file, "final"
+    # Priority 4: Look for regular episode models and find the highest episode
+    episode_files = glob.glob(os.path.join(model_folder_path, f"{pattern_prefix}episode_*.pt"))
+    # Filter out BEST files that were already checked
+    episode_files = [f for f in episode_files if "_BEST.pt" not in f]
     
-    # Priority 4: Look for episode-specific files and find the highest episode
-    episode_files = glob.glob(os.path.join(model_folder_path, "*_episode_*.pth"))
     if episode_files:
-        # Extract episode numbers and find the highest one
         episode_numbers = []
         for file in episode_files:
-            match = re.search(r'episode_(\d+)', os.path.basename(file))
+            match = re.search(r'episode_(\d+)\.pt$', os.path.basename(file))
             if match:
                 episode_numbers.append((int(match.group(1)), file))
         
@@ -84,15 +125,112 @@ def find_best_model_file(model_folder_path):
             print(f"Found highest episode model: {os.path.basename(best_file)} (episode {highest_episode})")
             return best_file, highest_episode
     
-    # Priority 5: Look for any .pth files
-    pth_files = glob.glob(os.path.join(model_folder_path, "*.pth"))
-    if pth_files:
-        # Take the most recent .pth file
-        latest_file = max(pth_files, key=os.path.getmtime)
-        print(f"Found latest .pth model: {os.path.basename(latest_file)}")
+    # Priority 5: Look for any SKRL model files
+    all_skrl_files = glob.glob(os.path.join(model_folder_path, "skrl_model_*.pt"))
+    if all_skrl_files:
+        latest_file = max(all_skrl_files, key=os.path.getmtime)
+        print(f"Found latest SKRL model: {os.path.basename(latest_file)}")
         return latest_file, "latest"
     
+    print(f"No SKRL model files found in {model_folder_path}")
     return None, None
+
+def list_available_models(model_folder_path, traffic_light_id=None):
+    """
+    List all available SKRL model files in the specified folder.
+    
+    Args:
+        model_folder_path (str): Path to the model folder
+        traffic_light_id (str): Traffic light ID to filter models (optional)
+    """
+    if not os.path.exists(model_folder_path):
+        print(f"Model folder does not exist: {model_folder_path}")
+        return
+    
+    # Get all .pt files
+    all_pt_files = glob.glob(os.path.join(model_folder_path, "*.pt"))
+    
+    # Filter by traffic light ID if provided
+    if traffic_light_id:
+        filtered_files = [f for f in all_pt_files if f"skrl_model_{traffic_light_id}_" in os.path.basename(f)]
+    else:
+        filtered_files = [f for f in all_pt_files if "skrl_model_" in os.path.basename(f)]
+    
+    if not filtered_files:
+        print(f"No SKRL model files found in {model_folder_path}")
+        if traffic_light_id:
+            print(f"(searched for models with traffic light ID: {traffic_light_id})")
+        return
+    
+    print(f"Available models in {model_folder_path}:")
+    if traffic_light_id:
+        print(f"(filtered for traffic light ID: {traffic_light_id})")
+    
+    # Categorize files
+    global_best = []
+    current_best = []
+    episode_best = []
+    regular_episode = []
+    others = []
+    
+    for file_path in filtered_files:
+        filename = os.path.basename(file_path)
+        if "GLOBAL_BEST" in filename:
+            global_best.append(filename)
+        elif "CURRENT_BEST" in filename:
+            current_best.append(filename)
+        elif "_BEST.pt" in filename:
+            episode_best.append(filename)
+        elif "episode_" in filename:
+            regular_episode.append(filename)
+        else:
+            others.append(filename)
+    
+    # Print categorized results
+    if global_best:
+        print("  Global Best Models:")
+        for model in global_best:
+            print(f"    - {model}")
+    
+    if current_best:
+        print("  Current Best Models:")
+        for model in current_best:
+            print(f"    - {model}")
+    
+    if episode_best:
+        print("  Episode Best Models (latest 5):")
+        # Sort by episode number
+        episode_best_sorted = []
+        for model in episode_best:
+            match = re.search(r'episode_(\d+)_BEST', model)
+            if match:
+                episode_num = int(match.group(1))
+                episode_best_sorted.append((episode_num, model))
+        episode_best_sorted.sort(reverse=True)
+        for _, model in episode_best_sorted[:5]:
+            print(f"    - {model}")
+        if len(episode_best_sorted) > 5:
+            print(f"    ... and {len(episode_best_sorted) - 5} more episode best models")
+    
+    if regular_episode:
+        print("  Regular Episode Models (latest 5):")
+        # Sort by episode number
+        regular_episode_sorted = []
+        for model in regular_episode:
+            match = re.search(r'episode_(\d+)\.pt$', model)
+            if match:
+                episode_num = int(match.group(1))
+                regular_episode_sorted.append((episode_num, model))
+        regular_episode_sorted.sort(reverse=True)
+        for _, model in regular_episode_sorted[:5]:
+            print(f"    - {model}")
+        if len(regular_episode_sorted) > 5:
+            print(f"    ... and {len(regular_episode_sorted) - 5} more episode models")
+    
+    if others:
+        print("  Other Models:")
+        for model in others:
+            print(f"    - {model}")
 
 
 def test_base_simulation(config, path):
@@ -191,7 +329,7 @@ def test_actuated_simulation(config, path):
     actuated_simulation.reset_history()
 
 
-def test_dqn_simulation(config, path):
+def test_dqn_simulation(config, path, specific_model_file=None):
     """Test with DQN agent (requires pre-trained model)"""
     print("\n" + "="*50)
     print("TESTING DQN SIMULATION")
@@ -229,12 +367,30 @@ def test_dqn_simulation(config, path):
         model_folder_path = os.path.join("models", model_folder)
         print(f"Looking for DQN models in: {model_folder_path}")
         
-        # Auto-find the best model file
-        model_file_path, episode_info = find_best_model_file(model_folder_path)
+        # Extract traffic light ID for model file matching
+        traffic_light_id = None
+        if config["traffic_lights"] and len(config["traffic_lights"]) > 0:
+            # Get the first traffic light ID
+            first_tl = config["traffic_lights"][0]
+            if isinstance(first_tl, dict):
+                # Find the key that contains 'id'
+                for key, value in first_tl.items():
+                    if isinstance(value, dict) and 'id' in value:
+                        traffic_light_id = value['id']
+                        break
+            
+        print(f"Traffic light ID for model search: {traffic_light_id}")
+        
+        # Auto-find the best model file (or use specific filename if provided)
+        model_file_path, episode_info = find_best_model_file(model_folder_path, traffic_light_id, specific_model_file)
         
         if model_file_path is None:
             print(f"Warning: No DQN model files found in {model_folder_path}")
-            print("Available model folders:")
+            if specific_model_file:
+                print(f"Specific file '{specific_model_file}' not found.")
+            print(f"\nTo see available models, run:")
+            print(f"python test.py --list-models --model-folder {model_folder}")
+            print("\nAvailable model folders:")
             models_dir = "models"
             if os.path.exists(models_dir):
                 for item in os.listdir(models_dir):
@@ -345,7 +501,7 @@ def test_dqn_simulation(config, path):
     # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
     set_sumo(True, config["sumo_cfg_file"], config["max_steps"])
     
-    # Run simulation with epsilon=0 (no exploration, pure exploitation)
+    # Run simulation with episode=1 (pure exploitation mode since model is loaded)
     start_time = time.time()
     dqn_simulation.run(episode=1)
     total_time = time.time() - start_time
@@ -376,12 +532,40 @@ def main():
                        help='Enable SUMO GUI')
     parser.add_argument('--model-folder', '-m',
                        help='Model folder or direct .pt file path to use for DQN simulation (e.g., model_11, model_12, or models/model_14/skrl_model_NgatuNorthEast_GLOBAL_BEST.pt). Overrides config setting.')
+    parser.add_argument('--model-file', '-f',
+                       help='Specific model filename to use within the model folder (e.g., skrl_model_NgatuNorthEast_episode_999_BEST.pt). Works with --model-folder.')
+    parser.add_argument('--list-models', '-l',
+                       action='store_true',
+                       help='List available model files in the specified model folder and exit')
     
     args = parser.parse_args()
     
     # Load configuration
     print(f"Loading configuration from: {args.config}")
     config = import_test_configuration(args.config)
+    
+    # Handle list-models option
+    if args.list_models:
+        model_folder = args.model_folder if args.model_folder else config.get("model_folder", "model_41")
+        if model_folder.endswith('.pt'):
+            print("Cannot list models for a direct .pt file path. Please specify a model folder.")
+            return
+        
+        model_folder_path = os.path.join("models", model_folder)
+        
+        # Extract traffic light ID for filtering
+        traffic_light_id = None
+        if config["traffic_lights"] and len(config["traffic_lights"]) > 0:
+            first_tl = config["traffic_lights"][0]
+            if isinstance(first_tl, dict):
+                for key, value in first_tl.items():
+                    if isinstance(value, dict) and 'id' in value:
+                        traffic_light_id = value['id']
+                        break
+        
+        print(f"Listing models in folder: {model_folder_path}")
+        list_available_models(model_folder_path, traffic_light_id)
+        return
     
     # Override GUI setting if specified
     if args.gui:
@@ -403,6 +587,10 @@ def main():
             print(f"Using direct .pt model file from config: {config['model_folder']}")
         else:
             print(f"Using model folder from config: {config['model_folder']}")
+    
+    # Display specific model file if provided
+    if args.model_file:
+        print(f"Using specific model file: {args.model_file}")
     
     # Set up testing path
     path = set_test_path(config["models_path_name"])
