@@ -271,6 +271,14 @@ def test_base_simulation(config, path):
     
     print(f"Base simulation completed in {simulation_time:.2f}s (total: {total_time:.2f}s)")
     
+    # Collect completion tracker data before reset
+    completion_data = None
+    if hasattr(base_simulation, 'completion_tracker'):
+        completion_data = {
+            'completed_count': base_simulation.completion_tracker.get_completed_count(),
+            'avg_travel_time': base_simulation.completion_tracker.get_average_total_travel_time()
+        }
+    
     # Save metrics and plots
     print("Saving base simulation metrics...")
     base_simulation.save_metrics(episode=1)
@@ -278,6 +286,12 @@ def test_base_simulation(config, path):
     
     # Reset for next simulation
     base_simulation.reset_history()
+    
+    # Reset completion tracker after analysis and plotting
+    if hasattr(base_simulation, 'completion_tracker'):
+        base_simulation.completion_tracker.reset()
+        
+    return completion_data
 
 
 def test_actuated_simulation(config, path):
@@ -321,6 +335,14 @@ def test_actuated_simulation(config, path):
     
     print(f"Actuated simulation completed in {simulation_time:.2f}s (total: {total_time:.2f}s)")
     
+    # Collect completion tracker data before reset
+    completion_data = None
+    if hasattr(actuated_simulation, 'completion_tracker'):
+        completion_data = {
+            'completed_count': actuated_simulation.completion_tracker.get_completed_count(),
+            'avg_travel_time': actuated_simulation.completion_tracker.get_average_total_travel_time()
+        }
+    
     # Save metrics and plots
     print("Saving actuated simulation metrics...")
     actuated_simulation.save_metrics(episode=1)
@@ -328,6 +350,12 @@ def test_actuated_simulation(config, path):
     
     # Reset for next simulation
     actuated_simulation.reset_history()
+    
+    # Reset completion tracker after analysis and plotting
+    if hasattr(actuated_simulation, 'completion_tracker'):
+        actuated_simulation.completion_tracker.reset()
+        
+    return completion_data
 
 
 def test_dqn_simulation(config, path, specific_model_file=None):
@@ -508,6 +536,23 @@ def test_dqn_simulation(config, path, specific_model_file=None):
     
     print(f"DQN simulation completed in {total_time:.2f}s")
     
+    # Debug: Check completion tracker before data collection
+    # print(f"DEBUG: DQN simulation has completion_tracker: {hasattr(dqn_simulation, 'completion_tracker')}")
+    # if hasattr(dqn_simulation, 'completion_tracker'):
+    #     print(f"DEBUG: DQN completion tracker completed count: {dqn_simulation.completion_tracker.get_completed_count()}")
+    #     print(f"DEBUG: DQN completion tracker avg travel time: {dqn_simulation.completion_tracker.get_average_total_travel_time()}")
+    
+    # Collect completion tracker data before reset
+    completion_data = None
+    if hasattr(dqn_simulation, 'completion_tracker'):
+        completion_data = {
+            'completed_count': dqn_simulation.completion_tracker.get_completed_count(),
+            'avg_travel_time': dqn_simulation.completion_tracker.get_average_total_travel_time()
+        }
+        print(f"DEBUG: DQN completion_data collected: {completion_data}")
+    else:
+        print("DEBUG: DQN simulation does not have completion_tracker attribute")
+    
     # Save metrics and plots
     print("Saving DQN simulation metrics and plots...")
     dqn_simulation.save_plot(episode=1)
@@ -515,6 +560,12 @@ def test_dqn_simulation(config, path, specific_model_file=None):
     
     # Reset for next simulation
     dqn_simulation.reset_history()
+    
+    # Reset completion tracker after analysis and plotting
+    if hasattr(dqn_simulation, 'completion_tracker'):
+        dqn_simulation.completion_tracker.reset()
+        
+    return completion_data
 
 
 def main():
@@ -632,16 +683,26 @@ def main():
     # Run selected simulations
     overall_start = time.time()
     
+    # Collect completion tracker results
+    completion_results = {}
+    
     try:
         if 'base' in simulations_to_run:
-            test_base_simulation(config, path)
+            base_completion = test_base_simulation(config, path)
+            if base_completion:
+                completion_results['baseline'] = {'completion_tracker': base_completion}
             
         if 'actuated' in simulations_to_run:
-            test_actuated_simulation(config, path)
+            actuated_completion = test_actuated_simulation(config, path)
+            if actuated_completion:
+                completion_results['actuated'] = {'completion_tracker': actuated_completion}
             
         if 'dqn' in simulations_to_run:
-            test_dqn_simulation(config, path, args.model_file)
-            
+            dqn_completion = test_dqn_simulation(config, path, args.model_file)
+            if dqn_completion:
+                completion_results['dqn'] = {'completion_tracker': dqn_completion}
+        
+        print(completion_results)
     except Exception as e:
         print(f"Error during testing: {e}")
         import traceback
@@ -695,6 +756,75 @@ def main():
         
     except Exception as e:
         print(f"Warning: Could not generate vehicle comparison plots: {e}")
+    
+    # Generate completion tracker comparison plots
+    try:
+        print("\nGenerating completion tracker comparison plots...")
+        
+        if completion_results:
+            # Use the visualization instance to create completion tracker plots
+            visualization = Visualization(path=path, dpi=100)
+            
+            # Generate completion tracker comparison plot
+            visualization.plot_completed_travel_time_comparison(completion_results, episode=1)
+            
+            # Generate travel time improvements plot
+            visualization.plot_travel_time_improvements(completion_results, episode=1)
+            
+            print("✓ Completion tracker comparison plots generated successfully!")
+            
+            # Print summary of completion tracker results
+            print("\n" + "="*50)
+            print("COMPLETION TRACKER SUMMARY")
+            print("="*50)
+            
+            method_mapping = {
+                'actuated': 'Research Actuated',
+                'baseline': 'Baseline (Fixed)', 
+                'dqn': 'SKRL DQN'
+            }
+            
+            best_travel_time = float('inf')
+            best_method = ""
+            
+            for method_key, method_data in completion_results.items():
+                if 'completion_tracker' in method_data:
+                    completion_data = method_data['completion_tracker']
+                    method_name = method_mapping.get(method_key, method_key.title())
+                    completed_count = completion_data['completed_count']
+                    avg_travel_time = completion_data['avg_travel_time']
+                    
+                    print(f"{method_name}:")
+                    print(f"  Completed Vehicles: {completed_count}")
+                    print(f"  Average Travel Time: {avg_travel_time:.2f}s")
+                    
+                    if avg_travel_time < best_travel_time and avg_travel_time > 0:
+                        best_travel_time = avg_travel_time
+                        best_method = method_name
+                    print()
+            
+            if best_method:
+                print(f"Best Performance: {best_method} ({best_travel_time:.2f}s average travel time)")
+                
+                # Calculate improvements vs baseline if available
+                if 'baseline' in completion_results:
+                    baseline_time = completion_results['baseline']['completion_tracker']['avg_travel_time']
+                    if baseline_time > 0:
+                        print("\nImprovements vs Baseline:")
+                        for method_key in ['actuated', 'dqn']:
+                            if method_key in completion_results:
+                                method_time = completion_results[method_key]['completion_tracker']['avg_travel_time']
+                                if method_time > 0:
+                                    improvement = ((baseline_time - method_time) / baseline_time) * 100
+                                    method_name = method_mapping.get(method_key, method_key.title())
+                                    print(f"  {method_name}: {improvement:+.1f}%")
+        else:
+            print("No completion tracker data available for plotting")
+        
+    except Exception as e:
+        print(f"Warning: Could not generate completion tracker plots: {e}")
+        import traceback
+        traceback.print_exc()
     
     print("\n" + "="*50)
     print("TESTING COMPLETED")
