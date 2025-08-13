@@ -260,6 +260,8 @@ def test_base_simulation(config, path):
         path=path,
         save_interval=1
     )
+
+    base_simulation.testing_mode = True
     
     # Set up SUMO
     set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
@@ -321,9 +323,10 @@ def test_actuated_simulation(config, path):
         path=path,
         save_interval=1,
         min_green_time=config["agent"].get("min_green_time", 20),
-        max_green_time=config["agent"].get("max_green_time", 60),
         detection_threshold=config["agent"].get("detection_threshold", 2)
     )
+
+    actuated_simulation.testing_mode = True
     
     # Set up SUMO
     set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
@@ -527,7 +530,8 @@ def test_dqn_simulation(config, path, specific_model_file=None):
         return
     
     # Set up SUMO
-    set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+    # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+    set_sumo(True, config["sumo_cfg_file"], config["max_steps"])
     
     # Run simulation with episode=1 (pure exploitation mode since model is loaded)
     start_time = time.time()
@@ -662,51 +666,50 @@ def main():
     print("\n" + "="*50)
     print("GENERATING ROUTES FOR ALL DEMAND LEVELS")
     print("="*50)
-    
-    simulation_path = config["sumo_cfg_file"].split("/")[1]
-    # demand_levels = ['low', 'medium', 'high']
-    
-    # for demand_level in demand_levels:
-        # if args.config != "config/testing_testngatu6x1EastWestOverflow.yaml":
-        #     print(f"\nGenerating routes for {demand_level} demand level...")
-        #     Intersection.generate_residential_demand_routes(
-        #         config,
-        #         simulation_path,
-        #         demand_level=demand_level,
-        #         enable_bicycle=True,
-        #         enable_pedestrian=True,
-        #         enable_motorcycle=True,
-        #         enable_passenger=True,
-        #         enable_truck=True,
-        #     )
-    
+
     # Run selected simulations
     overall_start = time.time()
     
     # Collect completion tracker results
     completion_results = {}
     
-    try:
-        if 'base' in simulations_to_run:
-            base_completion = test_base_simulation(config, path)
-            if base_completion:
-                completion_results['baseline'] = {'completion_tracker': base_completion}
+    simulation_path = config["sumo_cfg_file"].split("/")[1]
+    demand_levels = ['low', 'medium', 'high']
+    
+    for demand_level in demand_levels:
+        if args.config != "config/testing_testngatu6x1EastWestOverflow.yaml":
+            print(f"\nGenerating routes for {demand_level} demand level...")
+            Intersection.generate_residential_demand_routes(
+                config,
+                simulation_path,
+                demand_level=demand_level,
+                enable_bicycle=True,
+                enable_pedestrian=True,
+                enable_motorcycle=True,
+                enable_passenger=True,
+                enable_truck=True,
+            )
+    
+        try:
+            if 'base' in simulations_to_run:
+                base_completion = test_base_simulation(config, path)
+                if base_completion:
+                    completion_results['baseline'] = {'completion_tracker': base_completion}
             
-        if 'actuated' in simulations_to_run:
-            actuated_completion = test_actuated_simulation(config, path)
-            if actuated_completion:
-                completion_results['actuated'] = {'completion_tracker': actuated_completion}
+            if 'actuated' in simulations_to_run:
+                actuated_completion = test_actuated_simulation(config, path)
+                if actuated_completion:
+                    completion_results['actuated'] = {'completion_tracker': actuated_completion}
             
-        if 'dqn' in simulations_to_run:
-            dqn_completion = test_dqn_simulation(config, path, args.model_file)
-            if dqn_completion:
-                completion_results['dqn'] = {'completion_tracker': dqn_completion}
-        
-        print(completion_results)
-    except Exception as e:
-        print(f"Error during testing: {e}")
-        import traceback
-        traceback.print_exc()
+            if 'dqn' in simulations_to_run:
+                dqn_completion = test_dqn_simulation(config, path)
+                if dqn_completion:
+                    completion_results['dqn'] = {'completion_tracker': dqn_completion}
+
+        except Exception as e:
+                print(f"Error during testing: {e}")
+                import traceback
+                traceback.print_exc()
     
     overall_time = time.time() - overall_start
     

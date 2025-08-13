@@ -1,6 +1,6 @@
 simulation:
   gui: False
-  total_episodes: 1000
+  total_episodes: 100
   max_steps: 3600
   interphase_duration: 3
 
@@ -12,7 +12,7 @@ memory:
 model:
   training_epochs: 20
   save_model_name: "dqn_testngatu_model" # Name for saving the model
-  load_model_name: "models/model_14" # Set to model path to load existing model, null to start fresh
+  load_model_name: null # Set to model path to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
   save_interval: 10 # Save model every N episodes
   training_steps: 10  # DECISION interval between batch training cycles (increased responsiveness while maintaining stability)
@@ -22,7 +22,7 @@ agent:
   rbf_components: 100
   rbf_gamma: 0.5
   gamma: 0.95
-  num_states: 6 # Per-phase features (4 phases × 1 feature waiting_time) + current_phase + DESRA_phase
+  num_states: 22 # Per-phase features (max 10 phases × 2 feature waiting_time, queue length) + current_phase + DESRA_phase
   batch_updates: 2  # Number of gradient update cycles per training interval (reduced for more frequent training)
   
   # DESRA-DQN Hybrid Configuration
@@ -65,7 +65,7 @@ agent:
     epsilon: 0.95
     min_epsilon: 0.05
   weight:
-    queue_length: -0.25
+    queue_length: -0.75
     outflow_rate: 1
     delay: -0.25
     travel_time: -1
