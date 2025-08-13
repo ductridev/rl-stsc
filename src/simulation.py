@@ -321,11 +321,16 @@ class Simulation(SUMO):
         print("Simulating...")
         print("---------------------------------------")
 
-        # Ensure local waiting time baseline is reset at the start of each episode
+        # Ensure local waiting time and queue baseline is reset at the start of each episode
         if hasattr(self, 'prev_local_wait'):
             self.prev_local_wait = {}
         else:
             self.prev_local_wait = {}
+            
+        if hasattr(self, 'prev_local_queue'):
+            self.prev_local_queue = {}
+        else:
+            self.prev_local_queue = {}
 
         # Build detector list
         self.all_detectors = [
@@ -715,6 +720,8 @@ class Simulation(SUMO):
         # Reset global waiting snapshot for next episode
         if hasattr(self, 'prev_local_wait'):
             self.prev_local_wait = {}
+        if hasattr(self, 'prev_local_queue'):
+            self.prev_local_queue = {}
 
         # Reset decision counter
         self.decision_counter = 0  # reset decision counter
@@ -765,12 +772,14 @@ class Simulation(SUMO):
                 continue
 
             waiting_time = 0
+            queue_length = 0
 
             for detector_id in movements:
                 waiting_time += TrafficMetrics.get_waiting_time(detector_id)
+                queue_length += TrafficMetrics.get_queue_length(detector_id)
 
             # Append per-phase state: only waiting_time
-            state_vector.extend([waiting_time])
+            state_vector.extend([waiting_time, queue_length])
 
         # Compute per-detector q_arr over [last_call, now]
         q_arr_dict = self._compute_arrival_flows()
@@ -819,12 +828,15 @@ class Simulation(SUMO):
         return np.array(state_vector, dtype=np.float32), desra_phase_idx
 
     def get_reward(self, tl_id: str, phase: str) -> float:
-        """Reward = decrease in LOCAL waiting time for this specific traffic light.
-        Uses the difference in waiting time before and after the action to provide
+        """Reward = decrease in LOCAL waiting time and queue length for this specific traffic light.
+        Uses the difference in waiting time and queue length before and after the action to provide
         proper credit assignment for multi-agent learning."""
+
+        weight = self.agent_cfg["weight"]
         
-        # Get current waiting time for this specific traffic light
+        # Get current waiting time and queue length for this specific traffic light
         current_local_wait = 0.0
+        current_local_queue = 0.0
         tl_data = None
         for tl in self.traffic_lights:
             if tl["id"] == tl_id:
@@ -835,29 +847,46 @@ class Simulation(SUMO):
             return 0.0
             
         current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
+        current_local_queue = TrafficMetrics.get_queue_length(tl_data["id"])
         
-        # Initialize per-TL waiting time tracking if not exists
+        # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):
             self.prev_local_wait = {}
+        if not hasattr(self, 'prev_local_queue'):
+            self.prev_local_queue = {}
         
         # First calculation for this TL returns 0 (no baseline)
-        if tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None:
+        if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None or
+            tl_id not in self.prev_local_queue or self.prev_local_queue[tl_id] is None):
             reward = 0.0
         else:
-            # Reward = reduction in waiting time (positive if decreased)
+            # Reward = reduction in waiting time and queue length (positive if decreased)
             waiting_reduction = self.prev_local_wait[tl_id] - current_local_wait
+            queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
+
+            waiting_norm = self.waiting_time_normalizer.normalize(waiting_reduction)
+            queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
             
-            # Scale reward based on magnitude to improve learning signal
+            # Scale rewards based on magnitude to improve learning signal
             # Use square root to reduce impact of extreme values
+            waiting_reward = 0.0
             if waiting_reduction > 0:
-                reward = np.sqrt(waiting_reduction) * 0.1  # Positive reward for improvement
+                waiting_reward = -waiting_norm * weight["waiting_time"]  # Positive reward for improvement
             elif waiting_reduction < 0:
-                reward = -np.sqrt(abs(waiting_reduction)) * 0.1  # Negative reward for worsening
-            else:
-                reward = 0.0  # No change
+                waiting_reward = waiting_norm * weight["waiting_time"]  # Negative reward for worsening
+            
+            queue_reward = 0.0
+            if queue_reduction > 0:
+                queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
+            elif queue_reduction < 0:
+                queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
+            
+            # Combined reward: waiting time has higher weight than queue length
+            reward = waiting_reward + queue_reward
         
-        # Update snapshot for this traffic light
+        # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait
+        self.prev_local_queue[tl_id] = current_local_queue
         return float(reward)
 
     def get_movements_from_phase(self, tl: Dict, phase_str: str) -> List[str]:
