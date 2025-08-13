@@ -51,6 +51,10 @@ class SKRLAgentManager:
         # Setup agents
         self._setup_agents()
 
+        # Additional configuration for batch training
+        self._training_interval = simulation_instance.training_steps  # decisions between batch updates
+        self._batch_updates = self.agent_cfg.get("batch_updates", 10)  # gradient batches per training interval
+
     def _create_model(self, observation_space, action_space, tl_id):
         """Create Q-network model with advanced configuration support"""
         model_config = self.agent_cfg.get("model", {})
@@ -135,7 +139,7 @@ class SKRLAgentManager:
                 "truncated",
             ]
             memory = RandomMemory(
-                memory_size=self.agent_cfg.get("memory_size", 10000),
+                memory_size=self.agent_cfg.get("model", {}).get("memory_size", 50000),  # Larger memory for better learning
                 num_envs=1,
                 device=self.device,
             )
@@ -177,8 +181,8 @@ class SKRLAgentManager:
                     "discount_factor": self.agent_cfg.get(
                         "gamma", 0.99
                     ),  # Use correct SKRL parameter name
-                    "batch_size": self.agent_cfg.get("model", {}).get("batch_size", 32),
-                    "learning_starts": 300,  # Start learning after 300 steps
+                    "batch_size": self.agent_cfg.get("model", {}).get("batch_size", 256),  # Match config value
+                    "learning_starts": 1000,  # Wait for more experience before training
                     "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
                     "exploration": {
                         "initial_epsilon": self.agent_cfg.get("model", {}).get(
@@ -187,11 +191,11 @@ class SKRLAgentManager:
                         "final_epsilon": self.agent_cfg.get("model", {}).get(
                             "min_epsilon", 0.001
                         ),
-                        "timesteps": 3600,
+                        "timesteps": 3240000,  # Decay over 900 episodes, stay at 0.05 for episodes 900-1000
                     },
-                    "polyak": 0.01,
-                    "gradient_steps": 5,
-                    "update_interval": 300,
+                    "polyak": 0.005,  # Slower target network updates for stability
+                    "gradient_steps": 1,  # Single gradient step per update for stability
+                    "update_interval": 1,  # Update every timestep (controlled by our batch training)
                     # Ensure experiment settings are properly configured
                     "experiment": {
                         "directory": "",
@@ -323,7 +327,7 @@ class SKRLAgentManager:
         )
 
     def train_agents(self, tl_id: str, step: int, max_steps: int) -> float:
-        """Train all agents using SKRL"""
+        """(Legacy) single training trigger using post_interaction once"""
         agent = self.agents[tl_id]
         total_loss = 0
 
@@ -369,20 +373,36 @@ class SKRLAgentManager:
 
         return total_loss
 
-    # def update_target_networks(self, step: int, max_steps: int):
-    #     """Update target networks for all agents"""
-    #     for tl_id, agent in self.agents.items():
-    #         memory = self.memories[tl_id]
-    #         # Only update if we have enough samples and agent is properly configured
-    #         if (
-    #             len(memory) >= self.agent_cfg.get("model", {}).get("batch_size", 32)
-    #             and hasattr(agent, "tensors_names")
-    #             and agent.tensors_names
-    #         ):
-    #             # For SKRL agents, target network updates are handled automatically
-    #             # during post_interaction based on update frequency
-    #             agent.post_interaction(timestep=step, timesteps=max_steps)
+    def maybe_batch_train(self, tl_id: str, decision_counter: int, max_steps: int):
+        """Perform batched training every configured decision interval.
+        Args:
+            tl_id: traffic light id
+            decision_counter: number of decisions (phase selections) so far in episode
+            max_steps: max steps (passed for API compatibility)
+        """
+        if self._training_interval <= 0:
+            return 0.0
+        if decision_counter == 0 or (decision_counter % self._training_interval) != 0:
+            return 0.0
+        
+        # Check if agent has enough experience to train
+        agent = self.agents[tl_id]
+        if len(agent.memory) < agent.cfg.get("learning_starts", 1000):
+            return 0.0  # Wait for sufficient experience
+        agent = self.agents[tl_id]
+        total_loss = 0.0
+        # Run multiple update cycles (post_interaction) to simulate batch training
+        for _ in range(self._batch_updates):
+            agent.post_interaction(timestep=decision_counter, timesteps=max_steps)
+            # collect loss if available
+            if hasattr(agent, "_q_loss") and agent._q_loss is not None:
+                try:
+                    total_loss += float(agent._q_loss.item())
+                except Exception:
+                    pass
+        return total_loss / max(1, self._batch_updates)
 
+    # ...existing code...
     def save_models(self, path: str, episode: Optional[int] = None):
         """Save all SKRL models"""
         for tl_id, agent in self.agents.items():
