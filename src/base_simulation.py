@@ -9,7 +9,7 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
-from sim_utils.traffic_metrics import TrafficMetrics
+from sim_utils.traffic_metrics import TrafficMetrics, VehicleCompletionTracker, JunctionVehicleTracker
 from visualization import Visualization
 from normalizer import Normalizer
 from .sumo import SUMO
@@ -41,6 +41,12 @@ class SimulationBase(SUMO):
         # Initialize VehicleTracker for logging vehicle statistics
         self.vehicle_tracker = VehicleTracker(path=self.path)
 
+        # Initialize completion tracker for episode-end travel time analysis
+        self.completion_tracker = VehicleCompletionTracker()
+
+        # Junction vehicle tracking for throughput analysis
+        self.junction_tracker = JunctionVehicleTracker()
+
         # Add normalizers for reward calculation (same as SKRL simulation)
         self.outflow_rate_normalizer = Normalizer()
         self.queue_length_normalizer = Normalizer()
@@ -66,6 +72,9 @@ class SimulationBase(SUMO):
             "outflow": {},
             "queue_length": {},
             "waiting_time": {},
+            "completed_travel_time": {},  # New: track average completed vehicle travel times
+            "junction_throughput": {},  # New: track vehicles entering junctions
+            "stopped_vehicles": {},  # New: track number of stopped vehicles
         }
 
         self.init_state()
@@ -107,6 +116,8 @@ class SimulationBase(SUMO):
                     "outflow": 0,
                     "queue": 0,
                     "waiting": 0,
+                    "junction_throughput": 0,
+                    "stopped_vehicles": 0,
                     "old_ids": [],
                 },
             }
@@ -149,14 +160,17 @@ class SimulationBase(SUMO):
         sum_density = self.get_sum_density(tl)
         sum_queue_length = self.get_sum_queue_length(tl)
         sum_waiting_time = self.get_sum_waiting_time(tl)
-
+        mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
+        stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
+        
         # 2) Accumulate into both TL‐level and step‐level metrics
         st["step"]["outflow"] += outflow
         st["step"]["delay"] += sum_travel_delay
-        st["step"]["time"] = sum_travel_time
+        st["step"]["time"] += sum_travel_time  # FIX: accumulate instead of assign
         st["step"]["density"] += sum_density
         st["step"]["queue"] += sum_queue_length
-        st["step"]["waiting"] = sum_waiting_time
+        st["step"]["waiting"] += mean_waiting_time
+        st["step"]["stopped_vehicles"] += stopped_vehicles_count
 
         # Update accumulated metrics
         st["outflow"] += outflow
@@ -174,6 +188,7 @@ class SimulationBase(SUMO):
                 ("density", "density"),
                 ("queue", "queue_length"),
                 ("waiting", "waiting_time"),
+                ("stopped_vehicles", "stopped_vehicles"),
             ]:
                 avg = st["step"][key] / 60.0
                 self.history[hist][tl_id].append(avg)
@@ -182,8 +197,14 @@ class SimulationBase(SUMO):
             # Append outflow before resetting
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             
+            # Add junction throughput to history (sum over 60 steps)
+            if tl_id not in self.history["junction_throughput"]:
+                self.history["junction_throughput"][tl_id] = []
+            self.history["junction_throughput"][tl_id].append(st["step"]["junction_throughput"])
+            
             # Reset step counters
             st["step"]["outflow"] = 0
+            st["step"]["junction_throughput"] = 0
 
     def run(self, episode):
         print("Simulation started (Base)")
@@ -207,6 +228,21 @@ class SimulationBase(SUMO):
 
             # Update vehicle tracking statistics
             self.vehicle_tracker.update_stats(self.step)
+
+            # Track completed vehicles for travel time analysis
+            self.completion_tracker.update_completed_vehicles()
+
+            # Update junction throughput tracking
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                st = self.tl_states[tl_id]
+                # Assume junction_id is in the traffic light config, or derive from tl_id
+                junction_id = tl.get("junction_id", tl_id)  # Use junction_id if available, else use tl_id
+                new_count, new_vehicles = self.junction_tracker.update_junction(junction_id)
+                
+                # Accumulate throughput for this step instead of directly appending
+                if new_count > 0:
+                    st["step"]["junction_throughput"] += new_count
 
             # Print vehicle stats every 1000 steps
             if self.step % 1000 == 0:
@@ -233,6 +269,17 @@ class SimulationBase(SUMO):
         self.vehicle_tracker.print_summary("base")
         self.vehicle_tracker.save_logs(episode, "base")
         # Note: vehicle_tracker.reset() moved to train.py after performance tracking
+
+        # Record episode-end completed vehicle travel time for all traffic lights
+        episode_avg_travel_time = self.completion_tracker.get_average_total_travel_time()
+        for tl in self.traffic_lights:
+            tl_id = tl["id"]
+            if tl_id not in self.history["completed_travel_time"]:
+                self.history["completed_travel_time"][tl_id] = []
+            self.history["completed_travel_time"][tl_id].append(episode_avg_travel_time)
+        
+        print(f"Episode {episode}: {self.completion_tracker.get_completed_count()} vehicles completed, "
+              f"average travel time: {episode_avg_travel_time:.2f}s")
 
         # 4) Save
         self.save_metrics(episode=episode)
@@ -294,6 +341,8 @@ class SimulationBase(SUMO):
             "travel_delay",
             "travel_time",
             "waiting_time",
+            "junction_throughput",
+            "stopped_vehicles",
         ]
 
         for metric, data_per_tls in self.history.items():
@@ -362,10 +411,25 @@ class SimulationBase(SUMO):
         return delay_sum
 
     def get_sum_travel_time(self, traffic_light):
-        travel_times = []
+        """Calculate average actual travel time of vehicles in the intersection area"""
+        total_travel_time = 0.0
+        vehicle_count = 0
+        
         for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            travel_times.append(traci.lane.getTraveltime(lane))
-        return np.sum(travel_times) if travel_times else 0.0
+            vehicle_ids = traci.lane.getLastStepVehicleIDs(lane)
+            for vehicle_id in vehicle_ids:
+                try:
+                    # Get actual travel time for each vehicle
+                    departure_time = traci.vehicle.getDeparture(vehicle_id)
+                    current_time = traci.simulation.getTime()
+                    travel_time = current_time - departure_time
+                    total_travel_time += travel_time
+                    vehicle_count += 1
+                except:
+                    pass  # Skip vehicles with errors
+        
+        # Return average travel time per vehicle (or 0 if no vehicles)
+        return total_travel_time / vehicle_count if vehicle_count > 0 else 0.0
 
     def get_sum_density(self, traffic_light):
         """
@@ -466,3 +530,9 @@ class SimulationBase(SUMO):
         for key in self.history:
             for tl_id in self.history[key]:
                 self.history[key][tl_id] = []
+        
+        # Reset junction tracking for next episode
+        self.junction_tracker.reset_all()
+        
+        # Reset vehicle stop tracking for next episode
+        TrafficMetrics.reset_vehicle_stop_tracker()

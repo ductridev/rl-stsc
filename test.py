@@ -716,7 +716,7 @@ def main():
         visualization = Visualization(path=path, dpi=100)
         
         # Generate plots comparing all simulation types
-        metrics = ["density_avg", "travel_time_avg", "outflow_avg", "queue_length_avg", "waiting_time_avg"]
+        metrics = ["density_avg", "travel_time_avg", "outflow_avg", "queue_length_avg", "waiting_time_avg", "junction_throughput_avg", "stopped_vehicles_avg"]
         names = []
         
         # Add simulation names based on what was run
