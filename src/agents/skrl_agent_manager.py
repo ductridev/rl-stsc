@@ -7,7 +7,7 @@ import numpy as np
 import gymnasium as gym
 from typing import Dict, List, Tuple, Optional
 from skrl.memories.torch import RandomMemory
-from skrl.agents.torch.dqn import DQN, DQN_DEFAULT_CONFIG
+from skrl.agents.torch.dqn import DQN_DEFAULT_CONFIG
 from skrl.utils import set_seed
 import sys
 import os
@@ -19,6 +19,7 @@ sys.path.insert(0, parent_dir)
 
 from models.q_network import QNetwork
 from environment.traffic_light_env import TrafficLightEnvironment
+from agents.custom_dqn import CustomDQN
 
 
 class SKRLAgentManager:
@@ -44,7 +45,7 @@ class SKRLAgentManager:
         set_seed(42)
 
         # Initialize containers
-        self.agents: dict[str, DQN] = {}
+        self.agents: dict[str, CustomDQN] = {}
         self.memories: dict[str, RandomMemory] = {}
         self.environments: dict[str, TrafficLightEnvironment] = {}
 
@@ -224,7 +225,7 @@ class SKRLAgentManager:
                     del dqn_cfg[param]
 
             # Create DQN agent
-            agent = DQN(
+            agent = CustomDQN(
                 models={"q_network": q_network, "target_q_network": target_q_network},
                 memory=memory,
                 cfg=dqn_cfg,
