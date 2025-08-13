@@ -260,6 +260,8 @@ def test_base_simulation(config, path):
         path=path,
         save_interval=1
     )
+
+    base_simulation.testing_mode = True
     
     # Set up SUMO
     set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
@@ -323,6 +325,8 @@ def test_actuated_simulation(config, path):
         min_green_time=config["agent"].get("min_green_time", 20),
         detection_threshold=config["agent"].get("detection_threshold", 2)
     )
+
+    actuated_simulation.testing_mode = True
     
     # Set up SUMO
     set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
@@ -690,23 +694,22 @@ def main():
             if 'base' in simulations_to_run:
                 base_completion = test_base_simulation(config, path)
                 if base_completion:
-                completion_results['baseline'] = {'completion_tracker': base_completion}
+                    completion_results['baseline'] = {'completion_tracker': base_completion}
             
             if 'actuated' in simulations_to_run:
                 actuated_completion = test_actuated_simulation(config, path)
                 if actuated_completion:
-                completion_results['actuated'] = {'completion_tracker': actuated_completion}
+                    completion_results['actuated'] = {'completion_tracker': actuated_completion}
             
             if 'dqn' in simulations_to_run:
                 dqn_completion = test_dqn_simulation(config, path)
                 if dqn_completion:
-                completion_results['dqn'] = {'completion_tracker': dqn_completion}
-        
-            print(completion_results)
-    except Exception as e:
-            print(f"Error during testing: {e}")
-            import traceback
-            traceback.print_exc()
+                    completion_results['dqn'] = {'completion_tracker': dqn_completion}
+
+        except Exception as e:
+                print(f"Error during testing: {e}")
+                import traceback
+                traceback.print_exc()
     
     overall_time = time.time() - overall_start
     

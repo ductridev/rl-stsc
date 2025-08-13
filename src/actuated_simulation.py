@@ -55,6 +55,9 @@ class ActuatedSimulation(SUMO):
         self.extension_counters = {}
         self.vehicles_detected_during_extension = {}
 
+        # Testing mode flag to disable training operations
+        self.testing_mode = False
+
         # Initialize VehicleTracker for logging vehicle statistics
         self.vehicle_tracker = VehicleTracker(path=self.path)
         
@@ -318,9 +321,12 @@ class ActuatedSimulation(SUMO):
         current_phase = st["phase"]
 
         # Calculate metrics
-        new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-        outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
-        st["old_vehicle_ids"] = new_ids
+        if self.testing_mode:
+            new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+            outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
+            st["old_vehicle_ids"] = new_ids
+            st["step"]["outflow"] += outflow
+            st["outflow"] += outflow
 
         sum_travel_delay = self.get_sum_travel_delay(tl)
         sum_travel_time = self.get_sum_travel_time(tl)
@@ -331,7 +337,6 @@ class ActuatedSimulation(SUMO):
         stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
         
         # Accumulate into both TL‐level and step‐level metrics
-        st["step"]["outflow"] += outflow
         st["step"]["delay"] += sum_travel_delay
         st["step"]["time"] += sum_travel_time
         st["step"]["density"] += sum_density
@@ -340,7 +345,6 @@ class ActuatedSimulation(SUMO):
         st["step"]["stopped_vehicles"] += stopped_vehicles_count
 
         # Update accumulated metrics
-        st["outflow"] += outflow
         st["travel_delay_sum"] = sum_travel_delay
         st["travel_time_sum"] = sum_travel_time
         st["queue_length"] = sum_queue_length
