@@ -722,7 +722,6 @@ def main():
     }
     
     config_files = [
-        "config/training_testngatu6x1EastWestOverflow.yaml", 
         "config/training_testngatu6x1.yaml",
     ]
     

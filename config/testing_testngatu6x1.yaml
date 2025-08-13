@@ -5,13 +5,13 @@ simulation:
   interphase_duration: 3
 
 agent:
-  num_states: 32 # Per-phase features (max 10 phases × 3 features) + current_phase + DESRA_phase
+  num_states: 6 # Per-phase features (4 phases × 1 feature waiting_time) + current_phase + DESRA_phase
   
   # Model configuration (must match training configuration)
   model:
     type: "qnetwork"
-    num_layers: 32
-    hidden_size: 256
+    num_layers: 9
+    hidden_size: 1000
     use_attention: true
     loss_type: "qr" # Quantile regression (must match training)
     num_quantiles: 100 # Must match training
@@ -36,22 +36,22 @@ agent:
 
 vehicle_counts:
   low:
-    motorcycle: 1750
-    passenger: 1250
+    motorcycle: 300
+    passenger: 100
     bicycle: 75
-    truck: 250
+    truck: 25
     pedestrian: 100
   medium:
-    motorcycle: 4000
-    passenger: 1500
-    truck: 150
-    bicycle: 500
+    motorcycle: 500
+    passenger: 300
+    truck: 75
+    bicycle: 125
     pedestrian: 200
   high:
-    motorcycle: 8000
-    passenger: 3000
-    truck: 300
-    bicycle: 1000
+    motorcycle: 1500
+    passenger: 900
+    truck: 150
+    bicycle: 300
     pedestrian: 400
 
 edge_groups:
@@ -68,7 +68,7 @@ dir:
   models_path_name: "models/"
   sumocfg_file_name: "simulations/testmodel6x1/osm.sumocfg"
   sumocfg_path: "simulations/testmodel6x1"
-  model_folder: "model_14"
+  model_folder: "model_41/"
 
 traffic_lights:
   # - traffic_light_1:
