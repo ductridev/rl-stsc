@@ -195,6 +195,62 @@ class QNetwork(DeterministicMixin, Model):
         else:
             return output
 
+    def compute_loss(self, q_values, target_q_values, actions=None):
+        """Compute loss based on the configured loss type"""
+        if self.loss_type == "mse":
+            return F.mse_loss(q_values, target_q_values)
+        
+        elif self.loss_type == "huber":
+            return F.smooth_l1_loss(q_values, target_q_values)
+        
+        elif self.loss_type == "weighted":
+            # Weighted MSE loss (could be extended to use importance sampling weights)
+            weights = torch.ones_like(q_values)
+            return F.mse_loss(q_values * weights, target_q_values * weights)
+        
+        elif self.loss_type == "qr":
+            # Quantile regression loss
+            return self._quantile_regression_loss(q_values, target_q_values)
+        
+        elif self.loss_type == "wasserstein":
+            # Wasserstein loss (simplified)
+            return self._wasserstein_loss(q_values, target_q_values)
+        
+        else:
+            raise ValueError(f"Unsupported loss type: {self.loss_type}")
+    
+    def _quantile_regression_loss(self, q_values, target_q_values):
+        """Compute quantile regression loss"""
+        # q_values: [batch, actions, quantiles]
+        # target_q_values: [batch, actions] or [batch, actions, quantiles]
+        
+        if target_q_values.dim() == 2:
+            # Expand target to match quantile dimension
+            target_q_values = target_q_values.unsqueeze(-1).expand_as(q_values)
+        
+        # Compute quantile regression loss
+        quantiles = torch.linspace(0.0, 1.0, self.num_quantiles, device=self.device)
+        quantiles = quantiles.view(1, 1, -1)  # [1, 1, num_quantiles]
+        
+        errors = target_q_values - q_values  # [batch, actions, quantiles]
+        loss = torch.where(errors >= 0, 
+                          quantiles * errors, 
+                          (quantiles - 1) * errors)
+        
+        return loss.mean()
+    
+    def _wasserstein_loss(self, q_values, target_q_values):
+        """Compute Wasserstein loss (simplified implementation)"""
+        # For simplicity, use sorted L1 distance as approximation
+        if q_values.dim() == 3:  # quantile format
+            q_values_sorted = torch.sort(q_values, dim=-1)[0]
+            if target_q_values.dim() == 2:
+                target_q_values = target_q_values.unsqueeze(-1).expand_as(q_values)
+            target_sorted = torch.sort(target_q_values, dim=-1)[0]
+            return F.l1_loss(q_values_sorted, target_sorted)
+        else:
+            return F.l1_loss(q_values, target_q_values)
+
     def summary(self, input_size=None):
         """Print model summary"""
         if input_size is None:
