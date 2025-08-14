@@ -5,15 +5,16 @@ simulation:
   interphase_duration: 3
 
 agent:
-  num_states: 6 # Per-phase features (4 phases × 1 feature waiting_time) + current_phase + DESRA_phase
+  num_states: 22 # Per-phase features (4 phases × 1 feature waiting_time) + current_phase + DESRA_phase
   
   # Model configuration (must match training configuration)
   model:
     type: "qnetwork"
     num_layers: 9
     hidden_size: 1000
+    batch_size: 256
     use_attention: true
-    loss_type: "qr" # Quantile regression (must match training)
+    loss_type: "huber" # Quantile regression (must match training)
     num_quantiles: 100 # Must match training
     v_min: -10.0
     v_max: 10.0
@@ -27,11 +28,11 @@ agent:
   
   # Reward weights (for DQN simulation)
   weight:
-    queue_length: -0.25
+    queue_length: -1
     outflow_rate: 1
     delay: -0.25
     travel_time: -1
-    waiting_time: -0.25
+    waiting_time: -0.75
     switch_phase: -5
 
 vehicle_counts:
@@ -68,7 +69,7 @@ dir:
   models_path_name: "models/"
   sumocfg_file_name: "simulations/testmodel6x1/osm.sumocfg"
   sumocfg_path: "simulations/testmodel6x1"
-  model_folder: "model_41/"
+  model_folder: "model_43/"
 
 traffic_lights:
   # - traffic_light_1:

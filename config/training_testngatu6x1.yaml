@@ -1,6 +1,6 @@
 simulation:
   gui: False
-  total_episodes: 100
+  total_episodes: 1000
   max_steps: 3600
   interphase_duration: 3
 
@@ -42,7 +42,7 @@ agent:
 
     # Advanced features from your original model
     use_attention: true # Enable SENet attention mechanism
-    loss_type: "qr" # Options: "mse", "huber", "weighted", "qr", "wasserstein"
+    loss_type: "huber" # Options: "mse", "huber", "weighted", "qr", "wasserstein"
 
     # Quantile regression settings (for loss_type: "qr" or "wasserstein")
     num_quantiles: 100
@@ -65,31 +65,31 @@ agent:
     epsilon: 0.95
     min_epsilon: 0.05
   weight:
-    queue_length: -0.75
+    queue_length: -1
     outflow_rate: 1
     delay: -0.25
     travel_time: -1
-    waiting_time: -1
+    waiting_time: -0.75
     switch_phase: -5
 
 vehicle_counts:
   low:
-    motorcycle: 1750
-    passenger: 1250
+    motorcycle: 300
+    passenger: 100
     bicycle: 75
-    truck: 250
+    truck: 25
     pedestrian: 100
   medium:
-    motorcycle: 4000
-    passenger: 1500
-    truck: 150
-    bicycle: 500
+    motorcycle: 500
+    passenger: 300
+    truck: 75
+    bicycle: 125
     pedestrian: 200
   high:
-    motorcycle: 8000
-    passenger: 3000
-    truck: 300
-    bicycle: 1000
+    motorcycle: 1500
+    passenger: 900
+    truck: 150
+    bicycle: 300
     pedestrian: 400
 
 edge_groups:
