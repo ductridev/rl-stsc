@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-15 22:04:13 by Eclipse SUMO duarouter Version 1.24.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_ped.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_ped.rou.xml"/>
+    </output>
+
+    <report>
+        <ignore-errors value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vehicle id="res_ped_int00" depart="0.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int01" depart="72.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int02" depart="144.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int03" depart="216.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int04" depart="288.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int06" depart="432.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int07" depart="504.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int09" depart="648.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int010" depart="720.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int011" depart="792.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int012" depart="864.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int013" depart="936.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int014" depart="1008.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int015" depart="1080.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int017" depart="1224.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int018" depart="1296.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int019" depart="1368.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int020" depart="1440.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int021" depart="1512.00" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int022" depart="1584.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int023" depart="1656.00" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int024" depart="1728.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int025" depart="1800.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int026" depart="1872.00" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int027" depart="1944.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int029" depart="2088.00" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int030" depart="2160.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int031" depart="2232.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int033" depart="2376.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int034" depart="2448.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int035" depart="2520.00" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int036" depart="2592.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int037" depart="2664.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int038" depart="2736.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int039" depart="2808.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int040" depart="2880.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int042" depart="3024.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int043" depart="3096.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int044" depart="3168.00" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int046" depart="3312.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int047" depart="3384.00" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int048" depart="3456.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int10" depart="3601.00" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int11" depart="3636.99" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int12" depart="3672.98" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int13" depart="3708.97" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int14" depart="3744.96" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int16" depart="3816.94" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int17" depart="3852.93" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int19" depart="3924.91" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int110" depart="3960.90" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int111" depart="3996.89" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int113" depart="4068.87" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int114" depart="4104.86" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int115" depart="4140.85" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int116" depart="4176.84" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int118" depart="4248.82" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int119" depart="4284.81" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int120" depart="4320.80" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int121" depart="4356.79" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int122" depart="4392.78" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int123" depart="4428.77" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int125" depart="4500.75" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int126" depart="4536.74" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int127" depart="4572.73" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int129" depart="4644.71" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int130" depart="4680.70" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int131" depart="4716.69" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int132" depart="4752.68" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int133" depart="4788.67" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int134" depart="4824.66" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int135" depart="4860.65" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int139" depart="5004.61" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int141" depart="5076.59" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int142" depart="5112.58" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int143" depart="5148.57" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int144" depart="5184.56" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int147" depart="5292.53" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int148" depart="5328.52" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int149" depart="5364.51" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int151" depart="5436.49" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int153" depart="5508.47" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int154" depart="5544.46" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int156" depart="5616.44" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int157" depart="5652.43" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int159" depart="5724.41" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int160" depart="5760.40" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int161" depart="5796.39" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int162" depart="5832.38" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int163" depart="5868.37" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int164" depart="5904.36" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int165" depart="5940.35" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int166" depart="5976.34" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int167" depart="6012.33" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int168" depart="6048.32" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int169" depart="6084.31" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int171" depart="6156.29" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int172" depart="6192.28" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int173" depart="6228.27" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int174" depart="6264.26" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int175" depart="6300.25" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int177" depart="6372.23" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int179" depart="6444.21" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int181" depart="6516.19" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int182" depart="6552.18" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int184" depart="6624.16" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int185" depart="6660.15" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int186" depart="6696.14" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int187" depart="6732.13" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int188" depart="6768.12" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int189" depart="6804.11" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int190" depart="6840.10" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int191" depart="6876.09" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int192" depart="6912.08" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int193" depart="6948.07" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int194" depart="6984.06" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int195" depart="7020.05" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_ped_int196" depart="7056.04" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int197" depart="7092.03" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_ped_int198" depart="7128.02" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int199" depart="7164.01" departLane="best" departSpeed="max">
+        <route edges="E31 E31.622"/>
+    </vehicle>
+</routes>

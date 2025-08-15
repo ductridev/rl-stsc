@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-15 22:04:18 by Eclipse SUMO duarouter Version 1.24.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_truck.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_truck.rou.xml"/>
+    </output>
+
+    <report>
+        <ignore-errors value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_truck_int0_truck" vClass="truck"/>
+    <vehicle id="res_truck_int00" type="res_truck_int0_truck" depart="0.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int01" type="res_truck_int0_truck" depart="300.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int02" type="res_truck_int0_truck" depart="600.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int03" type="res_truck_int0_truck" depart="900.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int04" type="res_truck_int0_truck" depart="1200.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int05" type="res_truck_int0_truck" depart="1500.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int06" type="res_truck_int0_truck" depart="1800.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int07" type="res_truck_int0_truck" depart="2100.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int08" type="res_truck_int0_truck" depart="2400.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int09" type="res_truck_int0_truck" depart="2700.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int010" type="res_truck_int0_truck" depart="3000.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int011" type="res_truck_int0_truck" depart="3300.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="res_truck_int1_truck" vClass="truck"/>
+    <vehicle id="res_truck_int10" type="res_truck_int1_truck" depart="3601.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int11" type="res_truck_int1_truck" depart="3739.42" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int12" type="res_truck_int1_truck" depart="3877.85" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int13" type="res_truck_int1_truck" depart="4016.27" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int14" type="res_truck_int1_truck" depart="4154.69" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int16" type="res_truck_int1_truck" depart="4431.54" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int17" type="res_truck_int1_truck" depart="4569.96" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int19" type="res_truck_int1_truck" depart="4846.81" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int110" type="res_truck_int1_truck" depart="4985.23" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int111" type="res_truck_int1_truck" depart="5123.65" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int112" type="res_truck_int1_truck" depart="5262.08" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int113" type="res_truck_int1_truck" depart="5400.50" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int114" type="res_truck_int1_truck" depart="5538.92" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int115" type="res_truck_int1_truck" depart="5677.35" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int116" type="res_truck_int1_truck" depart="5815.77" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.46" probability="1.00000000" edges="E18 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int118" type="res_truck_int1_truck" depart="6092.62" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int119" type="res_truck_int1_truck" depart="6231.04" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int120" type="res_truck_int1_truck" depart="6369.46" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int121" type="res_truck_int1_truck" depart="6507.88" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.48" probability="1.00000000" edges="E18 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int122" type="res_truck_int1_truck" depart="6646.31" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int123" type="res_truck_int1_truck" depart="6784.73" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.48" probability="1.00000000" edges="E18 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int124" type="res_truck_int1_truck" depart="6923.15" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_truck_int125" type="res_truck_int1_truck" depart="7061.58" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.15" probability="1.00000000" edges="E18 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+</routes>
