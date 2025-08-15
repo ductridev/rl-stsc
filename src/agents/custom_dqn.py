@@ -5,6 +5,7 @@ Custom SKRL DQN agent that supports configurable loss functions.
 import torch
 import torch.nn.functional as F
 from skrl.agents.torch.dqn import DQN
+from skrl import config, logger
 from typing import Union, Tuple, Dict, Any
 
 
@@ -21,64 +22,87 @@ class CustomDQN(DQN):
             print(f"Using custom loss function: {self.models['q_network'].loss_type}")
         else:
             print("Using default SKRL MSE loss function")
-            
-        # Ensure optimizer is properly initialized for Q-network
-        if not hasattr(self, 'optimizer'):
-            self.optimizer = torch.optim.Adam(
-                self.models["q_network"].parameters(), 
-                lr=self.cfg.get("learning_rate", 0.001)
-            )
     
     def _update(self, timestep: int, timesteps: int) -> None:
-        """Algorithm's main update step with custom loss support"""
-        
-        # Sample a batch from memory  
-        sampled_data = self.memory.sample(self.cfg["batch_size"])
-        
-        # Handle different memory formats
-        if isinstance(sampled_data, tuple) and len(sampled_data) > 1:
-            # Standard format: (data_dict, indices, weights)
-            sampled_tensors = sampled_data[0]
-        else:
-            # Direct tensor format
-            sampled_tensors = sampled_data
-            
-        # Extract tensors from the sampled data
-        sampled_states = sampled_tensors["states"].float()
-        sampled_actions = sampled_tensors["actions"].long()
-        sampled_rewards = sampled_tensors["rewards"].float()
-        sampled_next_states = sampled_tensors["next_states"].float()
-        sampled_dones = sampled_tensors["terminated"].bool()
+        """Algorithm's main update step
 
-        # Compute Q-values for current states
-        q_values, _ = self.models["q_network"].act({"states": sampled_states})
-        q_values = q_values.gather(1, sampled_actions)
+        :param timestep: Current timestep
+        :type timestep: int
+        :param timesteps: Number of timesteps
+        :type timesteps: int
+        """
 
-        # Compute target Q-values
-        with torch.no_grad():
-            next_q_values, _ = self.models["target_q_network"].act({"states": sampled_next_states})
-            target_q_values = sampled_rewards + self.cfg["discount_factor"] * \
-                             next_q_values.max(1)[0].unsqueeze(1) * ~sampled_dones
+        # gradient steps
+        for gradient_step in range(self._gradient_steps):
 
-        # Compute loss using custom or default method
-        if self.use_custom_loss:
-            # Use the Q-network's custom loss function
-            loss = self.models["q_network"].compute_loss(q_values, target_q_values)
-        else:
-            # Use default MSE loss
-            loss = F.mse_loss(q_values, target_q_values)
+            # sample a batch from memory
+            (
+                sampled_states,
+                sampled_actions,
+                sampled_rewards,
+                sampled_next_states,
+                sampled_terminated,
+                sampled_truncated,
+            ) = self.memory.sample(names=self.tensors_names, batch_size=self._batch_size)[0]
 
-        # Optimize the model
-        self.optimizer.zero_grad()
-        loss.backward()
-        if self.cfg.get("gradient_clipping", None) is not None:
-            torch.nn.utils.clip_grad_norm_(self.models["q_network"].parameters(), 
-                                         self.cfg["gradient_clipping"])
-        self.optimizer.step()
+            with torch.autocast(device_type=self._device_type, enabled=self._mixed_precision):
 
-        # Update tracking variables
-        if hasattr(self, 'tracking_data'):
-            self.tracking_data["Loss / Q-network loss"] = loss.item()
+                sampled_states = self._state_preprocessor(sampled_states, train=True)
+                sampled_next_states = self._state_preprocessor(sampled_next_states, train=True)
 
-        # Store loss for external access
-        self._q_loss = loss
+                # compute target values
+                with torch.no_grad():
+                    next_q_values, _, _ = self.target_q_network.act(
+                        {"states": sampled_next_states}, role="target_q_network"
+                    )
+
+                    target_q_values = torch.max(next_q_values, dim=-1, keepdim=True)[0]
+                    target_values = (
+                        sampled_rewards
+                        + self._discount_factor
+                        * (sampled_terminated | sampled_truncated).logical_not()
+                        * target_q_values
+                    )
+
+                # compute Q-network loss
+                q_values = torch.gather(
+                    self.q_network.act({"states": sampled_states}, role="q_network")[0],
+                    dim=1,
+                    index=sampled_actions.long(),
+                )
+
+                # Compute loss using custom or default method
+                if self.use_custom_loss:
+                    # Use the Q-network's custom loss function
+                    q_network_loss = self.models["q_network"].compute_loss(q_values, target_q_values)
+                else:
+                    # Use default MSE loss
+                    q_network_loss = F.mse_loss(q_values, target_q_values)
+
+            # optimize Q-network
+            self.optimizer.zero_grad()
+            self.scaler.scale(q_network_loss).backward()
+
+            if config.torch.is_distributed:
+                self.q_network.reduce_parameters()
+
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+
+            # update target network
+            if not timestep % self._target_update_interval:
+                self.target_q_network.update_parameters(self.q_network, polyak=self._polyak)
+
+            # update learning rate
+            if self._learning_rate_scheduler:
+                self.scheduler.step()
+
+            # record data
+            self.track_data("Loss / Q-network loss", q_network_loss.item())
+
+            self.track_data("Target / Target (max)", torch.max(target_values).item())
+            self.track_data("Target / Target (min)", torch.min(target_values).item())
+            self.track_data("Target / Target (mean)", torch.mean(target_values).item())
+
+            if self._learning_rate_scheduler:
+                self.track_data("Learning / Learning rate", self.scheduler.get_last_lr()[0])
