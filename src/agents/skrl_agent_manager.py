@@ -21,7 +21,6 @@ from models.q_network import QNetwork
 from environment.traffic_light_env import TrafficLightEnvironment
 from agents.custom_dqn import CustomDQN
 
-
 class SKRLAgentManager:
     """Manager for SKRL agents and components"""
 
@@ -183,16 +182,18 @@ class SKRLAgentManager:
                         "gamma", 0.99
                     ),  # Use correct SKRL parameter name
                     "batch_size": self.agent_cfg.get("model", {}).get("batch_size", 256),  # Match config value
-                    "learning_starts": 1000,  # Wait for more experience before training
+                    "learning_starts": 50,  # Wait for more experience before training
                     "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
                     "exploration": {
                         "initial_epsilon": self.agent_cfg.get("model", {}).get(
-                            "epsilon", 1
+                            "initial_epsilon", 0.95
                         ),
                         "final_epsilon": self.agent_cfg.get("model", {}).get(
-                            "min_epsilon", 0.001
+                            "min_epsilon", 0.01
                         ),
-                        "timesteps": 3240000,  # Decay over 900 episodes, stay at 0.05 for episodes 900-1000
+                        "timesteps": self.agent_cfg.get("model", {}).get(
+                            "decay_episodes", 90
+                        ) * self.sim.max_steps,  # Decay over 90 episodes, stay at min for episodes 90-100
                     },
                     "polyak": 0.005,  # Slower target network updates for stability
                     "gradient_steps": 1,  # Single gradient step per update for stability

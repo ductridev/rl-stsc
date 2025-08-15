@@ -1,6 +1,6 @@
 simulation:
   gui: False
-  total_episodes: 1000
+  total_episodes: 100
   max_steps: 3600
   interphase_duration: 3
 
@@ -16,7 +16,7 @@ model:
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
   save_interval: 10 # Save model every N episodes
   training_steps: 10  # DECISION interval between batch training cycles (increased responsiveness while maintaining stability)
-  updating_target_network_steps: 50  # Target network sync interval in decisions (reduced for better stability during learning)
+  updating_target_network_steps: 300  # Target network sync interval in decisions (reduced for better stability during learning)
 
 agent:
   rbf_components: 100
@@ -27,7 +27,7 @@ agent:
   
   # DESRA-DQN Hybrid Configuration
   use_desra_guidance: true          # Enable DESRA expert guidance
-  desra_min_probability: 0.15       # Minimum 15% DESRA usage (traffic responsiveness)
+  desra_min_probability: 0.05       # Minimum 5% DESRA usage (traffic responsiveness)
   desra_epsilon_multiplier: 0.6     # Scale DESRA usage with exploration rate
 
   model:
@@ -35,7 +35,7 @@ agent:
     type: "qnetwork" # Options: "qnetwork", "dueling", "noisy"
 
     # Basic architecture (from original model)
-    num_layers: 9
+    num_layers: 24
     hidden_size: 1000
     batch_size: 256
     learning_rate: 0.001
@@ -60,10 +60,10 @@ agent:
     noise_std: 0.5 # Initial noise standard deviation
     noisy_layers_only: true # Only make final layers noisy (vs all layers)
 
-    # Epsilon decay settings (not used for noisy networks)
-    decay_rate: 0.99
-    epsilon: 0.95
-    min_epsilon: 0.05
+    # Epsilon settings
+    decay_episode: 90 # epsilon will be min at episode 90
+    initial_epsilon: 0.95
+    min_epsilon: 0.01
   weight:
     queue_length: -1
     outflow_rate: 1

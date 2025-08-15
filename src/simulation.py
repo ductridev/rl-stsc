@@ -87,6 +87,7 @@ class Simulation(SUMO):
 
         # Simulation state
         self.step = 0
+        self.global_step = 0
         self.num_actions = {}
         self.actions_map = {}
 
@@ -258,8 +259,8 @@ class Simulation(SUMO):
             current_epsilon = 0.0
         elif hasattr(agent, 'cfg') and 'exploration' in agent.cfg:
             # Calculate current epsilon based on SKRL's schedule
-            timestep = self.step
-            total_timesteps = agent.cfg['exploration'].get('timesteps', 3240000)
+            timestep = self.global_step
+            total_timesteps = agent.cfg['exploration'].get('timesteps', 324000)
             initial_epsilon = agent.cfg['exploration'].get('initial_epsilon', 0.95)
             final_epsilon = agent.cfg['exploration'].get('final_epsilon', 0.05)
             
@@ -271,16 +272,9 @@ class Simulation(SUMO):
             else:
                 current_epsilon = final_epsilon
         
-        # Calculate DESRA usage probability
-        # Higher during exploration (high epsilon), lower during exploitation (low epsilon)
-        desra_probability = max(
-            self.desra_min_probability, 
-            current_epsilon * self.desra_epsilon_multiplier
-        )
-        
         # Decide whether to use DESRA or DQN
         import random
-        if random.random() < desra_probability:
+        if random.random() < current_epsilon:
             # Use DESRA recommendation with logging and tracking
             self.desra_action_count[tl_id] += 1
             if self.step % 1000 == 0:  # Log occasionally to avoid spam
@@ -482,6 +476,7 @@ class Simulation(SUMO):
                     print("Ending episode early due to simulation error")
                     break
             self.step += 1
+            self.global_step += 1
             # Removed per-step update_step calls (no direct _update usage)
 
             # Update vehicle tracking
@@ -805,20 +800,19 @@ class Simulation(SUMO):
             global_jam_density=global_jam_density,
         )
 
-        # Append current phase
-        current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)
-        state_vector.extend([current_phase_idx])
-
         padding = (
-            self.agent_cfg["num_states"] - len(state_vector) - 1
-        )  # 1 for DESRA phase instead of green time
+            self.agent_cfg["num_states"] - len(state_vector) - 2
+        )  # 1 for DESRA phase, 1 for current phase
         state_vector.extend([0] * padding)
+
+        # Append current phase
+        current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)   
 
         # Convert phase to index
         desra_phase_idx = phase_to_index(best_phase, self.actions_map[tl["id"]], 0)
 
         # Append DESRA guidance (using DESRA phase instead of green time)
-        state_vector.extend([desra_phase_idx])
+        state_vector.extend([current_phase_idx, desra_phase_idx])
 
         assert (
             len(state_vector) == self.agent_cfg["num_states"]
@@ -845,7 +839,7 @@ class Simulation(SUMO):
         if tl_data is None:
             return 0.0
             
-        current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
+        current_local_wait = TrafficMetrics.get_sum_waiting_time(tl_data)
         current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists

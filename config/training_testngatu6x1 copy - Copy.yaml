@@ -1,32 +1,69 @@
 simulation:
   gui: False
+  total_episodes: 100
   max_steps: 3600
-  episode_seed: 42
   interphase_duration: 3
 
+memory:
+  memory_size_min: 300
+  memory_size_max: 1000
+  sample_size: 300
+
+model:
+  training_epochs: 20
+  save_model_name: "dqn_testngatu_model" # Name for saving the model
+  load_model_name: null # Set to model path to load existing model, null to start fresh
+  load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
+  save_interval: 10 # Save model every N episodes
+  training_steps: 10  # DECISION interval between batch training cycles (increased responsiveness while maintaining stability)
+  updating_target_network_steps: 300  # Target network sync interval in decisions (reduced for better stability during learning)
+
 agent:
-  num_states: 22 # Per-phase features (4 phases × 1 feature waiting_time) + current_phase + DESRA_phase
+  rbf_components: 100
+  rbf_gamma: 0.5
+  gamma: 0.95
+  num_states: 22 # Per-phase features (max 10 phases × 2 feature waiting_time, queue length) + current_phase + DESRA_phase
+  batch_updates: 2  # Number of gradient update cycles per training interval (reduced for more frequent training)
   
-  # Model configuration (must match training configuration)
+  # DESRA-DQN Hybrid Configuration
+  use_desra_guidance: true          # Enable DESRA expert guidance
+  desra_min_probability: 0.05       # Minimum 5% DESRA usage (traffic responsiveness)
+  desra_epsilon_multiplier: 0.6     # Scale DESRA usage with exploration rate
+
   model:
-    type: "qnetwork"
-    num_layers: 9
+    # Model architecture type
+    type: "qnetwork" # Options: "qnetwork", "dueling", "noisy"
+
+    # Basic architecture (from original model)
+    num_layers: 24
     hidden_size: 1000
     batch_size: 256
-    use_attention: true
-    loss_type: "huber" # Quantile regression (must match training)
-    num_quantiles: 100 # Must match training
+    learning_rate: 0.001
+
+    # Advanced features from your original model
+    use_attention: true # Enable SENet attention mechanism
+    loss_type: "mse" # Options: "mse", "huber", "weighted", "qr", "wasserstein"
+
+    # Quantile regression settings (for loss_type: "qr" or "wasserstein")
+    num_quantiles: 100
     v_min: -10.0
     v_max: 10.0
-    dropout_rate: 0.2
-    batch_norm: true
-  
-  # Actuated control parameters (for actuated simulation)
-  min_green_time: 20
-  max_green_time: 60
-  detection_threshold: 2
-  
-  # Reward weights (for DQN simulation)
+
+    # Regularization options
+    dropout_rate: 0.2 # 0.0 to disable dropout
+    batch_norm: true # Enable batch normalization
+
+    # Custom layer architecture (optional - overrides num_layers and hidden_size)
+    # layer_sizes: [128, 256, 512, 256, 128]
+
+    # Noisy network specific settings (only used when type: "noisy")
+    noise_std: 0.5 # Initial noise standard deviation
+    noisy_layers_only: true # Only make final layers noisy (vs all layers)
+
+    # Epsilon settings
+    decay_episode: 90 # epsilon will be min at episode 90
+    initial_epsilon: 0.95
+    min_epsilon: 0.01
   weight:
     queue_length: -1
     outflow_rate: 1
@@ -67,9 +104,8 @@ edge_groups:
 
 dir:
   models_path_name: "models/"
-  sumocfg_file_name: "simulations/testmodel6x1/osm.sumocfg"
-  sumocfg_path: "simulations/testmodel6x1"
-  model_folder: "model_78_queue_waiting_queue_waiting_huber_9/"
+  sumocfg_file_name: "simulations/testmodel6x1 - Copy - Copy/osm.sumocfg"
+  sumocfg_path: "simulations/testmodel6x1 - Copy - Copy"
 
 traffic_lights:
   # - traffic_light_1:

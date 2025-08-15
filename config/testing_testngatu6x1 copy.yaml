@@ -14,7 +14,7 @@ agent:
     hidden_size: 1000
     batch_size: 256
     use_attention: true
-    loss_type: "huber" # Quantile regression (must match training)
+    loss_type: "qr" # Quantile regression (must match training)
     num_quantiles: 100 # Must match training
     v_min: -10.0
     v_max: 10.0
@@ -67,9 +67,9 @@ edge_groups:
 
 dir:
   models_path_name: "models/"
-  sumocfg_file_name: "simulations/testmodel6x1/osm.sumocfg"
-  sumocfg_path: "simulations/testmodel6x1"
-  model_folder: "model_78_queue_waiting_queue_waiting_huber_9/"
+  sumocfg_file_name: "simulations/testmodel6x1 - Copy/osm.sumocfg"
+  sumocfg_path: "simulations/testmodel6x1 - Copy"
+  model_folder: "model_52_queue_waiting_queue_waiting_mse_9/"
 
 traffic_lights:
   # - traffic_light_1:
