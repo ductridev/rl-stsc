@@ -143,7 +143,7 @@ class Intersection:
 
                 with open(merged_trip_file, "w") as merged_file:
                     merged_file.write("<routes>\n")
-                    random_intervals = random.randint(0,7) # Randomly choose number of intervals between 0 and 7
+                    random_interval = random.choice(intervals) # Randomly choose number of intervals between 0 and 7
                     for interval_id, (begin_time, end_time) in enumerate(intervals):
                         demand_file_name = f"random_edge_priority_interval_{interval_id}.src.xml"
                         if not os.path.exists(demand_file_name):
@@ -174,13 +174,14 @@ class Intersection:
                                 '--trip-attributes', 'departLane="best"',
                                 '--fringe-start-attributes', 'departSpeed="max"',
                                 '--prefix', f'res_{prefix}_int{interval_id}',
-                                '--weights-prefix', f'random_edge_priority_interval_{interval_id}'
+                                '--weights-prefix', f'random_edge_priority_interval_{interval_id}',
+                                '--verbose'
                             ]
                             
-                            if interval_id == random_intervals:
-                                insertion_rate = vehicles_in_interval * 3600 * 4 / (end_time - begin_time)
+                            if interval_id == random_interval:
+                                insertion_rate = vehicles_in_interval * 3600 * 4 / (end_time - begin_time) if end_time <= 3600 else vehicles_in_interval * end_time * 4 / (end_time - begin_time)
                             else:
-                                insertion_rate = vehicles_in_interval * 3600 / (end_time - begin_time)
+                                insertion_rate = vehicles_in_interval * 3600 / (end_time - begin_time) if end_time <= 3600 else vehicles_in_interval * end_time / (end_time - begin_time)
                             cmd_args.extend(['--insertion-rate', str(insertion_rate)])
 
                             if vehicle_class == "pedestrian":

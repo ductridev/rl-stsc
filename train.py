@@ -44,13 +44,13 @@ def generate_routes_if_needed(config_file, config):
         print("Generating routes...")
         generate_and_save_random_intervals(
             sumo_cfg_file=config["sumo_cfg_file"],
-            total_duration=3600,
-            min_interval=360,
-            max_interval=360,
-            base_weight=100.0,
-            high_min=200.0,
-            high_max=400.0,
-            min_active_sides=1,
+            total_duration=7200,
+            min_interval=3600,
+            max_interval=3600,
+            base_weight=0.0,
+            high_min=33,
+            high_max=400,
+            min_active_sides=2,
             max_active_sides=2,
             edge_groups=config["edge_groups"],
         )
@@ -140,9 +140,6 @@ def run_baseline_simulations(config_files, shared_path, shared_visualization, ph
             duration=config["duration"],
             junction_id_list=config["junction_id_list"],
         )
-        
-        # Generate routes for baseline
-        generate_routes_if_needed(config_file, config)
         
         # Initialize SimulationBase
         simulation_base = SimulationBase(
@@ -292,9 +289,6 @@ def train_dqn_episode(simulation_skrl, global_episode, config_episode, config_fi
         tuple: (performance_metrics)
     """
     print(f"\n----- Config Episode {config_episode} of {config['total_episodes']} (Global: {global_episode}) -----")
-    
-    # Generate routes if needed
-    generate_routes_if_needed(config_file, config)
     
     print("Running SKRL DQN Simulation...")
     # Enable GUI once every 100 episodes for visual monitoring
@@ -732,6 +726,9 @@ def main():
         config = import_train_configuration(config_file)
         configs.append((config_file, config))
         max_episodes_per_config = max(max_episodes_per_config, config["total_episodes"])
+
+        # Generate routes if needed
+        generate_routes_if_needed(config_file, config)
     
     print(f"\nALTERNATING CONFIGURATION TRAINING:")
     print(f"   Configurations: {len(config_files)}")
@@ -783,6 +780,10 @@ def main():
         # Determine which configuration to use for this episode
         config_idx = (global_episode - 1) % len(config_files)
         current_tracker = config_trackers[config_idx]
+
+        if global_episode % 25 == 0:
+            # Generate routes if needed
+            generate_routes_if_needed(config_file, config)
         
         # Skip if this configuration has completed all episodes
         if current_tracker['completed']:
