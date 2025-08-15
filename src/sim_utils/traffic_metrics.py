@@ -139,7 +139,8 @@ class TrafficMetrics:
         """Get sum of waiting times for a traffic light"""
         total_waiting_time = 0.0
         for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            total_waiting_time += traci.lane.getWaitingTime(lane)
+            for veh in traci.lane.getLastStepVehicleIDs(lane):
+                total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
         return total_waiting_time
 
     @staticmethod
@@ -149,8 +150,10 @@ class TrafficMetrics:
         total_vehicles = 0
 
         for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            # Get cumulative waiting time for all vehicles in lane
-            lane_waiting_time = traci.lane.getWaitingTime(lane)
+            lane_waiting_time = 0.0
+            for veh in traci.lane.getLastStepVehicleIDs(lane):
+                # Get cumulative waiting time for all vehicles in lane
+                lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
             # Get number of vehicles currently in lane
             vehicle_count = traci.lane.getLastStepVehicleNumber(lane)
 
@@ -196,7 +199,7 @@ class TrafficMetrics:
         vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
         total_waiting_time = 0.0
         for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getWaitingTime(vid)
+            total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(vid)
         return total_waiting_time
 
     @staticmethod
