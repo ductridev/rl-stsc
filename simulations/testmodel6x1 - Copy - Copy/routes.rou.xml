@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-06 15:45:45 by Eclipse SUMO duarouter Version 1.22.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_ped.interval_9.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="routes.rou.xml"/>
+        <alternatives-output value="NUL"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="3249.0"/>
+        <end value="3600.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vehicle id="res_ped_int91" depart="3284.10" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int92" depart="3319.20" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int93" depart="3354.30" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int94" depart="3389.40" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int96" depart="3459.60" departLane="best" departSpeed="max">
+        <route edges="E18 E18.410"/>
+    </vehicle>
+    <vehicle id="res_ped_int97" depart="3494.70" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_ped_int99" depart="3564.90" departLane="best" departSpeed="max">
+        <route edges="E31 E18.410"/>
+    </vehicle>
+</routes>
