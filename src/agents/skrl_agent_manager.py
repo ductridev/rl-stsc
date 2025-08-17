@@ -95,11 +95,6 @@ class SKRLAgentManager:
         # Model type selection (for future extensibility)
         model_type = model_config.get("type", "qnetwork")
 
-        return MLP(observation_space=observation_space,
-             action_space=action_space,
-             device=self.device,
-             clip_actions=False).to(self.device)
-
         if model_type == "qnetwork":
             return QNetwork(**model_params).to(self.device)
         elif model_type == "dueling":
@@ -200,8 +195,8 @@ class SKRLAgentManager:
                     "batch_size": self.agent_cfg.get("model", {}).get(
                         "batch_size", 256
                     ),  # Match config value
-                    "learning_starts": 50,  # Wait for more experience before training
-                    "target_update_interval": self.updating_target_network_steps * 5,  # Use correct SKRL parameter name
+                    "learning_starts": 0,  # Wait for more experience before training
+                    "target_update_interval": self.updating_target_network_steps * 3,  # Use correct SKRL parameter name
                     "exploration": {
                         "initial_epsilon": self.agent_cfg.get("model", {}).get(
                             "initial_epsilon", 0.95
@@ -214,8 +209,8 @@ class SKRLAgentManager:
                         )
                         * self.sim.max_steps,  # Decay over 90 episodes, stay at min for episodes 90-100
                     },
-                    "polyak": 0.005,  # Slower target network updates for stability
-                    "gradient_steps": 800,  # 800 gradient steps per update for stability
+                    "polyak": 1,  # Slower target network updates for stability
+                    "gradient_steps": 1000,  # 1000 gradient steps per update for stability
                     "update_interval": self.updating_target_network_steps,  # Update every timestep (controlled by our batch training)
                 }
             )
