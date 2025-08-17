@@ -1,3 +1,4 @@
+import time
 from typing import Any, Mapping, Optional, Tuple, Union
 
 import copy
@@ -331,6 +332,8 @@ class DQN(Agent):
         :type timesteps: int
         """
 
+        start = time.time()
+
         # gradient steps
         for gradient_step in range(self._gradient_steps):
 
@@ -399,3 +402,6 @@ class DQN(Agent):
 
             if self._learning_rate_scheduler:
                 self.track_data("Learning / Learning rate", self.scheduler.get_last_lr()[0])
+
+        end = time.time()
+        print(f"Training took {end - start} seconds")

@@ -566,12 +566,8 @@ class Simulation(SUMO):
                     self._finalize_phase_skrl(tl, tl_id, st)
                     st["green_time_remaining"] -= 1
 
-                train_time = time.time()
                 # Post-interaction before do new interaction
                 self.agent_manager.post_interaction(tl_id, self.step, self.max_steps)
-
-                if self.global_step % self.updating_target_network_steps == 0:
-                    print(f"Training took {time.time() - train_time} seconds")
 
                 # Periodic metric flushing
                 if self.step > 0 and self.step % 60 == 0:
