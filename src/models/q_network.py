@@ -230,40 +230,50 @@ class TestQNetwork(nn.Module):
         # Build backbone, attention, head (same as QNetwork)
         self.backbone = self._build_backbone()
         self.attention = self._build_attention() if self.use_attention else None
-        self.head = nn.Linear(self.final_feature_size, self.output_dim).to(device)
+        self.head = self._build_head()
 
         # Load weights
         self._load_my_model(model_path)
 
     def _build_backbone(self):
+        """Build the backbone network (feature extractor)"""
         layers = []
+        
         if self.layer_sizes is not None:
-            # custom layer sizes
+            # Use custom layer architecture
             layer_sizes = [self.input_dim] + self.layer_sizes
+            
             for i in range(len(layer_sizes) - 1):
                 layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
+                
                 if self.batch_norm:
                     layers.append(nn.LayerNorm(layer_sizes[i + 1]))
+                
                 layers.append(nn.ReLU())
+                
                 if self.dropout_rate > 0:
                     layers.append(nn.Dropout(self.dropout_rate))
+            
             final_size = layer_sizes[-1]
         else:
-            # default architecture
+            # Use default architecture similar to original model
+            # Input layer
             layers.append(nn.Linear(self.input_dim, self.hidden_size))
             if self.batch_norm:
                 layers.append(nn.LayerNorm(self.hidden_size))
             layers.append(nn.ReLU())
             if self.dropout_rate > 0:
                 layers.append(nn.Dropout(self.dropout_rate))
-
+            
+            # Second layer
             layers.append(nn.Linear(self.hidden_size, self.hidden_size))
             if self.batch_norm:
                 layers.append(nn.LayerNorm(self.hidden_size))
             layers.append(nn.ReLU())
             if self.dropout_rate > 0:
                 layers.append(nn.Dropout(self.dropout_rate))
-
+            
+            # Additional hidden layers
             for _ in range(self.num_layers):
                 layers.append(nn.Linear(self.hidden_size, self.hidden_size))
                 if self.batch_norm:
@@ -271,17 +281,27 @@ class TestQNetwork(nn.Module):
                 layers.append(nn.ReLU())
                 if self.dropout_rate > 0:
                     layers.append(nn.Dropout(self.dropout_rate))
+            
             final_size = self.hidden_size
-
+        
         self.final_feature_size = final_size
-        return nn.Sequential(*layers).to(self.device)
+        return nn.Sequential(*layers)
 
     def _build_attention(self):
-        return SENetFC(
-            feature_dim=self.final_feature_size,
-            reduction=16,
-            use_layer_norm=self.batch_norm
-        ).to(self.device)
+        """Build attention mechanism using improved SENet"""
+        if self.use_attention:
+            # Use the advanced SENetFC for fully connected features
+            return SENetFC(
+                feature_dim=self.final_feature_size,
+                reduction=16,
+                use_layer_norm=self.batch_norm
+            )
+        return None
+
+    def _build_head(self):
+        """Build the output head based on loss type"""
+        # Standard Q-values: one output per action
+        return nn.Linear(self.final_feature_size, self.output_dim)
 
     def forward(self, x):
         # Backbone feature extraction
