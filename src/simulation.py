@@ -420,7 +420,7 @@ class Simulation(SUMO):
                 # Post-interaction before do new interaction
                 loss = self.train_agents(tl_id)
 
-                print(f"Total training loss for {tl_id}: {loss}")
+                # print(f"Total training loss for {tl_id}: {loss}")
 
                 # Pre-interaction (epsilon schedule etc.) based on decision count
                 self.agent_manager.pre_interaction(tl_id, self.decision_counter, state["green_time"])
