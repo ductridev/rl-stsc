@@ -370,7 +370,7 @@ class DQN(Agent):
                     index=sampled_actions.long(),
                 )
 
-                q_network_loss = F.mse_loss(q_values, target_values)
+                q_network_loss = F.huber_loss(q_values, target_values)
 
             # optimize Q-network
             self.optimizer.zero_grad()
