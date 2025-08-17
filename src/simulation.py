@@ -238,10 +238,6 @@ class Simulation(SUMO):
         self, tl_id: str, state: np.ndarray, desra_phase_idx: int
     ) -> int:
         """Select action using hybrid DESRA-DQN approach"""
-
-        assert (
-            len(state) == self.agent_cfg["num_states"]
-        ), f"State vector length {len(state)} does not match input_dim {self.agent_cfg['num_states']}"
         
         # Initialize tracking for this traffic light if needed
         if tl_id not in self.desra_action_count:
@@ -312,12 +308,6 @@ class Simulation(SUMO):
         self.agent_manager.store_transition(
             tl_id, state, action, reward, next_state, done, self.step, self.green_time
         )
-
-    def train_agents(self, tl_id):
-        """Train all agents using SKRL (returns 0 if in testing mode)"""
-        if self.testing_mode:
-            return 0.0
-        return self.agent_manager.train_agents(tl_id, self.step, self.green_time)
 
     def run(self, episode: int):
         """Run simulation with SKRL agents"""
@@ -416,9 +406,6 @@ class Simulation(SUMO):
 
                 # Get current state
                 current_state, desra_phase_idx = self.get_state(tl, state["phase"])
-
-                # Post-interaction before do new interaction
-                loss = self.train_agents(tl_id)
 
                 # print(f"Total training loss for {tl_id}: {loss}")
 
@@ -577,19 +564,18 @@ class Simulation(SUMO):
                 else:
                     # Phase ended - finalize and store experience
                     self._finalize_phase_skrl(tl, tl_id, st)
-                    # FIX: Use only decision-based batch training, remove step-based training
-                    if not self.testing_mode:
-                        loss = self.agent_manager.maybe_batch_train(tl_id, self.decision_counter, 10)
-                        if loss:
-                            self.history["loss"][tl_id].append(loss)
-
                     st["green_time_remaining"] -= 1
+
+                train_time = time.time()
+                # Post-interaction before do new interaction
+                self.agent_manager.post_interaction(tl_id, self.step, self.max_steps)
+
+                if self.global_step % self.updating_target_network_steps == 0:
+                    print(f"Training took {time.time() - train_time} seconds")
 
                 # Periodic metric flushing
                 if self.step > 0 and self.step % 60 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
-
-                # FIX: Removed redundant step-based training to avoid double training
 
         traci.close()
         sim_time = time.time() - start_time
@@ -793,16 +779,16 @@ class Simulation(SUMO):
                 num_vehicles += TrafficMetrics.get_num_vehicles(detector_id)
                 queue_length += TrafficMetrics.get_queue_length(detector_id)
 
-            # Append per-phase state: waiting_time & queue_length
-            state_vector.extend([self.waiting_time_normalizer.normalize(waiting_time), self.num_vehicles_normalizer.normalize(num_vehicles), self.queue_length_normalizer.normalize(queue_length)])
+            # Append per-phase features (will add desra flag later)
+            state_vector.append([
+                waiting_time,
+                num_vehicles,
+                queue_length,
+            ])
 
-        # Compute per-detector q_arr over [last_call, now]
         q_arr_dict = self._compute_arrival_flows()
-
-        # Get current simulation time for DESRA parameter updates
         current_time = traci.simulation.getTime()
 
-        # Get DESRA configuration for this traffic light
         (
             use_global_params,
             global_saturation_flow,
@@ -810,7 +796,6 @@ class Simulation(SUMO):
             global_jam_density,
         ) = self.get_desra_parameters(tl["id"])
 
-        # DESRA recommended phase and green time with real-time parameter updates
         best_phase, desra_green = self.desra.select_phase_with_desra_hints(
             tl,
             q_arr_dict,
@@ -821,35 +806,38 @@ class Simulation(SUMO):
             global_jam_density=global_jam_density,
         )
 
-        # padding = (
-        #     self.agent_cfg["num_states"] - len(state_vector) - 2
-        # )  # 1 for current phase, 1 for DESRA phase
-        # state_vector.extend([0] * padding)
-
-        # Append current phase
-        current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)   
-
-        # Convert phase to index
+        # Convert DESRA phase to index
         desra_phase_idx = phase_to_index(best_phase, self.actions_map[tl["id"]], 0)
 
         # Check if desra does not select empty phase follow the state vector
         best_phase_idx = self.choose_best_phase(state_vector, desra_phase_idx)
 
-        # Append current phase
-        state_vector.extend([desra_phase_idx])
+        for i in range(len(state_vector)):
+            is_desra = 1.0 if i == best_phase_idx else 0.0
+            state_vector[i].append(is_desra)
 
-        assert (
-            len(state_vector) == self.agent_cfg["num_states"]
-        ), f"State vector length {len(state_vector)} does not match input_dim {self.agent_cfg['num_states']}"
+        flat_state = [f for phase_features in state_vector for f in phase_features]
 
-        return np.array(state_vector, dtype=np.float32), best_phase_idx
+        # assert (
+        #     len(state_vector) == self.agent_cfg["num_states"]
+        # ), f"State vector length {len(state_vector)} does not match input_dim {self.agent_cfg['num_states']}"
+
+        return np.array(flat_state, dtype=np.float32), desra_phase_idx
     
     def choose_best_phase(self, state_vector, desra_phase_idx):
-        num_phases = len(state_vector) // 3
-        phases = [state_vector[i*3:(i+1)*3] for i in range(num_phases)]
+        """
+        Select the best traffic light phase based on:
+        1. DESRA suggestion (if valid and non-zero)
+        2. Rule-based comparison: choose the phase that dominates
+            others in at least 2 out of 3 features.
+        """
+
+        # state_vector is already shaped like [[f1,f2,f3], [f1,f2,f3], ...]
+        phases = np.array(state_vector, dtype=float)
+        num_phases = len(phases)
 
         # --- 1. Check DESRA suggestion ---
-        if desra_phase_idx is not None:
+        if desra_phase_idx is not None and 0 <= desra_phase_idx < num_phases:
             desra_phase = phases[desra_phase_idx]
             if not np.allclose(desra_phase, [0., 0., 0.]):  # reject [0,0,0]
                 return desra_phase_idx
@@ -857,6 +845,7 @@ class Simulation(SUMO):
         # --- 2. Rule-based selection (2/3 better elements) ---
         best_idx = 0
         for i in range(1, num_phases):
+            # Count how many features of phase i are better than current best
             better_count = np.sum(phases[i] > phases[best_idx])
             if better_count >= 2:
                 best_idx = i

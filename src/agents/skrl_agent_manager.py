@@ -18,11 +18,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from models.q_network import QNetwork
+from models.q_network import QNetwork, MLP
 from environment.traffic_light_env import TrafficLightEnvironment
 # from agents.custom_dqn import CustomDQN
-# from skrl.agents.torch.dqn import DQN, DDQN
-from agents.custom_dqn import DQN
+from skrl.agents.torch.dqn import DQN, DDQN
+# from agents.custom_dqn import DQN
 
 class SKRLAgentManager:
     """Manager for SKRL agents and components"""
@@ -94,6 +94,11 @@ class SKRLAgentManager:
 
         # Model type selection (for future extensibility)
         model_type = model_config.get("type", "qnetwork")
+
+        return MLP(observation_space=observation_space,
+             action_space=action_space,
+             device=self.device,
+             clip_actions=False).to(self.device)
 
         if model_type == "qnetwork":
             return QNetwork(**model_params).to(self.device)
@@ -196,7 +201,7 @@ class SKRLAgentManager:
                         "batch_size", 256
                     ),  # Match config value
                     "learning_starts": 50,  # Wait for more experience before training
-                    "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
+                    "target_update_interval": self.updating_target_network_steps * 5,  # Use correct SKRL parameter name
                     "exploration": {
                         "initial_epsilon": self.agent_cfg.get("model", {}).get(
                             "initial_epsilon", 0.95
@@ -210,18 +215,8 @@ class SKRLAgentManager:
                         * self.sim.max_steps,  # Decay over 90 episodes, stay at min for episodes 90-100
                     },
                     "polyak": 0.005,  # Slower target network updates for stability
-                    "gradient_steps": 1,  # Single gradient step per update for stability
-                    "update_interval": 1,  # Update every timestep (controlled by our batch training)
-                    # Ensure experiment settings are properly configured
-                    "experiment": {
-                        "directory": "",
-                        "experiment_name": "",
-                        "write_interval": 1200,
-                        "checkpoint_interval": 1200,
-                        "store_separately": True,
-                        "wandb": False,
-                        "wandb_kwargs": {},
-                    },
+                    "gradient_steps": 800,  # 800 gradient steps per update for stability
+                    "update_interval": self.updating_target_network_steps,  # Update every timestep (controlled by our batch training)
                 }
             )
 
@@ -266,6 +261,11 @@ class SKRLAgentManager:
 
             self.agents[tl_id] = agent
 
+    def post_interaction(self, tl_id: str, step: int, max_steps: int):
+        agent = self.agents[tl_id]
+
+        agent.post_interaction(timestep=step, timesteps=max_steps)
+
     def pre_interaction(self, tl_id: str, step: int, max_steps: int):
         agent = self.agents[tl_id]
 
@@ -281,7 +281,7 @@ class SKRLAgentManager:
         state_tensor = torch.Tensor(state).unsqueeze(0).to(self.device)
 
         # SKRL's DQN agent.act() returns: (tensor([[action]], device='cuda:0'), None, None)
-        action_result = agent.act(state_tensor, step, max_steps, desra_phase_idx)
+        action_result = agent.act(state_tensor, step, max_steps)
 
         # Extract action from the tuple - first element is the action tensor
         if isinstance(action_result, tuple) and len(action_result) >= 1:
@@ -305,14 +305,6 @@ class SKRLAgentManager:
         else:
             # Last resort: try to convert to int
             return int(action_tensor)
-            # Last resort: try to convert to int
-            return int(action_tensor)
-
-    def update_step(self, tl_id: str, step: int, max_steps: int):
-        """Update step for the agent"""
-        agent = self.agents[tl_id]
-        if len(agent.memory) > 0:
-            agent._update(timestep=step, timesteps=max_steps)
 
     def store_transition(
         self,
@@ -348,116 +340,6 @@ class SKRLAgentManager:
             timesteps=max_steps,
         )
 
-    def train_agents(self, tl_id: str, step: int, max_steps: int) -> float:
-        """(Legacy) single training trigger using post_interaction once"""
-        agent = self.agents[tl_id]
-        total_loss = 0
-
-        # Call post_interaction which handles the training step internally
-        agent.post_interaction(timestep=step, timesteps=max_steps)
-
-        # Try to extract loss information if available from the agent
-        # SKRL DQN agents store their losses in different ways
-        if hasattr(agent, "tracking_data") and agent.tracking_data:
-            # Get the latest loss from tracking data - look for the specific SKRL loss key
-            loss_keys = [
-                'Loss / Q-network loss',  # SKRL DQN format
-                'Loss / Q-loss',          # Alternative format
-                'q_loss',                 # Simple format
-            ]
-            
-            for loss_key in loss_keys:
-                if loss_key in agent.tracking_data:
-                    value = agent.tracking_data[loss_key]
-                    total_loss += np.mean(value) if isinstance(value, list) else value
-                    break
-            else:
-                # Fallback: search for any key containing "loss"
-                for key, value in agent.tracking_data.items():
-                    if "loss" in key.lower() and isinstance(value, (list, tuple)) and value:
-                        latest_loss = (
-                            value[-1]
-                            if isinstance(value[-1], (int, float))
-                            else (value[-1].item() if hasattr(value[-1], "item") else 0)
-                        )
-                        total_loss += latest_loss
-                        break
-        elif hasattr(agent, "_q_loss") and agent._q_loss is not None:
-            # Some SKRL agents store loss in _q_loss
-            loss_val = (
-                agent._q_loss.item()
-                if hasattr(agent._q_loss, "item")
-                else agent._q_loss
-            )
-            total_loss += loss_val
-        elif hasattr(agent, "_losses") and agent._losses:
-            # SKRL agents typically store losses in a dictionary
-            for loss_name, loss_value in agent._losses.items():
-                if isinstance(loss_value, (int, float)):
-                    total_loss += loss_value
-                elif hasattr(loss_value, "item"):  # torch tensor
-                    total_loss += loss_value.item()
-
-        return total_loss
-
-    def maybe_batch_train(self, tl_id: str, decision_counter: int, max_steps: int):
-        """Perform batched training every configured decision interval.
-        Args:
-            tl_id: traffic light id
-            decision_counter: number of decisions (phase selections) so far in episode
-            max_steps: max steps (passed for API compatibility)
-        """
-        if self._training_interval <= 0:
-            return 0.0
-        if decision_counter == 0 or (decision_counter % self._training_interval) != 0:
-            return 0.0
-
-        # Check if agent has enough experience to train
-        agent = self.agents[tl_id]
-        if len(agent.memory) < agent.cfg.get("learning_starts", 1000):
-            return 0.0  # Wait for sufficient experience
-        agent = self.agents[tl_id]
-        total_loss = 0.0
-        # Run multiple update cycles (post_interaction) to simulate batch training
-        for _ in range(self._batch_updates):
-            agent.post_interaction(timestep=decision_counter, timesteps=max_steps)
-            
-            # Collect loss if available - try multiple methods
-            loss_collected = False
-            
-            # Method 1: Check tracking_data for SKRL format
-            if hasattr(agent, "tracking_data") and agent.tracking_data:
-                loss_keys = [
-                    'Loss / Q-network loss',  # SKRL DQN format
-                    'Loss / Q-loss',          # Alternative format
-                    'q_loss',                 # Simple format
-                ]
-                
-                for loss_key in loss_keys:
-                    if loss_key in agent.tracking_data:
-                        value = agent.tracking_data[loss_key]
-                        if isinstance(value, (list, tuple)) and value:
-                            try:
-                                latest_loss = (
-                                    value[-1]
-                                    if isinstance(value[-1], (int, float))
-                                    else (value[-1].item() if hasattr(value[-1], "item") else 0)
-                                )
-                                total_loss += latest_loss
-                                loss_collected = True
-                                break
-                            except Exception:
-                                pass
-            
-            # Method 2: Fallback to _q_loss if tracking_data didn't work
-            if not loss_collected and hasattr(agent, "_q_loss") and agent._q_loss is not None:
-                try:
-                    total_loss += float(agent._q_loss.item())
-                except Exception:
-                    pass
-        return total_loss / max(1, self._batch_updates)
-
-    # ...existing code...
     def save_models(self, path: str, episode: Optional[int] = None):
         """Save all SKRL models"""
         for tl_id, agent in self.agents.items():

@@ -5,10 +5,48 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import os
+import sys
 from skrl.models.torch import Model, DeterministicMixin
 from torchinfo import summary
 from typing import Optional
 from src.SENet_module import SENet, SENetFC
+
+class MLP(DeterministicMixin, Model):
+    def __init__(self, observation_space, action_space, device, clip_actions=False):
+        Model.__init__(self, observation_space, action_space, device)
+        DeterministicMixin.__init__(self, clip_actions)
+
+        self.net = nn.Sequential(nn.Linear(self.num_observations, 64),
+                                 nn.ReLU(),
+                                 nn.Linear(64, 32),
+                                 nn.ReLU(),
+                                 nn.Linear(32, self.num_actions))
+
+    def compute(self, inputs, role):
+        return self.net(inputs["states"]), {}
+    
+    def summary(self, input_size=None):
+        """Print model summary"""
+        return
+        if input_size is None:
+            input_size = (1, self.input_dim)
+        
+        print("=== Q-Network Architecture Summary ===")
+        print(f"Input dim: {self.input_dim}")
+        print(f"Output dim: {self.output_dim}")
+        print(f"Use attention: {self.use_attention}")
+        
+        print("\nBackbone:")
+        summary(self.backbone, input_size=input_size)
+        
+        if self.attention is not None:
+            print("\nAttention:")
+            summary(self.attention, input_size=(input_size[0], self.final_feature_size))
+        
+        print("\nHead:")
+        summary(self.head, input_size=(input_size[0], self.final_feature_size))
+        print("=" * 40)
 
 class QNetwork(DeterministicMixin, Model):
     """Advanced Q-network model for DQN using SKRL with features from original model"""
@@ -18,8 +56,8 @@ class QNetwork(DeterministicMixin, Model):
         DeterministicMixin.__init__(self)
 
         # Basic configuration
-        self.input_dim = kwargs.get("input_dim", observation_space.shape[0])
-        self.output_dim = kwargs.get("output_dim", action_space.n)
+        self.input_dim = kwargs.get("input_dim", self.num_observations)
+        self.output_dim = kwargs.get("output_dim", self.num_actions)
         self.device = device
         
         # Architecture configuration
@@ -130,70 +168,28 @@ class QNetwork(DeterministicMixin, Model):
         output = self.head(features)
         
         return output
-        
-    def act(self, inputs, role=""):
-        """Get Q-values for given inputs (SKRL interface)"""
-        q_values = self._forward_internal(inputs["states"])
-        
-        # SKRL expects Q-values, not actions!
-        return q_values, None, {}
 
-    def predict_one(self, x):
-        """Predict Q-values for a single input (compatibility method)"""
-        if not isinstance(x, torch.Tensor):
-            x = torch.tensor(np.reshape(x, [1, self.input_dim]), dtype=torch.float32).to(self.device)
-        else:
-            x = torch.reshape(x, [1, self.input_dim])
-        return self._forward_internal(x)
+    def train_batch(self, batch):
+        """Train the model on a single batch of data"""
+        states = batch["states"]
+        actions = batch["actions"]
+        rewards = batch["rewards"]
+        next_states = batch["next_states"]
+        dones = batch["dones"]
 
-    def predict_batch(self, x):
-        """Predict Q-values for a batch of inputs (compatibility method)"""
-        if not isinstance(x, torch.Tensor):
-            x = torch.tensor(x, dtype=torch.float32).to(self.device)
-        return self._forward_internal(x)
+        # Forward pass
+        q_values = self.compute({"states": states})
+        next_q_values = self.compute({"states": next_states})
 
-    def get_q_values(self, states):
-        """Get Q-values for given states (handles different loss types)"""
-        output = self._forward_internal(states)
-        
-        return output
+        # Compute loss
+        loss = self._compute_loss(q_values, actions, rewards, next_q_values, dones)
 
-    def compute_loss(self, q_values, target_q_values, actions=None):
-        """Compute loss based on the configured loss type"""
-        
-        return F.mse_loss(q_values, target_q_values)
-    
-    def _quantile_regression_loss(self, q_values, target_q_values):
-        """Compute quantile regression loss"""
-        # q_values: [batch, actions, quantiles]
-        # target_q_values: [batch, actions] or [batch, actions, quantiles]
-        
-        if target_q_values.dim() == 2:
-            # Expand target to match quantile dimension
-            target_q_values = target_q_values.unsqueeze(-1).expand_as(q_values)
-        
-        # Compute quantile regression loss
-        quantiles = torch.linspace(0.0, 1.0, self.num_quantiles, device=self.device)
-        quantiles = quantiles.view(1, 1, -1)  # [1, 1, num_quantiles]
-        
-        errors = target_q_values - q_values  # [batch, actions, quantiles]
-        loss = torch.where(errors >= 0, 
-                          quantiles * errors, 
-                          (quantiles - 1) * errors)
-        
-        return loss.mean()
-    
-    def _wasserstein_loss(self, q_values, target_q_values):
-        """Compute Wasserstein loss (simplified implementation)"""
-        # For simplicity, use sorted L1 distance as approximation
-        if q_values.dim() == 3:  # quantile format
-            q_values_sorted = torch.sort(q_values, dim=-1)[0]
-            if target_q_values.dim() == 2:
-                target_q_values = target_q_values.unsqueeze(-1).expand_as(q_values)
-            target_sorted = torch.sort(target_q_values, dim=-1)[0]
-            return F.l1_loss(q_values_sorted, target_sorted)
-        else:
-            return F.l1_loss(q_values, target_q_values)
+        # Backward pass
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return loss.item()
 
     def summary(self, input_size=None):
         """Print model summary"""
@@ -215,3 +211,112 @@ class QNetwork(DeterministicMixin, Model):
         print("\nHead:")
         summary(self.head, input_size=(input_size[0], self.final_feature_size))
         print("=" * 40)
+
+class TestQNetwork(nn.Module):
+    def __init__(self, input_dim, output_dim, model_path, device="cpu",
+                 num_layers=3, hidden_size=256, use_attention=True,
+                 dropout_rate=0.0, batch_norm=False, layer_sizes=None):
+        super().__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.device = device
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.use_attention = use_attention
+        self.dropout_rate = dropout_rate
+        self.batch_norm = batch_norm
+        self.layer_sizes = layer_sizes
+
+        # Build backbone, attention, head (same as QNetwork)
+        self.backbone = self._build_backbone()
+        self.attention = self._build_attention() if self.use_attention else None
+        self.head = nn.Linear(self.final_feature_size, self.output_dim).to(device)
+
+        # Load weights
+        self._load_my_model(model_path)
+
+    def _build_backbone(self):
+        layers = []
+        if self.layer_sizes is not None:
+            # custom layer sizes
+            layer_sizes = [self.input_dim] + self.layer_sizes
+            for i in range(len(layer_sizes) - 1):
+                layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
+                if self.batch_norm:
+                    layers.append(nn.LayerNorm(layer_sizes[i + 1]))
+                layers.append(nn.ReLU())
+                if self.dropout_rate > 0:
+                    layers.append(nn.Dropout(self.dropout_rate))
+            final_size = layer_sizes[-1]
+        else:
+            # default architecture
+            layers.append(nn.Linear(self.input_dim, self.hidden_size))
+            if self.batch_norm:
+                layers.append(nn.LayerNorm(self.hidden_size))
+            layers.append(nn.ReLU())
+            if self.dropout_rate > 0:
+                layers.append(nn.Dropout(self.dropout_rate))
+
+            layers.append(nn.Linear(self.hidden_size, self.hidden_size))
+            if self.batch_norm:
+                layers.append(nn.LayerNorm(self.hidden_size))
+            layers.append(nn.ReLU())
+            if self.dropout_rate > 0:
+                layers.append(nn.Dropout(self.dropout_rate))
+
+            for _ in range(self.num_layers):
+                layers.append(nn.Linear(self.hidden_size, self.hidden_size))
+                if self.batch_norm:
+                    layers.append(nn.LayerNorm(self.hidden_size))
+                layers.append(nn.ReLU())
+                if self.dropout_rate > 0:
+                    layers.append(nn.Dropout(self.dropout_rate))
+            final_size = self.hidden_size
+
+        self.final_feature_size = final_size
+        return nn.Sequential(*layers).to(self.device)
+
+    def _build_attention(self):
+        return SENetFC(
+            feature_dim=self.final_feature_size,
+            reduction=16,
+            use_layer_norm=self.batch_norm
+        ).to(self.device)
+
+    def forward(self, x):
+        # Backbone feature extraction
+        features = self.backbone(x)  # [B, feature_size]
+        
+        # Apply attention if enabled
+        if self.attention is not None:
+            features = self.attention(features)
+        
+        # Output head
+        output = self.head(features)
+        
+        return output
+
+    def _load_my_model(self, model_file_path):
+        if os.path.isfile(model_file_path):
+            checkpoint = torch.load(model_file_path, map_location=self.device)
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                self.load_state_dict(checkpoint["model_state_dict"])
+            elif isinstance(checkpoint, dict):
+                self.load_state_dict(checkpoint)
+            else:
+                # whole model was saved
+                self.load_state_dict(checkpoint.state_dict())
+            self.eval()
+        else:
+            sys.exit("❌ Model file not found: " + model_file_path)
+
+    def predict_one(self, state):
+        """Predict Q-values for a single input (compatibility method)"""
+        with torch.no_grad():
+            if not isinstance(state, torch.Tensor):
+                state = torch.tensor(np.reshape(state, [1, self.input_dim]), dtype=torch.float32).to(self.device)
+            else:
+                state = torch.reshape(state, [1, self.input_dim]).to(self.device)
+
+            q_values = self.forward(state)
+        return q_values.detach().cpu().numpy().squeeze()
