@@ -16,7 +16,7 @@ from skrl.models.torch import Model
 
 # fmt: off
 # [start-config-dict-torch]
-DQN_DEFAULT_CONFIG = {
+DDQN_DEFAULT_CONFIG = {
     "gradient_steps": 1,            # gradient steps
     "batch_size": 64,               # training batch size
 
@@ -62,7 +62,7 @@ DQN_DEFAULT_CONFIG = {
 # fmt: on
 
 
-class DQN(Agent):
+class DDQN(Agent):
     def __init__(
         self,
         models: Mapping[str, Model],
@@ -72,9 +72,9 @@ class DQN(Agent):
         device: Optional[Union[str, torch.device]] = None,
         cfg: Optional[dict] = None,
     ) -> None:
-        """Deep Q-Network (DQN)
+        """Double Deep Q-Network (DDQN)
 
-        https://arxiv.org/abs/1312.5602
+        https://ojs.aaai.org/index.php/AAAI/article/view/10295
 
         :param models: Models used by the agent
         :type models: dictionary of skrl.models.torch.Model
@@ -94,7 +94,7 @@ class DQN(Agent):
 
         :raises KeyError: If the models dictionary is missing a required key
         """
-        _cfg = copy.deepcopy(DQN_DEFAULT_CONFIG)
+        _cfg = copy.deepcopy(DDQN_DEFAULT_CONFIG)
         _cfg.update(cfg if cfg is not None else {})
         super().__init__(
             models=models,
@@ -200,6 +200,8 @@ class DQN(Agent):
         :type timestep: int
         :param timesteps: Number of timesteps
         :type timesteps: int
+        :param desra_phase_idx: DESRA phase index to use instead of random exploration
+        :type desra_phase_idx: int
 
         :return: Actions
         :rtype: torch.Tensor
@@ -226,7 +228,6 @@ class DQN(Agent):
 
         indexes = (torch.rand(states.shape[0], device=self.device) >= epsilon).nonzero().view(-1)
         if indexes.numel():
-            print("DQN predicted actions")
             with torch.autocast(device_type=self._device_type, enabled=self._mixed_precision):
                 actions[indexes] = torch.argmax(
                     self.q_network.act({"states": states[indexes]}, role="q_network")[0], dim=1, keepdim=True
@@ -354,7 +355,15 @@ class DQN(Agent):
                         {"states": sampled_next_states}, role="target_q_network"
                     )
 
-                    target_q_values = torch.max(next_q_values, dim=-1, keepdim=True)[0]
+                    target_q_values = torch.gather(
+                        next_q_values,
+                        dim=1,
+                        index=torch.argmax(
+                            self.q_network.act({"states": sampled_next_states}, role="q_network")[0],
+                            dim=1,
+                            keepdim=True,
+                        ),
+                    )
                     target_values = (
                         sampled_rewards
                         + self._discount_factor

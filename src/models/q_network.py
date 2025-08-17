@@ -8,30 +8,7 @@ import numpy as np
 from skrl.models.torch import Model, DeterministicMixin
 from torchinfo import summary
 from typing import Optional
-
-# Import SENet if available, otherwise create a simple attention module
-try:
-    from src.SENet_module import SENet
-except ImportError:
-    class SENet(nn.Module):
-        """Simple attention module as fallback"""
-        def __init__(self, channel):
-            super().__init__()
-            self.channel = channel
-            self.attention = nn.Sequential(
-                nn.AdaptiveAvgPool1d(1),
-                nn.Conv1d(channel, channel // 16, 1),
-                nn.ReLU(),
-                nn.Conv1d(channel // 16, channel, 1),
-                nn.Sigmoid()
-            )
-        
-        def forward(self, x):
-            # Simple channel attention
-            b, c = x.shape
-            attn = self.attention(x.unsqueeze(-1)).squeeze(-1)
-            return x * attn
-
+from src.SENet_module import SENet, SENetFC
 
 class QNetwork(DeterministicMixin, Model):
     """Advanced Q-network model for DQN using SKRL with features from original model"""
@@ -49,9 +26,7 @@ class QNetwork(DeterministicMixin, Model):
         self.num_layers = kwargs.get("num_layers", 3)
         self.hidden_size = kwargs.get("hidden_size", 256)
         self.use_attention = kwargs.get("use_attention", True)
-        
-        # Advanced features from original model
-        self.loss_type = kwargs.get("loss_type", "mse")  # mse, huber, weighted, qr
+
         self.num_quantiles = kwargs.get("num_quantiles", 100)
         self.v_min = kwargs.get("v_min", -10.0)
         self.v_max = kwargs.get("v_max", 10.0)
@@ -91,15 +66,15 @@ class QNetwork(DeterministicMixin, Model):
         else:
             # Use default architecture similar to original model
             # Input layer
-            layers.append(nn.Linear(self.input_dim, 128))
+            layers.append(nn.Linear(self.input_dim, self.hidden_size))
             if self.batch_norm:
-                layers.append(nn.LayerNorm(128))
+                layers.append(nn.LayerNorm(self.hidden_size))
             layers.append(nn.ReLU())
             if self.dropout_rate > 0:
                 layers.append(nn.Dropout(self.dropout_rate))
             
             # Second layer
-            layers.append(nn.Linear(128, self.hidden_size))
+            layers.append(nn.Linear(self.hidden_size, self.hidden_size))
             if self.batch_norm:
                 layers.append(nn.LayerNorm(self.hidden_size))
             layers.append(nn.ReLU())
@@ -121,19 +96,20 @@ class QNetwork(DeterministicMixin, Model):
         return nn.Sequential(*layers)
 
     def _build_attention(self):
-        """Build attention mechanism"""
+        """Build attention mechanism using improved SENet"""
         if self.use_attention:
-            return SENet(channel=self.final_feature_size)
+            # Use the advanced SENetFC for fully connected features
+            return SENetFC(
+                feature_dim=self.final_feature_size,
+                reduction=16,
+                use_layer_norm=self.batch_norm
+            )
         return None
 
     def _build_head(self):
         """Build the output head based on loss type"""
-        if self.loss_type in ("qr", "wasserstein"):
-            # Quantile regression: output num_quantiles for each action
-            return nn.Linear(self.final_feature_size, self.output_dim * self.num_quantiles)
-        else:
-            # Standard Q-values: one output per action
-            return nn.Linear(self.final_feature_size, self.output_dim)
+        # Standard Q-values: one output per action
+        return nn.Linear(self.final_feature_size, self.output_dim)
 
     def compute(self, inputs, role=""):
         """Compute Q-values for given inputs (SKRL interface)"""
@@ -153,20 +129,11 @@ class QNetwork(DeterministicMixin, Model):
         # Output head
         output = self.head(features)
         
-        # Reshape for quantile regression
-        if self.loss_type in ("qr", "wasserstein"):
-            batch_size = output.shape[0]
-            output = output.view(batch_size, self.output_dim, self.num_quantiles)
-        
         return output
         
     def act(self, inputs, role=""):
         """Get Q-values for given inputs (SKRL interface)"""
         q_values = self._forward_internal(inputs["states"])
-        
-        if self.loss_type in ("qr", "wasserstein"):
-            # For quantile regression, average across quantiles to get Q-values
-            q_values = q_values.mean(dim=-1)
         
         # SKRL expects Q-values, not actions!
         return q_values, None, {}
@@ -189,35 +156,12 @@ class QNetwork(DeterministicMixin, Model):
         """Get Q-values for given states (handles different loss types)"""
         output = self._forward_internal(states)
         
-        if self.loss_type in ("qr", "wasserstein"):
-            # Average across quantiles for standard Q-values
-            return output.mean(dim=-1)
-        else:
-            return output
+        return output
 
     def compute_loss(self, q_values, target_q_values, actions=None):
         """Compute loss based on the configured loss type"""
-        if self.loss_type == "mse":
-            return F.mse_loss(q_values, target_q_values)
         
-        elif self.loss_type == "huber":
-            return F.smooth_l1_loss(q_values, target_q_values)
-        
-        elif self.loss_type == "weighted":
-            # Weighted MSE loss (could be extended to use importance sampling weights)
-            weights = torch.ones_like(q_values)
-            return F.mse_loss(q_values * weights, target_q_values * weights)
-        
-        elif self.loss_type == "qr":
-            # Quantile regression loss
-            return self._quantile_regression_loss(q_values, target_q_values)
-        
-        elif self.loss_type == "wasserstein":
-            # Wasserstein loss (simplified)
-            return self._wasserstein_loss(q_values, target_q_values)
-        
-        else:
-            raise ValueError(f"Unsupported loss type: {self.loss_type}")
+        return F.mse_loss(q_values, target_q_values)
     
     def _quantile_regression_loss(self, q_values, target_q_values):
         """Compute quantile regression loss"""
@@ -257,14 +201,9 @@ class QNetwork(DeterministicMixin, Model):
             input_size = (1, self.input_dim)
         
         print("=== Q-Network Architecture Summary ===")
-        print(f"Loss type: {self.loss_type}")
         print(f"Input dim: {self.input_dim}")
         print(f"Output dim: {self.output_dim}")
         print(f"Use attention: {self.use_attention}")
-        
-        if self.loss_type in ("qr", "wasserstein"):
-            print(f"Num quantiles: {self.num_quantiles}")
-            print(f"Total output size: {self.output_dim * self.num_quantiles}")
         
         print("\nBackbone:")
         summary(self.backbone, input_size=input_size)

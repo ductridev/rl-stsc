@@ -154,15 +154,16 @@ class SimulationBase(SUMO):
 
             self.history["reward"][tl_id].append(reward)
 
+        # Calculate metrics
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-        outflow = sum(1 for v in st["old_vehicle_ids"] if v not in new_ids)
+        outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
         st["old_vehicle_ids"] = new_ids
 
-        sum_travel_delay = self.get_sum_travel_delay(tl)
-        sum_travel_time = self.get_sum_travel_time(tl)
-        sum_density = self.get_sum_density(tl)
-        sum_queue_length = self.get_sum_queue_length(tl)
-        sum_waiting_time = self.get_sum_waiting_time(tl)
+        sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
+        sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
+        sum_density = TrafficMetrics.get_sum_density(tl)
+        sum_queue_length = TrafficMetrics.get_sum_queue_length(tl)
+        sum_waiting_time = TrafficMetrics.get_sum_waiting_time(tl)
         mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
         stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
         
@@ -182,7 +183,7 @@ class SimulationBase(SUMO):
         st["queue_length"] = sum_queue_length
         st["waiting_time"] = sum_waiting_time
 
-        # 3) Every 60 steps, flush step‐averages into history
+        # 3) Every 60 steps, flush step‐averages into history for fairness
         if self.step % 60 == 0:
             
             for key, hist in [
@@ -219,6 +220,10 @@ class SimulationBase(SUMO):
 
         num_vehicles = 0
         num_vehicles_out = 0
+
+        # Warm up 50 steps
+        for _ in range(50):
+            traci.simulationStep()
 
         # 2) Main loop (one traci.simulationStep per iteration)
         while self.step < self.max_steps:
@@ -502,32 +507,66 @@ class SimulationBase(SUMO):
         return total_waiting_time
 
     def get_reward(self, tl_id: str, phase: str) -> float:
-        """Calculate reward for a traffic light action (adapted from SKRL simulation)"""
-        weight = self.agent_cfg.get(
-            "weight",
-            {
-                "outflow_rate": 1.0,
-                "delay": -1.0,
-                "waiting_time": -1.0,
-                "switch_phase": -0.1,
-                "travel_time": -1.0,
-                "queue_length": -1.0,
-            },
-        )
+        """Reward = decrease in LOCAL waiting time and queue length for this specific traffic light.
+        Uses the difference in waiting time and queue length before and after the action to provide
+        proper credit assignment for multi-agent learning."""
 
-        return (
-            weight["outflow_rate"]
-            * self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
-            + weight["delay"]
-            * self.travel_delay_normalizer.normalize(self.travel_delay[tl_id])
-            + weight["waiting_time"]
-            * self.waiting_time_normalizer.normalize(self.waiting_time[tl_id])
-            - 5
-            + weight["travel_time"]
-            * self.travel_time_normalizer.normalize(self.travel_time[tl_id])
-            + weight["queue_length"]
-            * self.queue_length_normalizer.normalize(self.queue_length[tl_id])
-        )
+        weight = self.agent_cfg["weight"]
+        
+        # Get current waiting time and queue length for this specific traffic light
+        current_local_wait = 0.0
+        current_local_queue = 0.0
+        tl_data = None
+        for tl in self.traffic_lights:
+            if tl["id"] == tl_id:
+                tl_data = tl
+                break
+        
+        if tl_data is None:
+            return 0.0
+            
+        current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
+        # current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
+        
+        # Initialize per-TL waiting time and queue length tracking if not exists
+        if not hasattr(self, 'prev_local_wait'):
+            self.prev_local_wait = {}
+        # if not hasattr(self, 'prev_local_queue'):
+        #     self.prev_local_queue = {}
+        
+        # First calculation for this TL returns 0 (no baseline)
+        if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
+            reward = 0.0
+        else:
+            # Reward = reduction in waiting time and queue length (positive if decreased)
+            waiting_reduction = self.prev_local_wait[tl_id] - current_local_wait
+            # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
+
+            # waiting_norm = self.waiting_time_normalizer.normalize(waiting_reduction)
+            # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
+            
+            # Scale rewards based on magnitude to improve learning signal
+            # Use square root to reduce impact of extreme values
+            # waiting_reward = 0.0
+            # if waiting_reduction > 0:
+            #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
+            # elif waiting_reduction < 0:
+            #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
+            
+            # queue_reward = 0.0
+            # if queue_reduction > 0:
+            #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
+            # elif queue_reduction < 0:
+            #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
+            
+            # Combined reward: waiting time has higher weight than queue length
+            # reward = waiting_reward + queue_reward
+            reward = -current_local_wait
+        
+        # Update snapshots for this traffic light
+        self.prev_local_wait[tl_id] = current_local_wait
+        # self.prev_local_queue[tl_id] = current_local_queue
+        return float(reward)
 
     def reset_history(self):
         for key in self.history:

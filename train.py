@@ -30,9 +30,9 @@ import datetime
 import shutil
 import os
 import glob
+from skrl.utils import set_seed
 
-
-def generate_routes_if_needed(config_file, config):
+def generate_routes_if_needed(config_file, config, demand = "high", global_episode=1):
     """
     Generate routes for simulation if needed based on configuration.
     
@@ -42,6 +42,60 @@ def generate_routes_if_needed(config_file, config):
     """
     if config_file != "config/training_testngatu6x1EastWestOverflow.yaml":
         print("Generating routes...")
+        # if global_episode <= 50:
+        #     generate_and_save_random_intervals(
+        #         sumo_cfg_file=config["sumo_cfg_file"],
+        #         total_duration=7200,
+        #         min_interval=3600,
+        #         max_interval=3600,
+        #         base_weight=0.0,
+        #         high_min=33,
+        #         high_max=400,
+        #         min_active_sides=4,
+        #         max_active_sides=4,
+        #         edge_groups=config["edge_groups"],
+        #     )
+        # elif global_episode <= 100:
+        #     generate_and_save_random_intervals(
+        #         sumo_cfg_file=config["sumo_cfg_file"],
+        #         total_duration=7200,
+        #         min_interval=3600,
+        #         max_interval=3600,
+        #         base_weight=0.0,
+        #         high_min=33,
+        #         high_max=400,
+        #         min_active_sides=3,
+        #         max_active_sides=3,
+        #         edge_groups=config["edge_groups"],
+        #     )
+        # el
+        # if global_episode <= 100:
+        #     generate_and_save_random_intervals(
+        #         sumo_cfg_file=config["sumo_cfg_file"],
+        #         total_duration=7200,
+        #         min_interval=3600,
+        #         max_interval=3600,
+        #         base_weight=0.0,
+        #         high_min=33,
+        #         high_max=400,
+        #         min_active_sides=2,
+        #         max_active_sides=2,
+        #         edge_groups=config["edge_groups"],
+        #     )
+        # elif global_episode <= 200:
+        #     generate_and_save_random_intervals(
+        #         sumo_cfg_file=config["sumo_cfg_file"],
+        #         total_duration=7200,
+        #         min_interval=3600,
+        #         max_interval=3600,
+        #         base_weight=0.0,
+        #         high_min=33,
+        #         high_max=400,
+        #         min_active_sides=1,
+        #         max_active_sides=1,
+        #         edge_groups=config["edge_groups"],
+        #     )
+        # elif global_episode <= 300:
         generate_and_save_random_intervals(
             sumo_cfg_file=config["sumo_cfg_file"],
             total_duration=7200,
@@ -50,15 +104,15 @@ def generate_routes_if_needed(config_file, config):
             base_weight=0.0,
             high_min=33,
             high_max=400,
-            min_active_sides=2,
-            max_active_sides=2,
+            min_active_sides=1,
+            max_active_sides=4,
             edge_groups=config["edge_groups"],
         )
 
         Intersection.generate_residential_demand_routes(
             config,
             config["sumo_cfg_file"].split("/")[1],
-            demand_level="low",
+            demand_level=demand,
             enable_motorcycle=True,
             enable_passenger=True,
             enable_truck=True,
@@ -248,6 +302,7 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
             training_steps=config["training_steps"],
             updating_target_network_steps=config["updating_target_network_steps"],
             save_interval=save_interval,
+            memory_size=(config['memory_size_min'], config['memory_size_max'])
         )
         
         print(f"Shared DQN model initialized with first config")
@@ -726,9 +781,6 @@ def main():
         config = import_train_configuration(config_file)
         configs.append((config_file, config))
         max_episodes_per_config = max(max_episodes_per_config, config["total_episodes"])
-
-        # Generate routes if needed
-        generate_routes_if_needed(config_file, config)
     
     print(f"\nALTERNATING CONFIGURATION TRAINING:")
     print(f"   Configurations: {len(config_files)}")
@@ -738,8 +790,8 @@ def main():
     print("=" * 80)
     
     # Run initial baseline simulations
-    baseline_results_before = run_baseline_simulations(config_files, shared_path, shared_visualization, "before_training")
-    baseline_results = {'before_training': baseline_results_before}
+    # baseline_results_before = run_baseline_simulations(config_files, shared_path, shared_visualization, "before_training")
+    # baseline_results = {'before_training': baseline_results_before}
     
     # Initialize tracking for each configuration
     config_trackers = {}
@@ -781,10 +833,6 @@ def main():
         config_idx = (global_episode - 1) % len(config_files)
         current_tracker = config_trackers[config_idx]
 
-        if global_episode % 25 == 0:
-            # Generate routes if needed
-            generate_routes_if_needed(config_file, config)
-        
         # Skip if this configuration has completed all episodes
         if current_tracker['completed']:
             # Find next available configuration
@@ -797,10 +845,12 @@ def main():
             else:
                 # All configurations completed
                 break
-        
+
         config_file = current_tracker['config_file']
         config = current_tracker['config']
         config_episode = current_tracker['config_episode']
+
+        set_seed(global_episode)
         
         print(f"\n{'='*80}")
         print(f"GLOBAL EPISODE {global_episode}: Using Config {config_idx + 1}/{len(config_files)}")
@@ -812,21 +862,25 @@ def main():
         shared_simulation_skrl, shared_path, shared_visualization = initialize_dqn_simulation(
             config, shared_simulation_skrl, shared_path, shared_visualization, config_idx
         )
-        
-        # Train one episode with current configuration
-        performance_metrics = train_dqn_episode(
-            shared_simulation_skrl, global_episode, config_episode, config_file, 
-            config, {}
-        )
-        
+
+        for demand in ['high']:
+            # Generate routes if needed
+            generate_routes_if_needed(current_tracker['config_file'], current_tracker['config'], demand, global_episode)
+
+            # Train one episode with current configuration
+            performance_metrics = train_dqn_episode(
+                shared_simulation_skrl, global_episode, config_episode, config_file, 
+                config, {}
+            )
+
+            # Store performance data for this configuration
+            current_tracker['performance_history'].append(performance_metrics)
+
         # Evaluate and save best model if needed
-        current_tracker['best_performance'], global_best_performance = evaluate_and_save_best_model(
-            performance_metrics, current_tracker['best_performance'], global_best_performance,
-            config_file, shared_simulation_skrl, shared_path, global_episode, config_episode
-        )
-        
-        # Store performance data for this configuration
-        current_tracker['performance_history'].append(performance_metrics)
+        # current_tracker['best_performance'], global_best_performance = evaluate_and_save_best_model(
+        #     performance_metrics, current_tracker['best_performance'], global_best_performance,
+        #     config_file, shared_simulation_skrl, shared_path, global_episode, config_episode
+        # )
         
         # Save comparison plots at intervals
         save_interval = config.get("save_interval", 10)
@@ -841,7 +895,7 @@ def main():
         
         # Save model at intervals
         if global_episode % save_interval == 0 and global_episode > 0:
-            shared_simulation_skrl.save_model(global_episode)
+            shared_simulation_skrl.save_model(1)
             print(f"SKRL DQN model saved at global episode {global_episode}")
         
         # Update episode counters for current configuration
@@ -883,44 +937,44 @@ def main():
     
     print(f"\nALL CONFIGURATIONS COMPLETED - Total global episodes: {global_episode - 1}")
     
-    # Run final baseline simulations for comparison
-    baseline_results_after = run_baseline_simulations(config_files, shared_path, shared_visualization, "after_training")
-    baseline_results['after_training'] = baseline_results_after
+    # # Run final baseline simulations for comparison
+    # baseline_results_after = run_baseline_simulations(config_files, shared_path, shared_visualization, "after_training")
+    # baseline_results['after_training'] = baseline_results_after
     
-    # Compare baselines with DQN results
-    compare_baselines_with_dqn(baseline_results, all_config_results)
+    # # Compare baselines with DQN results
+    # compare_baselines_with_dqn(baseline_results, all_config_results)
     
-    # Save comprehensive results
-    save_comprehensive_results(all_config_results, global_best_performance, shared_path, 
-                             baseline_results)
+    # # Save comprehensive results
+    # save_comprehensive_results(all_config_results, global_best_performance, shared_path, 
+    #                          baseline_results)
     
-    # Final summary
-    print("\nMULTI-CONFIGURATION ALTERNATING TRAINING COMPLETED!")
-    print("=" * 85)
-    print("TRAINING STRUCTURE:")
-    print("   1. Baseline simulations run BEFORE DQN training (initial measurements)")
-    print(f"   2. DQN training with ALTERNATING configurations each episode")  
-    print("   3. Baseline simulations run AFTER DQN training (final comparison)")
-    print("   4. Comprehensive performance analysis completed")
-    print()
-    print("ALTERNATING PATTERN USED:")
-    for i, config_file in enumerate(config_files):
-        config_name = config_file.split('/')[-1].replace('.yaml', '')
-        print(f"   Config {i+1}: {config_name}")
-    print(f"   Episodes alternated: 1→Config 1, 2→Config 2, 3→Config 3, 4→Config 1, 5→Config 2, etc.")
-    print(f"   Total configurations: {len(config_files)}")
-    print()
-    print("BEST DQN PERFORMANCE:")
-    print(f"   Configuration: {global_best_performance['config_file']}")
-    print(f"   Episode: {global_best_performance['episode']}")
-    print(f"   Completion Rate: {global_best_performance['completion_rate']:.1f}%")
-    print(f"   Total Reward: {global_best_performance['total_reward']:.1f}")
-    print(f"   Avg Outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}")
-    print()
-    print(f"EXPLORATION: SKRL handles epsilon-greedy exploration automatically")
-    print(f"All results saved to: {shared_path}")
-    print("Baseline comparisons available in comprehensive analysis above")
-    print("=" * 85)
+    # # Final summary
+    # print("\nMULTI-CONFIGURATION ALTERNATING TRAINING COMPLETED!")
+    # print("=" * 85)
+    # print("TRAINING STRUCTURE:")
+    # print("   1. Baseline simulations run BEFORE DQN training (initial measurements)")
+    # print(f"   2. DQN training with ALTERNATING configurations each episode")  
+    # print("   3. Baseline simulations run AFTER DQN training (final comparison)")
+    # print("   4. Comprehensive performance analysis completed")
+    # print()
+    # print("ALTERNATING PATTERN USED:")
+    # for i, config_file in enumerate(config_files):
+    #     config_name = config_file.split('/')[-1].replace('.yaml', '')
+    #     print(f"   Config {i+1}: {config_name}")
+    # print(f"   Episodes alternated: 1→Config 1, 2→Config 2, 3→Config 3, 4→Config 1, 5→Config 2, etc.")
+    # print(f"   Total configurations: {len(config_files)}")
+    # print()
+    # print("BEST DQN PERFORMANCE:")
+    # print(f"   Configuration: {global_best_performance['config_file']}")
+    # print(f"   Episode: {global_best_performance['episode']}")
+    # print(f"   Completion Rate: {global_best_performance['completion_rate']:.1f}%")
+    # print(f"   Total Reward: {global_best_performance['total_reward']:.1f}")
+    # print(f"   Avg Outflow: {global_best_performance.get('dqn_avg_outflow', 'N/A')}")
+    # print()
+    # print(f"EXPLORATION: SKRL handles epsilon-greedy exploration automatically")
+    # print(f"All results saved to: {shared_path}")
+    # print("Baseline comparisons available in comprehensive analysis above")
+    # print("=" * 85)
 
 
 if __name__ == "__main__":

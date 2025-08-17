@@ -206,6 +206,20 @@ class TrafficMetrics:
     def get_num_vehicles(detector_id: str) -> int:
         """Get number of vehicles in detector"""
         return traci.lanearea.getLastStepVehicleNumber(detector_id)
+    
+    @staticmethod
+    def get_speed(detector_id: str) -> float:
+        """Get average speed of vehicles in detector"""
+        vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
+        total_speed = 0.0
+        for vid in vehicle_ids:
+            total_speed += traci.vehicle.getSpeed(vid)
+        return total_speed
+    
+    @staticmethod
+    def get_occupance(detector_id: str) -> float:
+        """Get occupancy of a lane"""
+        return traci.lanearea.getLastStepOccupancy(detector_id)
 
     @staticmethod
     def get_vehicles_in_phase(tl: Dict, phase_str: str) -> List[str]:

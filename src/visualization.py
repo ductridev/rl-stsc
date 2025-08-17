@@ -100,7 +100,7 @@ class Visualization:
                 if name in data:
                     plt.plot(data[name], label=name.upper())
 
-            plt.xlabel("60 seconds")
+            plt.xlabel("Minute")
             plt.ylabel(metric.replace("_", " ").title())
             plt.title(
                 f"Comparison of {metric.replace('_', ' ').title()} (Episode {episode})"
@@ -415,7 +415,7 @@ class Visualization:
         # Plot 1: Completed Vehicle Count
         bars1 = ax1.bar(methods, completed_counts, color=colors[:len(methods)], alpha=0.7)
         ax1.set_title('Number of Completed Vehicles', fontsize=14, fontweight='bold')
-        ax1.set_ylabel('Completed Vehicle Count', fontsize=12)
+        ax1.set_ylabel('Completed Vehicle Count (number vehicles)', fontsize=12)
         ax1.grid(True, alpha=0.3)
         
         # Add value labels on bars

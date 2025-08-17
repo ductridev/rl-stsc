@@ -44,6 +44,7 @@ class Simulation(SUMO):
         training_steps: int = 300,
         updating_target_network_steps: int = 100,
         save_interval: int = 2,
+        memory_size: Tuple[int, int] = (10000, 100000)
     ):
         # Initialize parent class
         super().__init__()
@@ -60,7 +61,9 @@ class Simulation(SUMO):
         self.training_steps = training_steps
         self.updating_target_network_steps = updating_target_network_steps
         self.save_interval = save_interval
-        
+        self.memory_size = memory_size
+        self.green_time = 10
+
         # Testing mode flag to disable training operations
         self.testing_mode = False
         
@@ -70,11 +73,12 @@ class Simulation(SUMO):
         self.desra_epsilon_multiplier = agent_cfg.get("desra_epsilon_multiplier", 0.5)  # Scale with epsilon
 
         # Normalizers
-        self.outflow_rate_normalizer = Normalizer()
-        self.queue_length_normalizer = Normalizer()
-        self.travel_time_normalizer = Normalizer()
-        self.travel_delay_normalizer = Normalizer()
-        self.waiting_time_normalizer = Normalizer()
+        self.outflow_rate_normalizer = Normalizer(0, 100)
+        self.queue_length_normalizer = Normalizer(0, 300)
+        self.num_vehicles_normalizer = Normalizer(0, 100)
+        self.travel_time_normalizer = Normalizer(0, 500)
+        self.travel_delay_normalizer = Normalizer(0, 50)
+        self.waiting_time_normalizer = Normalizer(0, 500)
 
         # Vehicle tracking
         self.vehicle_tracker = VehicleTracker(path=self.path)
@@ -234,6 +238,10 @@ class Simulation(SUMO):
         self, tl_id: str, state: np.ndarray, desra_phase_idx: int
     ) -> int:
         """Select action using hybrid DESRA-DQN approach"""
+
+        assert (
+            len(state) == self.agent_cfg["num_states"]
+        ), f"State vector length {len(state)} does not match input_dim {self.agent_cfg['num_states']}"
         
         # Initialize tracking for this traffic light if needed
         if tl_id not in self.desra_action_count:
@@ -241,7 +249,11 @@ class Simulation(SUMO):
             self.dqn_action_count[tl_id] = 0
         
         # Get DQN agent's action preference
-        dqn_action = self.agent_manager.select_action(tl_id, state, self.step, self.max_steps)
+        dqn_action = self.agent_manager.select_action(tl_id, state, self.step, 10, desra_phase_idx)
+
+        print(f"State for TL {tl_id}: {state}, DQN: {dqn_action}")
+
+        return int(dqn_action)
         
         # If DESRA guidance is disabled OR in testing mode, just use DQN
         if not self.use_desra_guidance or self.testing_mode:
@@ -298,14 +310,14 @@ class Simulation(SUMO):
     ):
         """Store transition in agent's memory"""
         self.agent_manager.store_transition(
-            tl_id, state, action, reward, next_state, done, self.step, self.max_steps
+            tl_id, state, action, reward, next_state, done, self.step, self.green_time
         )
 
     def train_agents(self, tl_id):
         """Train all agents using SKRL (returns 0 if in testing mode)"""
         if self.testing_mode:
             return 0.0
-        return self.agent_manager.train_agents(tl_id, self.step, self.max_steps)
+        return self.agent_manager.train_agents(tl_id, self.step, self.green_time)
 
     def run(self, episode: int):
         """Run simulation with SKRL agents"""
@@ -344,7 +356,7 @@ class Simulation(SUMO):
         for tl in self.traffic_lights:
             tl_id = tl["id"]
             self.tl_states[tl_id] = {
-                "green_time_remaining": 10,
+                "green_time_remaining": self.green_time,
                 "yellow_time_remaining": 0,
                 "interphase": False,
                 "travel_delay_sum": 0,
@@ -357,7 +369,7 @@ class Simulation(SUMO):
                 "action_idx": None,
                 "phase": tl["phase"][0],
                 "old_phase": tl["phase"][0],
-                "green_time": 10,
+                "green_time": self.green_time,
                 "step_travel_delay_sum": 0,
                 "step_travel_time_sum": 0,
                 "step_outflow_sum": 0,
@@ -367,10 +379,15 @@ class Simulation(SUMO):
                 "step_junction_throughput_sum": 0,
                 "step_stopped_vehicles_sum": 0,
                 "step_old_vehicle_ids": [],
+                "step_reward_sum": 0
             }
 
         num_vehicles = 0
         num_vehicles_out = 0
+
+        # Warm up 50 steps
+        for _ in range(50):
+            traci.simulationStep()
 
         while self.step < self.max_steps:
             # Action selection for each traffic light
@@ -400,8 +417,13 @@ class Simulation(SUMO):
                 # Get current state
                 current_state, desra_phase_idx = self.get_state(tl, state["phase"])
 
+                # Post-interaction before do new interaction
+                loss = self.train_agents(tl_id)
+
+                print(f"Total training loss for {tl_id}: {loss}")
+
                 # Pre-interaction (epsilon schedule etc.) based on decision count
-                self.agent_manager.pre_interaction(tl_id, self.decision_counter, self.max_steps)
+                self.agent_manager.pre_interaction(tl_id, self.decision_counter, state["green_time"])
 
                 # Select action using SKRL agent
                 action_idx = self.select_action(
@@ -498,8 +520,8 @@ class Simulation(SUMO):
                     st["step_junction_throughput_sum"] += new_count
 
             # Update DESRA traffic parameters for real-time adaptation
-            # Only update every 10 steps to reduce computational overhead
-            if self.step % 10 == 0:
+            # Only update every 100 steps to reduce computational overhead
+            if self.step % 100 == 0:
                 current_time = traci.simulation.getTime()
                 for det in self.all_detectors:
                     self.desra.update_traffic_parameters(det, current_time)
@@ -550,16 +572,18 @@ class Simulation(SUMO):
                 st["waiting_time"] = sum_waiting_time
 
                 # Handle green time countdown
-                if st["green_time_remaining"] > 0:
+                if st["green_time_remaining"] > 1:
                     st["green_time_remaining"] -= 1
                 else:
                     # Phase ended - finalize and store experience
                     self._finalize_phase_skrl(tl, tl_id, st)
                     # FIX: Use only decision-based batch training, remove step-based training
                     if not self.testing_mode:
-                        loss = self.agent_manager.maybe_batch_train(tl_id, self.decision_counter, self.max_steps)
+                        loss = self.agent_manager.maybe_batch_train(tl_id, self.decision_counter, 10)
                         if loss:
                             self.history["loss"][tl_id].append(loss)
+
+                    st["green_time_remaining"] -= 1
 
                 # Periodic metric flushing
                 if self.step > 0 and self.step % 60 == 0:
@@ -612,7 +636,7 @@ class Simulation(SUMO):
             )
 
         # Always record reward when phase ends (not just every 60 steps)
-        self.history["reward"][tl_id].append(reward)
+        st["step_reward_sum"] += reward
 
         # Reset phase metrics
         for key in [
@@ -654,6 +678,7 @@ class Simulation(SUMO):
             "queue_length",
             "waiting_time",
             "stopped_vehicles",
+            "reward"
         ]:
             val = avg(metric)
             self.history[metric][tl_id].append(val)
@@ -684,12 +709,6 @@ class Simulation(SUMO):
         print(f"Episode {episode}: {self.completion_tracker.get_completed_count()} vehicles completed, "
               f"average travel time: {episode_avg_travel_time:.2f}s")
 
-        # Update target networks periodically (skip if in testing mode)
-        # if (not self.testing_mode and 
-        #     episode % self.save_interval == 0 and 
-        #     episode > 0):
-        #     self.agent_manager.update_target_networks(self.step, self.max_steps)
-
         # Save plots
         self.save_plot(episode=episode)
         
@@ -707,9 +726,9 @@ class Simulation(SUMO):
             self.desra.clear_buffers()
             
         # Clear agent memories periodically to prevent accumulation
-        if episode % 5 == 0:  # Clear every 5 episodes to balance performance and memory
-            if hasattr(self.agent_manager, 'clear_memories'):
-                self.agent_manager.clear_memories()
+        # if episode % 5 == 0:  # Clear every 5 episodes to balance performance and memory
+        #     if hasattr(self.agent_manager, 'clear_memories'):
+        #         self.agent_manager.clear_memories()
 
         # Reset global waiting snapshot for next episode
         if hasattr(self, 'prev_local_wait'):
@@ -766,14 +785,16 @@ class Simulation(SUMO):
                 continue
 
             waiting_time = 0
+            num_vehicles = 0
             queue_length = 0
 
             for detector_id in movements:
                 waiting_time += TrafficMetrics.get_waiting_time(detector_id)
+                num_vehicles += TrafficMetrics.get_num_vehicles(detector_id)
                 queue_length += TrafficMetrics.get_queue_length(detector_id)
 
-            # Append per-phase state: only waiting_time
-            state_vector.extend([waiting_time, queue_length])
+            # Append per-phase state: waiting_time & queue_length
+            state_vector.extend([self.waiting_time_normalizer.normalize(waiting_time), self.num_vehicles_normalizer.normalize(num_vehicles), self.queue_length_normalizer.normalize(queue_length)])
 
         # Compute per-detector q_arr over [last_call, now]
         q_arr_dict = self._compute_arrival_flows()
@@ -800,10 +821,10 @@ class Simulation(SUMO):
             global_jam_density=global_jam_density,
         )
 
-        padding = (
-            self.agent_cfg["num_states"] - len(state_vector) - 2
-        )  # 1 for DESRA phase, 1 for current phase
-        state_vector.extend([0] * padding)
+        # padding = (
+        #     self.agent_cfg["num_states"] - len(state_vector) - 2
+        # )  # 1 for current phase, 1 for DESRA phase
+        # state_vector.extend([0] * padding)
 
         # Append current phase
         current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)   
@@ -811,14 +832,36 @@ class Simulation(SUMO):
         # Convert phase to index
         desra_phase_idx = phase_to_index(best_phase, self.actions_map[tl["id"]], 0)
 
-        # Append DESRA guidance (using DESRA phase instead of green time)
-        state_vector.extend([current_phase_idx, desra_phase_idx])
+        # Check if desra does not select empty phase follow the state vector
+        best_phase_idx = self.choose_best_phase(state_vector, desra_phase_idx)
+
+        # Append current phase
+        state_vector.extend([desra_phase_idx])
 
         assert (
             len(state_vector) == self.agent_cfg["num_states"]
         ), f"State vector length {len(state_vector)} does not match input_dim {self.agent_cfg['num_states']}"
 
-        return np.array(state_vector, dtype=np.float32), desra_phase_idx
+        return np.array(state_vector, dtype=np.float32), best_phase_idx
+    
+    def choose_best_phase(self, state_vector, desra_phase_idx):
+        num_phases = len(state_vector) // 3
+        phases = [state_vector[i*3:(i+1)*3] for i in range(num_phases)]
+
+        # --- 1. Check DESRA suggestion ---
+        if desra_phase_idx is not None:
+            desra_phase = phases[desra_phase_idx]
+            if not np.allclose(desra_phase, [0., 0., 0.]):  # reject [0,0,0]
+                return desra_phase_idx
+
+        # --- 2. Rule-based selection (2/3 better elements) ---
+        best_idx = 0
+        for i in range(1, num_phases):
+            better_count = np.sum(phases[i] > phases[best_idx])
+            if better_count >= 2:
+                best_idx = i
+
+        return best_idx
 
     def get_reward(self, tl_id: str, phase: str) -> float:
         """Reward = decrease in LOCAL waiting time and queue length for this specific traffic light.
@@ -839,47 +882,47 @@ class Simulation(SUMO):
         if tl_data is None:
             return 0.0
             
-        current_local_wait = TrafficMetrics.get_sum_waiting_time(tl_data)
-        current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
+        current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
+        # current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):
             self.prev_local_wait = {}
-        if not hasattr(self, 'prev_local_queue'):
-            self.prev_local_queue = {}
+        # if not hasattr(self, 'prev_local_queue'):
+        #     self.prev_local_queue = {}
         
         # First calculation for this TL returns 0 (no baseline)
-        if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None or
-            tl_id not in self.prev_local_queue or self.prev_local_queue[tl_id] is None):
+        if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
             reward = 0.0
         else:
             # Reward = reduction in waiting time and queue length (positive if decreased)
             waiting_reduction = self.prev_local_wait[tl_id] - current_local_wait
-            queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
+            # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
 
-            waiting_norm = self.waiting_time_normalizer.normalize(waiting_reduction)
-            queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
+            # waiting_norm = self.waiting_time_normalizer.normalize(waiting_reduction)
+            # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
             
             # Scale rewards based on magnitude to improve learning signal
             # Use square root to reduce impact of extreme values
-            waiting_reward = 0.0
-            if waiting_reduction > 0:
-                waiting_reward = -waiting_norm * weight["waiting_time"]  # Positive reward for improvement
-            elif waiting_reduction < 0:
-                waiting_reward = waiting_norm * weight["waiting_time"]  # Negative reward for worsening
+            # waiting_reward = 0.0
+            # if waiting_reduction > 0:
+            #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
+            # elif waiting_reduction < 0:
+            #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
             
-            queue_reward = 0.0
-            if queue_reduction > 0:
-                queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
-            elif queue_reduction < 0:
-                queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
+            # queue_reward = 0.0
+            # if queue_reduction > 0:
+            #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
+            # elif queue_reduction < 0:
+            #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
             
             # Combined reward: waiting time has higher weight than queue length
-            reward = waiting_reward + queue_reward
+            # reward = waiting_reward + queue_reward
+            reward = -waiting_reduction
         
         # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait
-        self.prev_local_queue[tl_id] = current_local_queue
+        # self.prev_local_queue[tl_id] = current_local_queue
         return float(reward)
 
     def get_movements_from_phase(self, tl: Dict, phase_str: str) -> List[str]:

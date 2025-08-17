@@ -7,7 +7,7 @@ import math
 
 
 class DESRA(SUMO):
-    def __init__(self, interphase_duration=3, buffer_size=100):
+    def __init__(self, interphase_duration=3, buffer_size=10000):
         self.interphase_duration = interphase_duration
         self.buffer_size = buffer_size
 
