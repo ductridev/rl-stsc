@@ -281,7 +281,7 @@ class SKRLAgentManager:
         state_tensor = torch.Tensor(state).unsqueeze(0).to(self.device)
 
         # SKRL's DQN agent.act() returns: (tensor([[action]], device='cuda:0'), None, None)
-        action_result = agent.act(state_tensor, step, max_steps)
+        action_result = agent.act(state_tensor, step, max_steps, desra_phase_idx)
 
         # Extract action from the tuple - first element is the action tensor
         if isinstance(action_result, tuple) and len(action_result) >= 1:
