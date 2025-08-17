@@ -200,6 +200,8 @@ class DQN(Agent):
         :type timestep: int
         :param timesteps: Number of timesteps
         :type timesteps: int
+        :param desra_phase_idx: Current DESRA phase index
+        :type desra_phase_idx: int
 
         :return: Actions
         :rtype: torch.Tensor
@@ -226,7 +228,6 @@ class DQN(Agent):
 
         indexes = (torch.rand(states.shape[0], device=self.device) >= epsilon).nonzero().view(-1)
         if indexes.numel():
-            print("DQN predicted actions")
             with torch.autocast(device_type=self._device_type, enabled=self._mixed_precision):
                 actions[indexes] = torch.argmax(
                     self.q_network.act({"states": states[indexes]}, role="q_network")[0], dim=1, keepdim=True

@@ -21,8 +21,8 @@ sys.path.insert(0, parent_dir)
 from models.q_network import QNetwork, MLP
 from environment.traffic_light_env import TrafficLightEnvironment
 # from agents.custom_dqn import CustomDQN
-from skrl.agents.torch.dqn import DQN, DDQN
-# from agents.custom_dqn import DQN
+# from skrl.agents.torch.dqn import DQN, DDQN
+from agents.custom_dqn import DQN
 
 class SKRLAgentManager:
     """Manager for SKRL agents and components"""
