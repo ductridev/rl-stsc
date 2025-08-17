@@ -379,7 +379,7 @@ class Simulation(SUMO):
         for _ in range(50):
             traci.simulationStep()
 
-        while self.step < self.max_steps:
+        while self.step <= self.max_steps:
             # Action selection for each traffic light
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
