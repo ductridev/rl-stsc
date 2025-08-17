@@ -251,7 +251,7 @@ class Simulation(SUMO):
         # Get DQN agent's action preference
         dqn_action = self.agent_manager.select_action(tl_id, state, self.step, 10, desra_phase_idx)
 
-        print(f"State for TL {tl_id}: {state}, DQN: {dqn_action}")
+        # print(f"State for TL {tl_id}: {state}, DQN: {dqn_action}")
 
         return int(dqn_action)
         
