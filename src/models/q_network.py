@@ -9,7 +9,7 @@ import os
 import sys
 from skrl.models.torch import Model, DeterministicMixin
 from torchinfo import summary
-from typing import Optional
+from typing import Any, Mapping, Optional, Tuple, Union
 from src.SENet_module import SENet, SENetFC
 
 class MLP(DeterministicMixin, Model):
@@ -48,12 +48,11 @@ class MLP(DeterministicMixin, Model):
         summary(self.head, input_size=(input_size[0], self.final_feature_size))
         print("=" * 40)
 
-class QNetwork(DeterministicMixin, Model):
+class QNetwork(Model):
     """Advanced Q-network model for DQN using SKRL with features from original model"""
 
     def __init__(self, observation_space, action_space, device="cpu", **kwargs):
         Model.__init__(self, observation_space, action_space, device)
-        DeterministicMixin.__init__(self)
 
         # Basic configuration
         self.input_dim = kwargs.get("input_dim", self.num_observations)
@@ -136,18 +135,20 @@ class QNetwork(DeterministicMixin, Model):
     def _build_attention(self):
         """Build attention mechanism using improved SENet"""
         if self.use_attention:
-            # Use the advanced SENetFC for fully connected features
-            return SENetFC(
-                feature_dim=self.final_feature_size,
-                reduction=16,
-                use_layer_norm=self.batch_norm
+            # Use the advanced SENet for fully connected features
+            return SENet(
+                channel=self.final_feature_size,
+                reduction=2,
+                force_1d=True,
             )
         return None
 
     def _build_head(self):
         """Build the output head based on loss type"""
         # Standard Q-values: one output per action
-        return nn.Linear(self.final_feature_size, self.output_dim)
+        head = nn.Linear(self.final_feature_size, self.output_dim)
+        
+        return head
 
     def compute(self, inputs, role=""):
         """Compute Q-values for given inputs (SKRL interface)"""
@@ -168,28 +169,35 @@ class QNetwork(DeterministicMixin, Model):
         output = self.head(features)
         
         return output
+    
+    def act(
+        self, inputs: Mapping[str, Union[torch.Tensor, Any]], role: str = ""
+    ) -> Tuple[torch.Tensor, Union[torch.Tensor, None], Mapping[str, Union[torch.Tensor, Any]]]:
+        """Act deterministically in response to the state of the environment
 
-    def train_batch(self, batch):
-        """Train the model on a single batch of data"""
-        states = batch["states"]
-        actions = batch["actions"]
-        rewards = batch["rewards"]
-        next_states = batch["next_states"]
-        dones = batch["dones"]
+        :param inputs: Model inputs. The most common keys are:
 
-        # Forward pass
-        q_values = self.compute({"states": states})
-        next_q_values = self.compute({"states": next_states})
+                       - ``"states"``: state of the environment used to make the decision
+                       - ``"taken_actions"``: actions taken by the policy for the given states
+        :type inputs: dict where the values are typically torch.Tensor
+        :param role: Role play by the model (default: ``""``)
+        :type role: str, optional
 
-        # Compute loss
-        loss = self._compute_loss(q_values, actions, rewards, next_q_values, dones)
+        :return: Model output. The first component is the action to be taken by the agent.
+                 The second component is ``None``. The third component is a dictionary containing extra output values
+        :rtype: tuple of torch.Tensor, torch.Tensor or None, and dict
 
-        # Backward pass
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        Example::
 
-        return loss.item()
+            >>> # given a batch of sample states with shape (4096, 60)
+            >>> actions, _, outputs = model.act({"states": states})
+            >>> print(actions.shape, outputs)
+            torch.Size([4096, 1]) {}
+        """
+        # map from observations/states to actions
+        actions, outputs = self.compute(inputs, role)
+
+        return actions, None, outputs
 
     def summary(self, input_size=None):
         """Print model summary"""
@@ -228,9 +236,9 @@ class TestQNetwork(nn.Module):
         self.layer_sizes = layer_sizes
 
         # Build backbone, attention, head (same as QNetwork)
-        self.backbone = self._build_backbone()
-        self.attention = self._build_attention() if self.use_attention else None
-        self.head = self._build_head()
+        self.backbone = self._build_backbone().to(self.device)
+        self.attention = self._build_attention().to(self.device) if self.use_attention else None
+        self.head = self._build_head().to(self.device)
 
         # Load weights
         self._load_my_model(model_path)
@@ -290,18 +298,20 @@ class TestQNetwork(nn.Module):
     def _build_attention(self):
         """Build attention mechanism using improved SENet"""
         if self.use_attention:
-            # Use the advanced SENetFC for fully connected features
-            return SENetFC(
-                feature_dim=self.final_feature_size,
-                reduction=16,
-                use_layer_norm=self.batch_norm
+            # Use the advanced SENet for fully connected features
+            return SENet(
+                channel=self.final_feature_size,
+                reduction=2,
+                force_1d=True,
             )
         return None
 
     def _build_head(self):
         """Build the output head based on loss type"""
         # Standard Q-values: one output per action
-        return nn.Linear(self.final_feature_size, self.output_dim)
+        head = nn.Linear(self.final_feature_size, self.output_dim)
+        
+        return head
 
     def forward(self, x):
         # Backbone feature extraction
