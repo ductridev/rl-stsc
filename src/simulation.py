@@ -180,13 +180,15 @@ class Simulation(SUMO):
         """Property to access SKRL models for compatibility"""
         return self.agent_manager.models
 
-    def save(self, path: str):
+    def save(self):
         """Save all SKRL models to a path"""
-        self.agent_manager.save_models(path)
+        if self.path:
+            self.agent_manager.save_models(self.path)
 
-    def save_checkpoint(self, path: str, episode: int = None):
+    def save_checkpoint(self, episode: int = None):
         """Save all SKRL model checkpoints"""
-        self.agent_manager.save_checkpoints(path, episode)
+        if self.path:
+            self.agent_manager.save_checkpoints(self.path, episode)
 
     def initState(self):
         """Initialize simulation state for all traffic lights"""
@@ -245,9 +247,7 @@ class Simulation(SUMO):
             self.dqn_action_count[tl_id] = 0
         
         # Get DQN agent's action preference
-        dqn_action = self.agent_manager.select_action(tl_id, state, self.step, 10, desra_phase_idx)
-
-        # print(f"State for TL {tl_id}: {state}, DQN: {dqn_action}")
+        dqn_action = self.agent_manager.select_action(tl_id, state, self.global_step, 10, desra_phase_idx)
 
         return int(dqn_action)
         
@@ -306,7 +306,7 @@ class Simulation(SUMO):
     ):
         """Store transition in agent's memory"""
         self.agent_manager.store_transition(
-            tl_id, state, action, reward, next_state, done, self.step, self.green_time
+            tl_id, state, action, reward, next_state, done, self.global_step, self.green_time
         )
 
     def run(self, episode: int):
@@ -567,7 +567,7 @@ class Simulation(SUMO):
                     st["green_time_remaining"] -= 1
 
                 # Post-interaction before do new interaction
-                self.agent_manager.post_interaction(tl_id, self.step, self.max_steps)
+                self.agent_manager.post_interaction(tl_id, self.global_step, self.max_steps)
 
                 # Periodic metric flushing
                 if self.step > 0 and self.step % 60 == 0:
@@ -814,11 +814,16 @@ class Simulation(SUMO):
 
         flat_state = [f for phase_features in state_vector for f in phase_features]
 
+        # Current phase to index
+        current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)
+
+        # flat_state.extend([current_phase_idx, best_phase_idx])
+
         # assert (
         #     len(state_vector) == self.agent_cfg["num_states"]
         # ), f"State vector length {len(state_vector)} does not match input_dim {self.agent_cfg['num_states']}"
 
-        return np.array(flat_state, dtype=np.float32), desra_phase_idx
+        return np.array(flat_state, dtype=np.float32), best_phase_idx
     
     def choose_best_phase(self, state_vector, desra_phase_idx):
         """

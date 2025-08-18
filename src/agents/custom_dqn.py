@@ -211,31 +211,54 @@ class DQN(Agent):
 
         if not self._exploration_timesteps:
             return (
-                torch.argmax(self.q_network.act({"states": states}, role="q_network")[0], dim=1, keepdim=True),
+                torch.argmax(self.q_network.random_act({"states": states}, role="q_network")[0], dim=1, keepdim=True),
                 None,
                 None,
             )
 
-        # sample random actions
-        # actions = self.q_network.random_act({"states": states}, role="q_network")[0]
-        actions = torch.full((states.shape[0], 1), desra_phase_idx, dtype=torch.int64, device=self.device)
+        # Initialize actions with proper random values for exploration
+        # actions = torch.full((states.shape[0], 1), desra_phase_idx, dtype=torch.int64, device=self.device)
+        actions = torch.randint(0, self.action_space.n if hasattr(self.action_space, 'n') else 4, 
+                               (states.shape[0], 1), dtype=torch.int64, device=self.device)
+
+        # During random exploration phase, return random actions
         if timestep < self._random_timesteps:
             return actions, None, None
-
-        # sample actions with epsilon-greedy policy
+        
+        # Calculate epsilon for epsilon-greedy policy
         epsilon = self._exploration_final_epsilon + (
             self._exploration_initial_epsilon - self._exploration_final_epsilon
         ) * math.exp(-1.0 * timestep / self._exploration_timesteps)
 
-        indexes = (torch.rand(states.shape[0], device=self.device) >= epsilon).nonzero().view(-1)
-        if indexes.numel():
+        # Determine which actions should be chosen by the model (exploitation)
+        # vs which should remain random (exploration)
+        random_mask = torch.rand(states.shape[0], device=self.device) < epsilon
+        exploit_mask = ~random_mask
+        exploit_indexes = exploit_mask.nonzero().view(-1)
+
+        print(f"Timestep: {timestep}, Epsilon: {epsilon:.4f}")
+        print(f"Exploration actions: {random_mask.sum().item()}/{states.shape[0]}")
+        print(f"Exploitation actions: {exploit_mask.sum().item()}/{states.shape[0]}")
+        
+        # For exploitation actions, use Q-network predictions
+        if exploit_indexes.numel() > 0:
             with torch.autocast(device_type=self._device_type, enabled=self._mixed_precision):
-                actions[indexes] = torch.argmax(
-                    self.q_network.act({"states": states[indexes]}, role="q_network")[0], dim=1, keepdim=True
-                )
+                q_values, log, adds = self.q_network.act({"states": states[exploit_indexes]}, role="q_network")
+
+                print(f"Q-values shape: {q_values.shape}")
+                print(f"Q-values (first 3): {q_values[:3] if q_values.shape[0] >= 3 else q_values}")
+
+                predicted_actions = torch.argmax(q_values, dim=1, keepdim=True)
+                actions[exploit_indexes] = predicted_actions
+                
+                print(f"Predicted actions: {predicted_actions.view(-1)}")
 
         # record epsilon
         self.track_data("Exploration / Exploration epsilon", epsilon)
+
+        print(f"After: {actions.view(-1)}")
+
+        print(f"State: {states}, DQN: {actions}")
 
         return actions, None, None
 
@@ -334,6 +357,10 @@ class DQN(Agent):
 
         start = time.time()
 
+        if len(self.memory) < self._batch_size:
+            print(f"Not enough samples in memory to update agent at timestep {timestep}")
+            return
+
         # gradient steps
         for gradient_step in range(self._gradient_steps):
 
@@ -345,7 +372,7 @@ class DQN(Agent):
                 sampled_next_states,
                 sampled_terminated,
                 sampled_truncated,
-            ) = self.memory.sample(names=self.tensors_names, batch_size=self._batch_size)[0]
+            ) = self.memory.sample(names=self.tensors_names, batch_size=self._batch_size, sequence_length=3)[0]
 
             with torch.autocast(device_type=self._device_type, enabled=self._mixed_precision):
 
@@ -373,7 +400,7 @@ class DQN(Agent):
                     index=sampled_actions.long(),
                 )
 
-                q_network_loss = F.huber_loss(q_values, target_values)
+                q_network_loss = F.huber_loss(q_values, target_values, delta=0.5)
 
             # optimize Q-network
             self.optimizer.zero_grad()
@@ -386,7 +413,7 @@ class DQN(Agent):
             self.scaler.update()
 
             # update target network
-            if not timestep % self._target_update_interval:
+            if not gradient_step % self._target_update_interval:
                 self.target_q_network.update_parameters(self.q_network, polyak=self._polyak)
 
             # update learning rate
@@ -404,4 +431,4 @@ class DQN(Agent):
                 self.track_data("Learning / Learning rate", self.scheduler.get_last_lr()[0])
 
         end = time.time()
-        print(f"Training took {end - start} seconds")
+        print(f"Training took {end - start} seconds - Loss: {q_network_loss.item()} - Learning Rate: {self.scheduler.get_last_lr()[0]}")

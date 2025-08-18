@@ -3,12 +3,13 @@ SKRL agent setup and management for traffic light control.
 """
 
 import torch
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, PolynomialLR, LinearLR
 from torch.optim import Adam
 import numpy as np
 import gymnasium as gym
 from typing import Dict, List, Tuple, Optional
 from memory_palace import MemoryPalace
+from skrl.memories.torch import RandomMemory
 from skrl.agents.torch.dqn import DQN_DEFAULT_CONFIG
 import sys
 import os
@@ -142,7 +143,7 @@ class SKRLAgentManager:
                 "terminated",
                 "truncated",
             ]
-            memory = MemoryPalace(
+            memory = RandomMemory(
                 memory_size=self.sim.memory_size[1],
                 num_envs=1,
                 device=self.device,
@@ -182,21 +183,23 @@ class SKRLAgentManager:
                     "learning_rate": self.agent_cfg.get("model", {}).get(
                         "learning_rate", 0.001
                     ),
-                    "learning_rate_scheduler": ExponentialLR,
+                    "learning_rate_scheduler": LinearLR,
                     "learning_rate_scheduler_kwargs": {
-                        "gamma": self.agent_cfg.get(
-                            "gamma", 0.99
-                        )
+                        "start_factor": 0.05,
+                        "total_iters": 1000,
                     },
                     "mixed_precision": True,
                     "discount_factor": self.agent_cfg.get(
                         "gamma", 0.99
                     ),  # Use correct SKRL parameter name
                     "batch_size": self.agent_cfg.get("model", {}).get(
-                        "batch_size", 256
+                        "batch_size", 64
                     ),  # Match config value
-                    "learning_starts": 0,  # Wait for more experience before training
-                    "target_update_interval": self.updating_target_network_steps * 3,  # Use correct SKRL parameter name
+                    "random_timesteps": self.sim.max_steps,
+                    "learning_starts": self.agent_cfg.get("model", {}).get(
+                        "batch_size", 64
+                    ) * 5,  # Wait for more experience before training
+                    "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
                     "exploration": {
                         "initial_epsilon": self.agent_cfg.get("model", {}).get(
                             "initial_epsilon", 0.95
@@ -211,7 +214,7 @@ class SKRLAgentManager:
                     },
                     "polyak": 1,  # Slower target network updates for stability
                     "gradient_steps": 1000,  # 1000 gradient steps per update for stability
-                    "update_interval": self.updating_target_network_steps,  # Update every timestep (controlled by our batch training)
+                    "update_interval": self.sim.max_steps,  # Update every timestep (controlled by our batch training)
                 }
             )
 
