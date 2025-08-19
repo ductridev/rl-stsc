@@ -13,6 +13,7 @@ from sim_utils.traffic_metrics import TrafficMetrics, VehicleCompletionTracker, 
 from visualization import Visualization
 from normalizer import Normalizer
 from .sumo import SUMO
+from sim_utils.phase_manager import index_to_action, phase_to_index
 from accident_manager import AccidentManager
 from vehicle_tracker import VehicleTracker
 
@@ -75,6 +76,7 @@ class ActuatedSimulation(SUMO):
         self.waiting_time_normalizer = Normalizer()
 
         self.step = 0
+        self.actions_map = {}
 
         # Traffic metrics (same structure as SKRL simulation)
         self.queue_length = {}
@@ -82,7 +84,7 @@ class ActuatedSimulation(SUMO):
         self.travel_delay = {}
         self.travel_time = {}
         self.waiting_time = {}
-        self.phase = {}  # Track current phase for switch penalty
+        self.phase = {}  # Track phases
 
         self.history = {
             "reward": {},
@@ -107,10 +109,17 @@ class ActuatedSimulation(SUMO):
             self.travel_delay[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
             self.waiting_time[traffic_light_id] = 0
-            self.phase[traffic_light_id] = traffic_light["phase"][0]  # Initialize with first phase
+            self.phase[traffic_light_id] = {}
+            for phase in traffic_light["phase"]:
+                self.phase[traffic_light_id][phase] = 0
 
             for key in self.history:
                 self.history[key][traffic_light_id] = []
+
+            # Initialize the action map
+            self.actions_map[traffic_light_id] = {}
+            for i, phase in enumerate(traffic_light["phase"]):
+                self.actions_map[traffic_light_id][i] = {"phase": phase}
 
     def _init_tl_states(self, actuated_mode=True):
         """
@@ -309,19 +318,52 @@ class ActuatedSimulation(SUMO):
         if st["green_time_remaining"] > 0:
             st["green_time_remaining"] -= 1
 
-        # Check if maximum green time exceeded (force switch)
-        phase_duration = self.step - st["phase_start_time"]
-        if phase_duration >= self.max_green_time:
-            # print(f"TL {tl_id}: Maximum green time ({self.max_green_time}s) reached - forcing phase change")
-            should_continue = False
-            reason = "max_green_exceeded"
-        else:
-            # Apply research-standard extension logic
-            should_continue, reason = self.should_extend_green_phase(tl, st)
+        should_change_phase = None
 
-        if not should_continue:
-            # Time to switch phases
-            new_phase_idx = self.select_next_phase(tl, st["current_phase_index"])
+        for phase in tl["phase"]:
+            if self.phase[tl_id][phase] > 6:
+                should_change_phase = phase
+                break
+
+        # Check if we should change to the phase never call last 6
+        if should_change_phase is None:
+            # Check if maximum green time exceeded (force switch)
+            phase_duration = self.step - st["phase_start_time"]
+            if phase_duration >= self.max_green_time:
+                # print(f"TL {tl_id}: Maximum green time ({self.max_green_time}s) reached - forcing phase change")
+                should_continue = False
+                reason = "max_green_exceeded"
+            else:
+                # Apply research-standard extension logic
+                should_continue, reason = self.should_extend_green_phase(tl, st)
+
+            if not should_continue:
+                # Time to switch phases
+                new_phase_idx = self.select_next_phase(tl, st["current_phase_index"])
+                
+                # print(f"TL {tl_id}: Switching from phase {st['current_phase_index']} to {new_phase_idx} (reason: {reason})")
+                
+                # Calculate reward for the completed phase
+                self._update_metrics_and_reward(tl, st)
+                
+                # Start yellow phase transition
+                st["current_phase_index"] = new_phase_idx
+                st["in_yellow"] = True
+                st["yellow_time_remaining"] = self.interphase_duration
+                
+                # Apply yellow phase (replace G with y)
+                current_phase = st["phase"]
+                yellow_phase = current_phase.replace("G", "y")
+                traci.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
+                
+                # Reset extension tracking
+                st["waiting_for_extension"] = False
+                st["extension_counter"] = 0
+                self.vehicles_detected_during_extension[tl_id] = False
+
+        else:
+            # Force switch to the phase that has not been called in the last X steps
+            new_phase_idx = phase_to_index(should_change_phase, self.actions_map[tl["id"]], 0)
             
             # print(f"TL {tl_id}: Switching from phase {st['current_phase_index']} to {new_phase_idx} (reason: {reason})")
             
@@ -361,9 +403,6 @@ class ActuatedSimulation(SUMO):
         reward = self.get_reward(tl_id, st["phase"])
         self.history["reward"][tl_id].append(reward)
 
-        # Update phase tracking
-        self.phase[tl_id] = st["phase"]
-
         # Reset phase metrics
         for key in ["travel_delay_sum", "travel_time_sum", "outflow", "queue_length", "waiting_time"]:
             st[key] = 0
@@ -372,6 +411,12 @@ class ActuatedSimulation(SUMO):
         """Collect traffic metrics for current step"""
         tl_id = tl["id"]
         current_phase = st["phase"]
+
+        for phase in tl["phase"]:
+            if phase != current_phase:
+                self.phase[tl_id][phase] += 1
+            else:
+                self.phase[tl_id][phase] = 0
 
         # Calculate metrics
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
@@ -382,7 +427,6 @@ class ActuatedSimulation(SUMO):
         sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
         sum_density = TrafficMetrics.get_sum_density(tl)
         sum_queue_length = TrafficMetrics.get_sum_queue_length(tl)
-        sum_waiting_time = TrafficMetrics.get_sum_waiting_time(tl)
         mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
         stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
         
@@ -400,10 +444,10 @@ class ActuatedSimulation(SUMO):
         st["travel_delay_sum"] = sum_travel_delay
         st["travel_time_sum"] = sum_travel_time
         st["queue_length"] = sum_queue_length
-        st["waiting_time"] = sum_waiting_time
+        st["waiting_time"] = mean_waiting_time
 
-        # Every 60 steps, flush step‐averages into history
-        if self.step % 60 == 0:
+        # Every 300 steps, flush step‐averages into history
+        if self.step % 300 == 0:
             for key, hist in [
                 ("delay", "travel_delay"),
                 ("time", "travel_time"),
@@ -412,14 +456,14 @@ class ActuatedSimulation(SUMO):
                 ("waiting", "waiting_time"),
                 ("stopped_vehicles", "stopped_vehicles"),
             ]:
-                avg = st["step"][key] / 60.0
+                avg = st["step"][key] / 300
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
 
             # Append outflow before resetting
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             
-            # Add junction throughput to history (sum over 60 steps)
+            # Add junction throughput to history (sum over 300 steps)
             if tl_id not in self.history["junction_throughput"]:
                 self.history["junction_throughput"][tl_id] = []
             self.history["junction_throughput"][tl_id].append(st["step"]["junction_throughput"])
@@ -446,7 +490,8 @@ class ActuatedSimulation(SUMO):
         # Main simulation loop
         while self.step < self.max_steps:
             # Step simulator
-            self.accident_manager.create_accident(current_step=self.step)
+            if self.accident_manager:
+                self.accident_manager.create_accident(current_step=self.step)
             traci.simulationStep()
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()
