@@ -766,21 +766,19 @@ class Simulation(SUMO):
             highest_queue_length = 0
 
             lane_waiting_time = 0.0
-            total_vehicle_count = 0
             for det in movements:
                 for veh in traci.lanearea.getLastStepVehicleIDs(det):
                     # Get cumulative waiting time for all vehicles in lane
                     lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
                 # Get number of vehicles currently in lane
-                total_vehicle_count += traci.lanearea.getLastStepVehicleNumber(det)
+                num_vehicles += traci.lanearea.getLastStepVehicleNumber(det)
 
-                num_vehicles += TrafficMetrics.get_num_vehicles(det)
                 queue_length = TrafficMetrics.get_queue_length(det)
                 highest_queue_length = queue_length if queue_length > highest_queue_length else highest_queue_length
 
             # Fill per-phase features
             state_vector.append([
-                lane_waiting_time / total_vehicle_count if total_vehicle_count > 0 else 0,
+                lane_waiting_time / num_vehicles if num_vehicles > 0 else 0,
                 num_vehicles,
                 highest_queue_length,
             ])
