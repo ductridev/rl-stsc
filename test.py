@@ -374,7 +374,8 @@ def test_actuated_simulation(config, path):
         accident_manager = AccidentManager(
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
-            junction_id_list=[junction["id"] for junction in config['accident']['junction']]
+            # junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
     
     # Initialize actuated simulation
@@ -574,7 +575,8 @@ def test_dqn_simulation(config, path, specific_model_file=None):
         accident_manager = AccidentManager(
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
-            junction_id_list=[junction["id"] for junction in config['accident']['junction']]
+            # junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
     
     # Initialize DQN simulation in testing mode
