@@ -759,27 +759,30 @@ class Simulation(SUMO):
         """Get state representation for a traffic light phase"""
         state_vector = []
 
-        for phase_str in tl["phase"]:
+        for phase_idx, phase_str in enumerate(tl["phase"]):
             movements = self.get_movements_from_phase(tl, phase_str)
 
-            # Skip phases with no movements (safety check)
-            if not movements:
-                continue
-
-            waiting_time = 0
             num_vehicles = 0
-            queue_length = 0
+            highest_queue_length = 0
 
-            for detector_id in movements:
-                waiting_time += TrafficMetrics.get_waiting_time(detector_id)
-                num_vehicles += TrafficMetrics.get_num_vehicles(detector_id)
-                queue_length += TrafficMetrics.get_queue_length(detector_id)
+            lane_waiting_time = 0.0
+            total_vehicle_count = 0
+            for det in movements:
+                for veh in traci.lanearea.getLastStepVehicleIDs(det):
+                    # Get cumulative waiting time for all vehicles in lane
+                    lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
+                # Get number of vehicles currently in lane
+                total_vehicle_count += traci.lanearea.getLastStepVehicleNumber(det)
 
-            # Append per-phase features (will add desra flag later)
+                num_vehicles += TrafficMetrics.get_num_vehicles(det)
+                queue_length = TrafficMetrics.get_queue_length(det)
+                highest_queue_length = queue_length if queue_length > highest_queue_length else highest_queue_length
+
+            # Fill per-phase features
             state_vector.append([
-                waiting_time,
+                lane_waiting_time / total_vehicle_count if total_vehicle_count > 0 else 0,
                 num_vehicles,
-                queue_length,
+                highest_queue_length,
             ])
 
         q_arr_dict = self._compute_arrival_flows()
@@ -882,33 +885,33 @@ class Simulation(SUMO):
         #     self.prev_local_queue = {}
         
         # First calculation for this TL returns 0 (no baseline)
-        if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
-            reward = 0.0
-        else:
-            # Reward = reduction in waiting time and queue length (positive if decreased)
-            waiting_reduction = self.prev_local_wait[tl_id] - current_local_wait
-            # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
+        # if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
+        #     reward = 0.0
+        # else:
+        # Reward = reduction in waiting time and queue length (positive if decreased)
+        # waiting_reduction = current_local_wait
+        # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
 
-            # waiting_norm = self.waiting_time_normalizer.normalize(waiting_reduction)
-            # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
-            
-            # Scale rewards based on magnitude to improve learning signal
-            # Use square root to reduce impact of extreme values
-            # waiting_reward = 0.0
-            # if waiting_reduction > 0:
-            #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
-            # elif waiting_reduction < 0:
-            #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
-            
-            # queue_reward = 0.0
-            # if queue_reduction > 0:
-            #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
-            # elif queue_reduction < 0:
-            #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
-            
-            # Combined reward: waiting time has higher weight than queue length
-            # reward = waiting_reward + queue_reward
-            reward = -waiting_reduction
+        # waiting_norm = self.waiting_time_normalizer.normalize(current_local_wait)
+        # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
+        
+        # Scale rewards based on magnitude to improve learning signal
+        # Use square root to reduce impact of extreme values
+        # waiting_reward = 0.0
+        # if waiting_reduction > 0:
+        #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
+        # elif waiting_reduction < 0:
+        #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
+        
+        # queue_reward = 0.0
+        # if queue_reduction > 0:
+        #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
+        # elif queue_reduction < 0:
+        #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
+        
+        # Combined reward: waiting time has higher weight than queue length
+        # reward = waiting_reward + queue_reward
+        reward = -current_local_wait
         
         # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait

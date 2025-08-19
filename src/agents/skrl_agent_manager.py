@@ -3,7 +3,7 @@ SKRL agent setup and management for traffic light control.
 """
 
 import torch
-from torch.optim.lr_scheduler import ExponentialLR, PolynomialLR, LinearLR
+from skrl.resources.schedulers.torch import KLAdaptiveLR
 from torch.optim import Adam
 import numpy as np
 import gymnasium as gym
@@ -21,6 +21,7 @@ sys.path.insert(0, parent_dir)
 
 from models.q_network import QNetwork, MLP
 from environment.traffic_light_env import TrafficLightEnvironment
+from skrl.resources.preprocessors.torch import RunningStandardScaler
 # from agents.custom_dqn import CustomDQN
 # from skrl.agents.torch.dqn import DQN, DDQN
 from agents.custom_dqn import DQN
@@ -35,6 +36,7 @@ class SKRLAgentManager:
         traffic_lights: List[Dict],
         updating_target_network_steps: int = 100,
         device: torch.device = None,
+        evaluation_mode: bool = False,
     ):
         self.sim = simulation_instance
         self.agent_cfg = agent_cfg
@@ -43,6 +45,7 @@ class SKRLAgentManager:
         self.device = device or torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
+        self.evaluation_mode = evaluation_mode
 
         # Initialize containers
         self.agents: dict[str, DQN] = {}
@@ -51,14 +54,6 @@ class SKRLAgentManager:
 
         # Setup agents
         self._setup_agents()
-
-        # Additional configuration for batch training
-        self._training_interval = (
-            simulation_instance.training_steps
-        )  # decisions between batch updates
-        self._batch_updates = self.agent_cfg.get(
-            "batch_updates", 10
-        )  # gradient batches per training interval
 
     def _create_model(self, observation_space, action_space, tl_id):
         """Create Q-network model with advanced configuration support"""
@@ -69,7 +64,7 @@ class SKRLAgentManager:
             "observation_space": observation_space,
             "action_space": action_space,
             "device": str(self.device),  # Convert device to string for QNetwork
-            "input_dim": observation_space.shape[0],
+            "input_dim": observation_space.shape,
             "output_dim": action_space.n,
             "num_layers": model_config.get("num_layers", 3),
             "hidden_size": model_config.get("hidden_size", 256),
@@ -95,6 +90,11 @@ class SKRLAgentManager:
 
         # Model type selection (for future extensibility)
         model_type = model_config.get("type", "qnetwork")
+
+        # return MLP(observation_space=observation_space,
+        #      action_space=action_space,
+        #      device=self.device,
+        #      clip_actions=False).to(self.device)
 
         if model_type == "qnetwork":
             return QNetwork(**model_params).to(self.device)
@@ -144,25 +144,10 @@ class SKRLAgentManager:
                 "truncated",
             ]
             memory = RandomMemory(
-                memory_size=self.sim.memory_size[1],
+                memory_size= 10000 if self.evaluation_mode else self.sim.memory_size[1],
                 num_envs=1,
                 device=self.device,
             )
-
-            # Create tensors dictionary and use create_tensor to register the tensor names properly
-            print(f"Initializing memory for {tl_id}...")
-
-            # SKRL requires tensors to be registered using create_tensor
-            # memory.create_tensor(
-            #     name="states", size=observation_space_size, dtype=torch.float32
-            # )
-            # memory.create_tensor(name="actions", size=1, dtype=torch.long)
-            # memory.create_tensor(name="rewards", size=1, dtype=torch.float32)
-            # memory.create_tensor(
-            #     name="next_states", size=observation_space_size, dtype=torch.float32
-            # )
-            # memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
-            # memory.create_tensor(name="truncated", size=1, dtype=torch.bool)
 
             self.memories[tl_id] = memory
 
@@ -180,15 +165,19 @@ class SKRLAgentManager:
             # Update with our specific configuration
             dqn_cfg.update(
                 {
-                    "learning_rate": self.agent_cfg.get("model", {}).get(
-                        "learning_rate", 0.001
-                    ),
-                    "learning_rate_scheduler": LinearLR,
+                    "learning_rate": min(self.agent_cfg.get("model", {}).get(
+                        "learning_rate", 0.0001
+                    ), 0.0001),  # Lower learning rate to prevent instability
+                    "learning_rate_scheduler": KLAdaptiveLR,
                     "learning_rate_scheduler_kwargs": {
-                        "start_factor": 0.05,
-                        "total_iters": 1000,
+                        "kl_threshold": 0.01,
                     },
-                    "mixed_precision": True,
+                    "state_preprocessor": RunningStandardScaler,
+                    "state_preprocessor_kwargs": {
+                        "size": observation_space.shape[1], 
+                        "device": self.device
+                    },
+                    "mixed_precision": True,  # Disable mixed precision to prevent NaN issues
                     "discount_factor": self.agent_cfg.get(
                         "gamma", 0.99
                     ),  # Use correct SKRL parameter name
@@ -201,20 +190,20 @@ class SKRLAgentManager:
                     ) * 5,  # Wait for more experience before training
                     "target_update_interval": self.updating_target_network_steps,  # Use correct SKRL parameter name
                     "exploration": {
-                        "initial_epsilon": self.agent_cfg.get("model", {}).get(
+                        "initial_epsilon": 0.0 if self.evaluation_mode else self.agent_cfg.get("model", {}).get(
                             "initial_epsilon", 0.95
                         ),
-                        "final_epsilon": self.agent_cfg.get("model", {}).get(
+                        "final_epsilon": 0.0 if self.evaluation_mode else self.agent_cfg.get("model", {}).get(
                             "min_epsilon", 0.01
                         ),
-                        "timesteps": self.agent_cfg.get("model", {}).get(
+                        "timesteps": 0 if self.evaluation_mode else self.agent_cfg.get("model", {}).get(
                             "decay_episode", 90
                         )
                         * self.sim.max_steps,  # Decay over 90 episodes, stay at min for episodes 90-100
                     },
                     "polyak": 1,  # Slower target network updates for stability
-                    "gradient_steps": 1000,  # 1000 gradient steps per update for stability
-                    "update_interval": self.sim.max_steps,  # Update every timestep (controlled by our batch training)
+                    "gradient_steps": 0 if self.evaluation_mode else 500,  # No gradient steps in evaluation mode
+                    "update_interval": 0 if self.evaluation_mode else self.sim.max_steps,  # No updates in evaluation mode
                 }
             )
 
@@ -243,6 +232,12 @@ class SKRLAgentManager:
             )
 
             agent.init()
+
+            # Set models to evaluation mode if in evaluation mode
+            if self.evaluation_mode:
+                agent.models["q_network"].eval()
+                agent.models["target_q_network"].eval()
+                print(f"Agent {tl_id} set to evaluation mode (no training, epsilon=0)")
 
             print(f"Memory tensors registered: {memory.get_tensor_names()}")
 
@@ -279,7 +274,11 @@ class SKRLAgentManager:
         state_tensor = torch.Tensor(state).unsqueeze(0).to(self.device)
 
         # SKRL's DQN agent.act() returns: (tensor([[action]], device='cuda:0'), None, None)
-        action_result = agent.act(state_tensor, step, max_steps, desra_phase_idx)
+        if self.evaluation_mode:
+            with torch.no_grad():
+                action_result = agent.act(state_tensor, step, max_steps, desra_phase_idx)
+        else:
+            action_result = agent.act(state_tensor, step, max_steps, desra_phase_idx)
 
         # Extract action from the tuple - first element is the action tensor
         if isinstance(action_result, tuple) and len(action_result) >= 1:
@@ -317,10 +316,10 @@ class SKRLAgentManager:
     ):
         """Store transition in agent's memory"""
         # Convert to tensors with correct data types
-        state_tensor = torch.FloatTensor(state).to(self.device)
-        next_state_tensor = torch.FloatTensor(next_state).to(self.device)
+        state_tensor = torch.LongTensor(state).to(self.device)
+        next_state_tensor = torch.LongTensor(next_state).to(self.device)
         action_tensor = torch.LongTensor([action]).to(self.device)
-        reward_tensor = torch.FloatTensor([reward]).to(self.device)
+        reward_tensor = torch.LongTensor([reward]).to(self.device)
         # Ensure terminated and truncated are boolean tensors
         terminated_tensor = torch.tensor([done], dtype=torch.bool, device=self.device)
         truncated_tensor = torch.tensor([False], dtype=torch.bool, device=self.device)
@@ -351,6 +350,29 @@ class SKRLAgentManager:
         """Load all SKRL models with improved file detection"""
         import glob
 
+        # Handle case where path is a full file path instead of directory
+        if path.endswith('.pt'):
+            # Extract directory and try to infer episode from filename
+            directory = os.path.dirname(path)
+            filename = os.path.basename(path)
+            
+            # Try to extract episode number from filename
+            if '_episode_' in filename:
+                try:
+                    episode_part = filename.split('_episode_')[1]
+                    if episode_part.endswith('.pt'):
+                        episode_part = episode_part[:-3]  # Remove .pt
+                    # Extract just the episode number (before any additional suffix)
+                    episode_extracted = int(episode_part.split('_')[0])
+                    if episode is None:
+                        episode = episode_extracted
+                        print(f"Extracted episode {episode} from filename: {filename}")
+                except (ValueError, IndexError):
+                    pass
+            
+            path = directory
+            print(f"Converted full file path to directory: {path}")
+
         loaded_count = 0
         for tl_id, agent in self.agents.items():
             model_loaded = False
@@ -369,6 +391,8 @@ class SKRLAgentManager:
                         model_patterns = [
                             f"{path}/skrl_model_{tl_id}_episode_{episode}.pt",
                             f"{path}/skrl_model_{tl_id}_episode_{episode}_BEST.pt",
+                            f"{path}/skrl_model_{tl_id}_episode_{episode}",  # Without .pt extension
+                            f"{path}/_{tl_id}_checkpoint.pt",
                         ]
                 else:
                     # Try to load in order of preference
@@ -377,6 +401,7 @@ class SKRLAgentManager:
                         f"{path}/skrl_model_{tl_id}_CURRENT_BEST.pt",
                         f"{path.rstrip('/')}/skrl_model_{tl_id}_GLOBAL_BEST.pt",
                         f"{path.rstrip('/')}/skrl_model_{tl_id}_CURRENT_BEST.pt",
+                        f"{path.rstrip('/')}/_{tl_id}_checkpoint.pt",
                     ]
 
                     # Also try to find any BEST models with episode numbers
@@ -405,16 +430,21 @@ class SKRLAgentManager:
                     if any_models:
                         model_patterns.extend(any_models)
 
+                    # Also try models without .pt extension (like skrl_model_NgatuNorthEast_episode_1)
+                    any_models_no_ext = glob.glob(
+                        f"{path.rstrip('/')}/skrl_model_{tl_id}_episode_*"
+                    )
+                    # Filter out .pt files since they're already covered above
+                    any_models_no_ext = [f for f in any_models_no_ext if not f.endswith('.pt')]
+                    if any_models_no_ext:
+                        model_patterns.extend(any_models_no_ext)
+
                 # Try each pattern until one works
                 for model_path in model_patterns:
                     if os.path.exists(model_path):
                         try:
-                            # Load the state dict
-                            state_dict = torch.load(
-                                model_path, map_location=self.device
-                            )
-                            agent.models["q_network"].load_state_dict(state_dict)
-                            agent.models["target_q_network"].load_state_dict(state_dict)
+                            agent.models["q_network"].load_state_dict(torch.load(model_path))
+                            agent.models["target_q_network"].load_state_dict(torch.load(model_path))
 
                             print(
                                 f"Loaded model for {tl_id} from: {os.path.basename(model_path)}"
@@ -429,15 +459,25 @@ class SKRLAgentManager:
                 if not model_loaded:
                     print(f"No suitable model found for {tl_id} in {path}")
                     # List available files for debugging
-                    available_files = glob.glob(
+                    available_files_pt = glob.glob(
                         f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt"
                     )
-                    if available_files:
+                    available_files_no_ext = glob.glob(
+                        f"{path.rstrip('/')}/skrl_model_{tl_id}_*"
+                    )
+                    # Filter out .pt files from the no extension list
+                    available_files_no_ext = [f for f in available_files_no_ext if not f.endswith('.pt')]
+                    
+                    if available_files_pt:
                         print(
-                            f"   Available files: {[os.path.basename(f) for f in available_files]}"
+                            f"   Available .pt files: {[os.path.basename(f) for f in available_files_pt]}"
                         )
-                    else:
-                        print(f"   No .pt files found for {tl_id}")
+                    if available_files_no_ext:
+                        print(
+                            f"   Available files without .pt: {[os.path.basename(f) for f in available_files_no_ext]}"
+                        )
+                    if not available_files_pt and not available_files_no_ext:
+                        print(f"   No model files found for {tl_id}")
 
             except Exception as e:
                 print(f"Error loading model for {tl_id}: {e}")
@@ -454,7 +494,7 @@ class SKRLAgentManager:
     def save_checkpoints(self, path: str, episode: Optional[int] = None):
         """Save all SKRL model checkpoints"""
         for tl_id, agent in self.agents.items():
-            checkpoint_path = f"{path.replace('.pt', '')}_{tl_id}_checkpoint.pt"
+            checkpoint_path = f"{path.replace('.pt', '')}_{tl_id}_{episode}_checkpoint.pt"
             checkpoint = {
                 "model_state_dict": agent.models["q_network"].state_dict(),
                 "target_model_state_dict": agent.models[

@@ -183,9 +183,9 @@ class DQN(Agent):
 
         # create tensors in memory
         if self.memory is not None:
-            self.memory.create_tensor(name="states", size=self.observation_space, dtype=torch.float32)
-            self.memory.create_tensor(name="next_states", size=self.observation_space, dtype=torch.float32)
-            self.memory.create_tensor(name="actions", size=self.action_space, dtype=torch.int64)
+            self.memory.create_tensor(name="states", size=self.observation_space.shape, dtype=torch.float32, keep_dimensions=True)
+            self.memory.create_tensor(name="next_states", size=self.observation_space.shape, dtype=torch.float32, keep_dimensions=True)
+            self.memory.create_tensor(name="actions", size=self.action_space.shape, dtype=torch.int64, keep_dimensions=True)
             self.memory.create_tensor(name="rewards", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
             self.memory.create_tensor(name="truncated", size=1, dtype=torch.bool)
@@ -210,16 +210,20 @@ class DQN(Agent):
         states = self._state_preprocessor(states)
 
         if not self._exploration_timesteps:
+            q_values, log, adds = self.q_network.act({"states": states}, role="q_network")
+
+            predicted_actions = torch.argmax(q_values, dim=1, keepdim=True)
+
+            print(f"No explore predicted actions: {predicted_actions.view(-1)} - Q-values {q_values} - States: {states}")
             return (
-                torch.argmax(self.q_network.random_act({"states": states}, role="q_network")[0], dim=1, keepdim=True),
-                None,
-                None,
+                predicted_actions,
+                log,
+                adds,
             )
 
         # Initialize actions with proper random values for exploration
-        # actions = torch.full((states.shape[0], 1), desra_phase_idx, dtype=torch.int64, device=self.device)
-        actions = torch.randint(0, self.action_space.n if hasattr(self.action_space, 'n') else 4, 
-                               (states.shape[0], 1), dtype=torch.int64, device=self.device)
+        actions = torch.full((states.shape[0], 1), desra_phase_idx, dtype=torch.int64, device=self.device)
+        # actions = self.q_network.random_act({"states": states, "phase_mask": phase_mask}, role="q_network")[0]
 
         # During random exploration phase, return random actions
         if timestep < self._random_timesteps:
@@ -235,30 +239,20 @@ class DQN(Agent):
         random_mask = torch.rand(states.shape[0], device=self.device) < epsilon
         exploit_mask = ~random_mask
         exploit_indexes = exploit_mask.nonzero().view(-1)
-
-        print(f"Timestep: {timestep}, Epsilon: {epsilon:.4f}")
-        print(f"Exploration actions: {random_mask.sum().item()}/{states.shape[0]}")
-        print(f"Exploitation actions: {exploit_mask.sum().item()}/{states.shape[0]}")
         
         # For exploitation actions, use Q-network predictions
         if exploit_indexes.numel() > 0:
             with torch.autocast(device_type=self._device_type, enabled=self._mixed_precision):
                 q_values, log, adds = self.q_network.act({"states": states[exploit_indexes]}, role="q_network")
 
-                print(f"Q-values shape: {q_values.shape}")
-                print(f"Q-values (first 3): {q_values[:3] if q_values.shape[0] >= 3 else q_values}")
-
                 predicted_actions = torch.argmax(q_values, dim=1, keepdim=True)
                 actions[exploit_indexes] = predicted_actions
                 
-                print(f"Predicted actions: {predicted_actions.view(-1)}")
+                print(f"Timestep: {timestep}, Epsilon: {epsilon:.4f}")
+                print(f"Predicted actions: {predicted_actions} - Actions: {actions} - Q-values {q_values} - States: {states}")
 
         # record epsilon
         self.track_data("Exploration / Exploration epsilon", epsilon)
-
-        print(f"After: {actions.view(-1)}")
-
-        print(f"State: {states}, DQN: {actions}")
 
         return actions, None, None
 
@@ -400,7 +394,7 @@ class DQN(Agent):
                     index=sampled_actions.long(),
                 )
 
-                q_network_loss = F.huber_loss(q_values, target_values, delta=0.5)
+                q_network_loss = F.huber_loss(q_values, target_values)
 
             # optimize Q-network
             self.optimizer.zero_grad()
@@ -408,6 +402,8 @@ class DQN(Agent):
 
             if config.torch.is_distributed:
                 self.q_network.reduce_parameters()
+
+            torch.nn.utils.clip_grad_norm_(self.q_network.parameters(), max_norm=10.0)
 
             self.scaler.step(self.optimizer)
             self.scaler.update()
