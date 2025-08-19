@@ -148,12 +148,16 @@ class TrafficMetrics:
         """Get mean waiting time per vehicle for a traffic light"""
         total_waiting_time = 0.0
         total_vehicles = 0
+        non_stop_vehicles = 0
 
         for lane in traci.trafficlight.getControlledLanes(tl["id"]):
             lane_waiting_time = 0.0
             for veh in traci.lane.getLastStepVehicleIDs(lane):
                 # Get cumulative waiting time for all vehicles in lane
                 lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
+                if traci.vehicle.getAccumulatedWaitingTime(veh) == 0:
+                    non_stop_vehicles += 1
+                
             # Get number of vehicles currently in lane
             vehicle_count = traci.lane.getLastStepVehicleNumber(lane)
 
@@ -161,7 +165,7 @@ class TrafficMetrics:
             total_vehicles += vehicle_count
 
         # Return mean waiting time per vehicle
-        return total_waiting_time / total_vehicles if total_vehicles > 0 else 0.0
+        return total_waiting_time / (total_vehicles - non_stop_vehicles) if total_vehicles - non_stop_vehicles > 0 else 0.0
 
     @staticmethod
     def get_completed_vehicles_travel_time() -> float:
