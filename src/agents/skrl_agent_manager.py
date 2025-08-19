@@ -347,145 +347,90 @@ class SKRLAgentManager:
             torch.save(agent.models["q_network"].state_dict(), model_path)
 
     def load_models(self, path: str, episode: Optional[int] = None):
-        """Load all SKRL models with improved file detection"""
+        """Load all SKRL models - if path ends with .pt, load directly, otherwise search for models"""
         import glob
 
-        # Handle case where path is a full file path instead of directory
-        if path.endswith('.pt'):
-            # Extract directory and try to infer episode from filename
-            directory = os.path.dirname(path)
-            filename = os.path.basename(path)
-            
-            # Try to extract episode number from filename
-            if '_episode_' in filename:
-                try:
-                    episode_part = filename.split('_episode_')[1]
-                    if episode_part.endswith('.pt'):
-                        episode_part = episode_part[:-3]  # Remove .pt
-                    # Extract just the episode number (before any additional suffix)
-                    episode_extracted = int(episode_part.split('_')[0])
-                    if episode is None:
-                        episode = episode_extracted
-                        print(f"Extracted episode {episode} from filename: {filename}")
-                except (ValueError, IndexError):
-                    pass
-            
-            path = directory
-            print(f"Converted full file path to directory: {path}")
-
         loaded_count = 0
-        for tl_id, agent in self.agents.items():
-            model_loaded = False
-
-            # Try different loading strategies
-            try:
-                if episode is not None:
-                    if episode == "final":
-                        # Try to load final episode model
-                        model_patterns = [
-                            f"{path}/skrl_model_{tl_id}_episode_final.pt",
-                            f"{path}/skrl_model_{tl_id}_FINAL.pt",
-                        ]
+        
+        # If path ends with .pt, it's a direct file path
+        if path.endswith('.pt'):
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Model file not found: {path}")
+            
+            # Load the same model for all traffic lights
+            for tl_id, agent in self.agents.items():
+                try:
+                    checkpoint = torch.load(path)
+                    
+                    # Check if it's a checkpoint file (contains dictionary) or direct state_dict
+                    if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                        # It's a checkpoint file saved by save_checkpoints
+                        agent.models["q_network"].load_state_dict(checkpoint["model_state_dict"])
+                        if "target_model_state_dict" in checkpoint:
+                            agent.models["target_q_network"].load_state_dict(checkpoint["target_model_state_dict"])
+                        else:
+                            # Use same weights for target network if not saved separately
+                            agent.models["target_q_network"].load_state_dict(checkpoint["model_state_dict"])
+                        print(f"Loaded checkpoint for {tl_id} from: {os.path.basename(path)} (episode: {checkpoint.get('episode', 'unknown')})")
                     else:
-                        # Try to load specific episode or BEST model
-                        model_patterns = [
-                            f"{path}/skrl_model_{tl_id}_episode_{episode}.pt",
-                            f"{path}/skrl_model_{tl_id}_episode_{episode}_BEST.pt",
-                            f"{path}/skrl_model_{tl_id}_episode_{episode}",  # Without .pt extension
-                            f"{path}/_{tl_id}_checkpoint.pt",
-                        ]
-                else:
-                    # Try to load in order of preference
-                    model_patterns = [
-                        f"{path}/skrl_model_{tl_id}_GLOBAL_BEST.pt",
-                        f"{path}/skrl_model_{tl_id}_CURRENT_BEST.pt",
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_GLOBAL_BEST.pt",
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_CURRENT_BEST.pt",
-                        f"{path.rstrip('/')}/_{tl_id}_checkpoint.pt",
-                    ]
-
-                    # Also try to find any BEST models with episode numbers
-                    best_files = glob.glob(
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_episode_*_BEST.pt"
-                    )
-                    if best_files:
-                        # Sort by episode number (extract from filename)
+                        # It's a direct state_dict file
+                        agent.models["q_network"].load_state_dict(checkpoint)
+                        agent.models["target_q_network"].load_state_dict(checkpoint)
+                        print(f"Loaded model for {tl_id} from: {os.path.basename(path)}")
+                    loaded_count += 1
+                except Exception as e:
+                    print(f"Failed to load {path} for {tl_id}: {e}")
+        else:
+            # Search for models in the directory
+            for tl_id, agent in self.agents.items():
+                model_loaded = False
+                
+                # Search for any .pt model file for this traffic light
+                model_patterns = glob.glob(f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt")
+                # Also search for checkpoint files
+                checkpoint_patterns = glob.glob(f"{path.rstrip('/')}/_{tl_id}_*_checkpoint.pt")
+                model_patterns.extend(checkpoint_patterns)
+                
+                if model_patterns:
+                    # Try to load the first available model
+                    for model_path in model_patterns:
                         try:
-                            best_files.sort(
-                                key=lambda x: int(
-                                    x.split("_episode_")[1].split("_")[0]
-                                ),
-                                reverse=True,
-                            )
-                            model_patterns.insert(
-                                0, best_files[0]
-                            )  # Add latest BEST model at the front
-                        except (ValueError, IndexError):
-                            model_patterns.extend(best_files)
-
-                    # Finally, try any model for this traffic light
-                    any_models = glob.glob(
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt"
-                    )
-                    if any_models:
-                        model_patterns.extend(any_models)
-
-                    # Also try models without .pt extension (like skrl_model_NgatuNorthEast_episode_1)
-                    any_models_no_ext = glob.glob(
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_episode_*"
-                    )
-                    # Filter out .pt files since they're already covered above
-                    any_models_no_ext = [f for f in any_models_no_ext if not f.endswith('.pt')]
-                    if any_models_no_ext:
-                        model_patterns.extend(any_models_no_ext)
-
-                # Try each pattern until one works
-                for model_path in model_patterns:
-                    if os.path.exists(model_path):
-                        try:
-                            agent.models["q_network"].load_state_dict(torch.load(model_path))
-                            agent.models["target_q_network"].load_state_dict(torch.load(model_path))
-
-                            print(
-                                f"Loaded model for {tl_id} from: {os.path.basename(model_path)}"
-                            )
+                            checkpoint = torch.load(model_path)
+                            
+                            # Check if it's a checkpoint file or direct state_dict
+                            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                                # It's a checkpoint file
+                                agent.models["q_network"].load_state_dict(checkpoint["model_state_dict"])
+                                if "target_model_state_dict" in checkpoint:
+                                    agent.models["target_q_network"].load_state_dict(checkpoint["target_model_state_dict"])
+                                else:
+                                    agent.models["target_q_network"].load_state_dict(checkpoint["model_state_dict"])
+                                print(f"Loaded checkpoint for {tl_id} from: {os.path.basename(model_path)} (episode: {checkpoint.get('episode', 'unknown')})")
+                            else:
+                                # It's a direct state_dict
+                                agent.models["q_network"].load_state_dict(checkpoint)
+                                agent.models["target_q_network"].load_state_dict(checkpoint)
+                                print(f"Loaded model for {tl_id} from: {os.path.basename(model_path)}")
+                            
                             model_loaded = True
                             loaded_count += 1
                             break
                         except Exception as e:
                             print(f"Failed to load {model_path}: {e}")
                             continue
-
+                
                 if not model_loaded:
                     print(f"No suitable model found for {tl_id} in {path}")
-                    # List available files for debugging
-                    available_files_pt = glob.glob(
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt"
-                    )
-                    available_files_no_ext = glob.glob(
-                        f"{path.rstrip('/')}/skrl_model_{tl_id}_*"
-                    )
-                    # Filter out .pt files from the no extension list
-                    available_files_no_ext = [f for f in available_files_no_ext if not f.endswith('.pt')]
-                    
-                    if available_files_pt:
-                        print(
-                            f"   Available .pt files: {[os.path.basename(f) for f in available_files_pt]}"
-                        )
-                    if available_files_no_ext:
-                        print(
-                            f"   Available files without .pt: {[os.path.basename(f) for f in available_files_no_ext]}"
-                        )
-                    if not available_files_pt and not available_files_no_ext:
+                    available_files = glob.glob(f"{path.rstrip('/')}/skrl_model_{tl_id}_*.pt")
+                    checkpoint_files = glob.glob(f"{path.rstrip('/')}/_{tl_id}_*_checkpoint.pt")
+                    all_files = available_files + checkpoint_files
+                    if all_files:
+                        print(f"   Available files: {[os.path.basename(f) for f in all_files]}")
+                    else:
                         print(f"   No model files found for {tl_id}")
 
-            except Exception as e:
-                print(f"Error loading model for {tl_id}: {e}")
-
         if loaded_count > 0:
-            print(
-                f"Successfully loaded models for {loaded_count}/{len(self.agents)} traffic lights"
-            )
+            print(f"Successfully loaded models for {loaded_count}/{len(self.agents)} traffic lights")
         else:
             raise FileNotFoundError(f"Failed to load any models from {path}")
 
