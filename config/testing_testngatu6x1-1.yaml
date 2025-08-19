@@ -1,6 +1,6 @@
 simulation:
   gui: False
-  max_steps: 3600
+  max_steps: 7200
   episode_seed: 42
   interphase_duration: 3
 
@@ -309,3 +309,16 @@ accident:
   duration: 100
   junction:
     - id: "NgatuNorthEast"
+  detectors:
+    - id: "e2_50"
+    - id: "e2_51"
+    - id: "e2_4"
+    - id: "e2_1"
+    - id: "e2_0"
+    - id: "e2_5"
+    - id: "e2_53"
+    - id: "e2_52"
+    - id: "e2_2"
+    - id: "e2_54"
+    - id: "e2_55"
+    - id: "e2_3"
