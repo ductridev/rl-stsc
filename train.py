@@ -726,12 +726,12 @@ def generate_routes_if_needed(config_file, config, demand = "high", global_episo
         # else:
         generate_and_save_random_intervals(
             sumo_cfg_file=config["sumo_cfg_file"],
-            total_duration=7200,
-            min_interval=3600,
-            max_interval=3600,
+            total_duration=3600,
+            min_interval=360,
+            max_interval=360,
             base_weight=0.0,
-            high_min=33,
-            high_max=400,
+            high_min=100,
+            high_max=500,
             min_active_sides=1,
             max_active_sides=4,
             edge_groups=config["edge_groups"],
@@ -1688,7 +1688,7 @@ def main():
             config, shared_simulation_skrl, shared_path, shared_visualization, config_idx
         )
 
-        for demand in ['high']:
+        for demand in ['medium']:
             # Generate routes if needed
             generate_routes_if_needed(current_tracker['config_file'], current_tracker['config'], demand, global_episode)
 
@@ -1717,12 +1717,9 @@ def main():
                 names=["skrl_dqn"],
             )
             print(f"Plots at global episode {global_episode} generated")
-        
-        # Save model at intervals
-        if global_episode % save_interval == 0 and global_episode > 0:
-            shared_simulation_skrl.save_checkpoint(1)
+            shared_simulation_skrl.save_checkpoint(global_episode)
             print(f"SKRL DQN model saved at global episode {global_episode}")
-        
+
         # Update episode counters for current configuration
         current_tracker['config_episode'] += 1
         

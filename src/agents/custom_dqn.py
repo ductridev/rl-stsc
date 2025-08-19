@@ -183,9 +183,9 @@ class DQN(Agent):
 
         # create tensors in memory
         if self.memory is not None:
-            self.memory.create_tensor(name="states", size=self.observation_space.shape, dtype=torch.float32, keep_dimensions=True)
-            self.memory.create_tensor(name="next_states", size=self.observation_space.shape, dtype=torch.float32, keep_dimensions=True)
-            self.memory.create_tensor(name="actions", size=self.action_space.shape, dtype=torch.int64, keep_dimensions=True)
+            self.memory.create_tensor(name="states", size=self.observation_space, dtype=torch.float32)
+            self.memory.create_tensor(name="next_states", size=self.observation_space, dtype=torch.float32)
+            self.memory.create_tensor(name="actions", size=self.action_space, dtype=torch.int64)
             self.memory.create_tensor(name="rewards", size=1, dtype=torch.float32)
             self.memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
             self.memory.create_tensor(name="truncated", size=1, dtype=torch.bool)

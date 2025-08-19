@@ -64,7 +64,7 @@ class SKRLAgentManager:
             "observation_space": observation_space,
             "action_space": action_space,
             "device": str(self.device),  # Convert device to string for QNetwork
-            "input_dim": observation_space.shape,
+            "input_dim": observation_space.shape[0],
             "output_dim": action_space.n,
             "num_layers": model_config.get("num_layers", 3),
             "hidden_size": model_config.get("hidden_size", 256),
@@ -172,11 +172,11 @@ class SKRLAgentManager:
                     "learning_rate_scheduler_kwargs": {
                         "kl_threshold": 0.01,
                     },
-                    "state_preprocessor": RunningStandardScaler,
-                    "state_preprocessor_kwargs": {
-                        "size": observation_space.shape[1], 
-                        "device": self.device
-                    },
+                    # "state_preprocessor": RunningStandardScaler,
+                    # "state_preprocessor_kwargs": {
+                    #     "size": observation_space.shape[0], 
+                    #     "device": self.device
+                    # },
                     "mixed_precision": True,  # Disable mixed precision to prevent NaN issues
                     "discount_factor": self.agent_cfg.get(
                         "gamma", 0.99
