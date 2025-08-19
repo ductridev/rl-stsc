@@ -163,7 +163,6 @@ class SimulationBase(SUMO):
         sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
         sum_density = TrafficMetrics.get_sum_density(tl)
         sum_queue_length = TrafficMetrics.get_sum_queue_length(tl)
-        sum_waiting_time = TrafficMetrics.get_sum_waiting_time(tl)
         mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
         stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
         
@@ -181,10 +180,10 @@ class SimulationBase(SUMO):
         st["travel_delay_sum"] = sum_travel_delay
         st["travel_time_sum"] = sum_travel_time
         st["queue_length"] = sum_queue_length
-        st["waiting_time"] = sum_waiting_time
+        st["waiting_time"] = mean_waiting_time
 
         # 3) Every 60 steps, flush step‐averages into history for fairness
-        if self.step % 60 == 0:
+        if self.step % 300 == 0:
             
             for key, hist in [
                 ("delay", "travel_delay"),
@@ -194,14 +193,14 @@ class SimulationBase(SUMO):
                 ("waiting", "waiting_time"),
                 ("stopped_vehicles", "stopped_vehicles"),
             ]:
-                avg = st["step"][key] / 60.0
+                avg = st["step"][key] / 300
                 self.history[hist][tl_id].append(avg)
                 st["step"][key] = 0
 
             # Append outflow before resetting
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             
-            # Add junction throughput to history (sum over 60 steps)
+            # Add junction throughput to history (sum over 300 steps)
             if tl_id not in self.history["junction_throughput"]:
                 self.history["junction_throughput"][tl_id] = []
             self.history["junction_throughput"][tl_id].append(st["step"]["junction_throughput"])
@@ -228,7 +227,8 @@ class SimulationBase(SUMO):
         # 2) Main loop (one traci.simulationStep per iteration)
         while self.step < self.max_steps:
             # 2a) Step simulator
-            self.accident_manager.create_accident(current_step=self.step)
+            if self.accident_manager:
+                self.accident_manager.create_accident(current_step=self.step)
             traci.simulationStep()
             num_vehicles += traci.simulation.getDepartedNumber()
             num_vehicles_out += traci.simulation.getArrivedNumber()

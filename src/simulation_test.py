@@ -86,9 +86,20 @@ class Simulation(SUMO):
         self.num_actions = {}
         self.actions_map = {}
 
+        # Agent states and memories
+        self.reward = {}
+        self.agent_state = {}
+        self.agent_old_state = {}
+
         # Traffic metrics
         self.arrival_buffers = defaultdict(lambda: deque())
         self.last_desra_time = {}
+        self.queue_length = {}
+        self.outflow_rate = {}
+        self.travel_delay = {}
+        self.travel_time = {}
+        self.waiting_time = {}
+        self.phase = {}
 
         # History tracking
         self.history = {
@@ -108,6 +119,10 @@ class Simulation(SUMO):
             "junction_throughput": {},  # New: track vehicles entering junctions
             "stopped_vehicles": {},  # New: track number of stopped vehicles
         }
+
+        # DESRA usage tracking
+        self.desra_action_count = {}
+        self.dqn_action_count = {}
 
         # Setup device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -155,6 +170,21 @@ class Simulation(SUMO):
             self.actions_map[traffic_light_id] = {}
             for i, phase in enumerate(traffic_light["phase"]):
                 self.actions_map[traffic_light_id][i] = {"phase": phase}
+
+            # Initialize metrics
+            self.reward[traffic_light_id] = 0
+            self.agent_state[traffic_light_id] = 0
+            self.agent_old_state[traffic_light_id] = 0
+            self.queue_length[traffic_light_id] = 0
+            self.outflow_rate[traffic_light_id] = 0
+            self.travel_delay[traffic_light_id] = 0
+            self.travel_time[traffic_light_id] = 0
+            self.waiting_time[traffic_light_id] = 0
+            self.phase[traffic_light_id] = None
+
+            # Initialize DESRA tracking
+            self.desra_action_count[traffic_light_id] = 0
+            self.dqn_action_count[traffic_light_id] = 0
 
             # Initialize history
             for key in self.history:
@@ -334,7 +364,8 @@ class Simulation(SUMO):
                 self.decision_counter += 1
 
             # Simulation step with error handling
-            self.accident_manager.create_accident(current_step=self.step)
+            if self.accident_manager:
+                self.accident_manager.create_accident(current_step=self.step)
             try:
                 traci.simulationStep()
                 num_vehicles += traci.simulation.getDepartedNumber()
@@ -444,7 +475,7 @@ class Simulation(SUMO):
                 st["travel_delay_sum"] = sum_travel_delay
                 st["travel_time_sum"] = sum_travel_time
                 st["queue_length"] = sum_queue_length
-                st["waiting_time"] = sum_waiting_time
+                st["waiting_time"] = mean_waiting_time
 
                 # Handle green time countdown
                 if st["green_time_remaining"] > 1:
@@ -455,7 +486,7 @@ class Simulation(SUMO):
                     st["green_time_remaining"] -= 1
 
                 # Periodic metric flushing
-                if self.step > 0 and self.step % 60 == 0:
+                if self.step > 0 and self.step % 300 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
 
                 # FIX: Removed redundant step-based training to avoid double training
@@ -478,6 +509,12 @@ class Simulation(SUMO):
 
     def _finalize_phase_skrl(self, tl: Dict, tl_id: str, st: Dict):
         """Finalize phase and store experience in SKRL memory"""
+        self.queue_length[tl_id] = st["queue_length"]
+        self.outflow_rate[tl_id] = st["outflow"]
+        self.travel_delay[tl_id] = st["travel_delay_sum"]
+        self.travel_time[tl_id] = st["travel_time_sum"]
+        self.waiting_time[tl_id] = st["waiting_time"]
+
         # Calculate reward
         reward = self.get_reward(tl_id, st["phase"])
 
@@ -514,7 +551,7 @@ class Simulation(SUMO):
     def _flush_step_metrics(self, tl: Dict, tl_id: str, st: Dict):
         """Flush step metrics to history"""
         # Calculate averages
-        avg = lambda name: st[f"step_{name}_sum"] / 60
+        avg = lambda name: st[f"step_{name}_sum"] / 300
 
         # Append to history
         for metric in [
@@ -533,7 +570,7 @@ class Simulation(SUMO):
         self.history["outflow"][tl_id].append(st["step_outflow_sum"])
         st["step_outflow_sum"] = 0
         
-        # Add junction throughput to history (sum over 60 steps)
+        # Add junction throughput to history (sum over 300 steps)
         if tl_id not in self.history["junction_throughput"]:
             self.history["junction_throughput"][tl_id] = []
         self.history["junction_throughput"][tl_id].append(st["step_junction_throughput_sum"])

@@ -100,7 +100,7 @@ class Visualization:
                 if name in data:
                     plt.plot(data[name], label=name.upper())
 
-            plt.xlabel("Minute")
+            plt.xlabel("5 Minutes")
             plt.ylabel(metric.replace("_", " ").title())
             plt.title(
                 f"Comparison of {metric.replace('_', ' ').title()} (Episode {episode})"

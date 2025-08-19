@@ -570,7 +570,7 @@ class Simulation(SUMO):
                 self.agent_manager.post_interaction(tl_id, self.global_step, self.max_steps)
 
                 # Periodic metric flushing
-                if self.step > 0 and self.step % 60 == 0:
+                if self.step > 0 and self.step % 300 == 0:
                     self._flush_step_metrics(tl, tl_id, st)
 
         traci.close()
@@ -650,7 +650,7 @@ class Simulation(SUMO):
     def _flush_step_metrics(self, tl: Dict, tl_id: str, st: Dict):
         """Flush step metrics to history"""
         # Calculate averages
-        avg = lambda name: st[f"step_{name}_sum"] / 60
+        avg = lambda name: st[f"step_{name}_sum"] / 300
 
         # Append to history
         for metric in [
@@ -669,7 +669,7 @@ class Simulation(SUMO):
         self.history["outflow"][tl_id].append(st["step_outflow_sum"])
         st["step_outflow_sum"] = 0
         
-        # Add junction throughput to history (sum over 60 steps)
+        # Add junction throughput to history (sum over 300 steps)
         if tl_id not in self.history["junction_throughput"]:
             self.history["junction_throughput"][tl_id] = []
         self.history["junction_throughput"][tl_id].append(st["step_junction_throughput_sum"])
