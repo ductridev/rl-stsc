@@ -1,11 +1,11 @@
 simulation:
   gui: False
-  max_steps: 7200
+  max_steps: 3600
   episode_seed: 42
   interphase_duration: 3
 
 agent:
-  num_states: 40 # Per-phase features (max 10 phases × 4 feature waiting_time, queue length, num vehicles, desra)
+  num_states: 16 # Per-phase features (max 4 phases × 4 feature waiting_time, queue length, num vehicles, desra)
   
   # Model configuration (must match training configuration)
   model:
@@ -18,8 +18,8 @@ agent:
     num_quantiles: 100 # Must match training
     v_min: -10.0
     v_max: 10.0
-    dropout_rate: 0.0
-    batch_norm: false
+    dropout_rate: 0.2
+    batch_norm: true
   
   # Actuated control parameters (for actuated simulation)
   min_green_time: 10
@@ -68,7 +68,7 @@ dir:
   models_path_name: "models/"
   sumocfg_file_name: "simulations/testmodel6x1-3/osm.sumocfg"
   sumocfg_path: "simulations/testmodel6x1-3"
-  model_folder: "model_147/"
+  model_folder: "model_152/"
 
 traffic_lights:
   # - traffic_light_1:
