@@ -214,7 +214,7 @@ class DQN(Agent):
 
             predicted_actions = torch.argmax(q_values, dim=1, keepdim=True)
 
-            print(f"No explore predicted actions: {predicted_actions.view(-1)} - Q-values {q_values} - States: {states}")
+            # print(f"No explore predicted actions: {predicted_actions.view(-1)} - Q-values {q_values} - States: {states}")
             return (
                 predicted_actions,
                 log,
