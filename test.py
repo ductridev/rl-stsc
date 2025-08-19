@@ -12,7 +12,7 @@ from src.visualization import Visualization
 from src.accident_manager import AccidentManager
 from src.base_simulation import SimulationBase
 from src.actuated_simulation import ActuatedSimulation
-from src.simulation import Simulation
+from src.simulation_test import Simulation
 import glob
 import re
 
@@ -281,6 +281,69 @@ def test_base_simulation(config, path):
             'avg_travel_time': base_simulation.completion_tracker.get_average_total_travel_time()
         }
     
+    # Collect detailed metrics data
+    metrics_data = {}
+    if hasattr(base_simulation, 'history'):
+        history = base_simulation.history
+        if history:
+            # Handle nested structure where metrics are organized by traffic light ID
+            # Calculate average metrics over the simulation with safe division
+            
+            # For reward - extract values from nested dict structure
+            if 'reward' in history:
+                reward_values = []
+                for tl_id, values in history['reward'].items():
+                    # Convert numpy types to regular Python floats/ints
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    reward_values.extend(converted_values)
+                metrics_data['reward'] = sum(reward_values) / max(len(reward_values), 1) if reward_values else 0
+            else:
+                metrics_data['reward'] = 0
+            
+            # For waiting time - use 'waiting_time' key
+            if 'waiting_time' in history:
+                waiting_values = []
+                for tl_id, values in history['waiting_time'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    waiting_values.extend(converted_values)
+                metrics_data['avg_waiting_time'] = sum(waiting_values) / max(len(waiting_values), 1) if waiting_values else 0
+            else:
+                metrics_data['avg_waiting_time'] = 0
+            
+            # For travel delay - use 'travel_delay' key  
+            if 'travel_delay' in history:
+                delay_values = []
+                for tl_id, values in history['travel_delay'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    delay_values.extend(converted_values)
+                metrics_data['avg_travel_delay'] = sum(delay_values) / max(len(delay_values), 1) if delay_values else 0
+            else:
+                metrics_data['avg_travel_delay'] = 0
+            
+            # For throughput - use 'outflow' key
+            if 'outflow' in history:
+                outflow_values = []
+                for tl_id, values in history['outflow'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    outflow_values.extend(converted_values)
+                metrics_data['throughput'] = sum(outflow_values) / max(len(outflow_values), 1) if outflow_values else 0
+            else:
+                metrics_data['throughput'] = 0
+            
+            # For queue length - use 'queue_length' key
+            if 'queue_length' in history:
+                queue_values = []
+                for tl_id, values in history['queue_length'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    queue_values.extend(converted_values)
+                metrics_data['avg_queue_length'] = sum(queue_values) / max(len(queue_values), 1) if queue_values else 0
+            else:
+                metrics_data['avg_queue_length'] = 0
+                
+        print(f"Base simulation metrics collected: {metrics_data}")
+    else:
+        print("Warning: Base simulation has no history attribute for metrics collection")
+    
     # Save metrics and plots
     print("Saving base simulation metrics...")
     base_simulation.save_metrics(episode=1)
@@ -293,7 +356,7 @@ def test_base_simulation(config, path):
     if hasattr(base_simulation, 'completion_tracker'):
         base_simulation.completion_tracker.reset()
         
-    return completion_data
+    return completion_data, metrics_data
 
 
 def test_actuated_simulation(config, path):
@@ -323,6 +386,7 @@ def test_actuated_simulation(config, path):
         path=path,
         save_interval=1,
         min_green_time=config["agent"].get("min_green_time", 20),
+        max_green_time=config["agent"].get("max_green_time", 60),
         detection_threshold=config["agent"].get("detection_threshold", 2)
     )
 
@@ -346,6 +410,69 @@ def test_actuated_simulation(config, path):
             'avg_travel_time': actuated_simulation.completion_tracker.get_average_total_travel_time()
         }
     
+    # Collect detailed metrics data
+    metrics_data = {}
+    if hasattr(actuated_simulation, 'history'):
+        history = actuated_simulation.history
+        if history:
+            # Handle nested structure where metrics are organized by traffic light ID
+            # Calculate average metrics over the simulation with safe division
+            
+            # For reward - extract values from nested dict structure
+            if 'reward' in history:
+                reward_values = []
+                for tl_id, values in history['reward'].items():
+                    # Convert numpy types to regular Python floats/ints
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    reward_values.extend(converted_values)
+                metrics_data['reward'] = sum(reward_values) / max(len(reward_values), 1) if reward_values else 0
+            else:
+                metrics_data['reward'] = 0
+            
+            # For waiting time - use 'waiting_time' key
+            if 'waiting_time' in history:
+                waiting_values = []
+                for tl_id, values in history['waiting_time'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    waiting_values.extend(converted_values)
+                metrics_data['avg_waiting_time'] = sum(waiting_values) / max(len(waiting_values), 1) if waiting_values else 0
+            else:
+                metrics_data['avg_waiting_time'] = 0
+            
+            # For travel delay - use 'travel_delay' key  
+            if 'travel_delay' in history:
+                delay_values = []
+                for tl_id, values in history['travel_delay'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    delay_values.extend(converted_values)
+                metrics_data['avg_travel_delay'] = sum(delay_values) / max(len(delay_values), 1) if delay_values else 0
+            else:
+                metrics_data['avg_travel_delay'] = 0
+            
+            # For throughput - use 'outflow' key
+            if 'outflow' in history:
+                outflow_values = []
+                for tl_id, values in history['outflow'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    outflow_values.extend(converted_values)
+                metrics_data['throughput'] = sum(outflow_values) / max(len(outflow_values), 1) if outflow_values else 0
+            else:
+                metrics_data['throughput'] = 0
+            
+            # For queue length - use 'queue_length' key
+            if 'queue_length' in history:
+                queue_values = []
+                for tl_id, values in history['queue_length'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    queue_values.extend(converted_values)
+                metrics_data['avg_queue_length'] = sum(queue_values) / max(len(queue_values), 1) if queue_values else 0
+            else:
+                metrics_data['avg_queue_length'] = 0
+                
+        print(f"Actuated simulation metrics collected: {metrics_data}")
+    else:
+        print("Warning: Actuated simulation has no history attribute for metrics collection")
+    
     # Save metrics and plots
     print("Saving actuated simulation metrics...")
     actuated_simulation.save_metrics(episode=1)
@@ -358,7 +485,7 @@ def test_actuated_simulation(config, path):
     if hasattr(actuated_simulation, 'completion_tracker'):
         actuated_simulation.completion_tracker.reset()
         
-    return completion_data
+    return completion_data, metrics_data
 
 
 def test_dqn_simulation(config, path, specific_model_file=None):
@@ -458,76 +585,9 @@ def test_dqn_simulation(config, path, specific_model_file=None):
         accident_manager=accident_manager,
         interphase_duration=config["interphase_duration"],
         path=path,
-        epoch=1,  # Testing mode
-        training_steps=float('inf'),  # Disable training by setting to infinity
-        updating_target_network_steps=float('inf'),  # Disable target network updates
-        save_interval=1
+        model_file_path=model_file_path,
+        use_skrl=True
     )
-    
-    # Set testing mode flag to disable all training operations
-    dqn_simulation.testing_mode = True
-    
-    # Load the trained model
-    try:
-        # Load the model directly using the found file path
-        print(f"Loading model from: {model_file_path}")
-        
-        # Load model state dict directly into the agent's neural networks
-        import torch
-        model_state = torch.load(model_file_path, map_location=dqn_simulation.device, weights_only=False)
-
-        # Get the first (and likely only) traffic light agent
-        agent_manager = dqn_simulation.agent_manager
-        if agent_manager.agents:
-            # Load the model into all traffic light agents
-            for tl_id, agent in agent_manager.agents.items():
-                try:
-                    # Try to load the state dict directly
-                    if isinstance(model_state, dict):
-                        # If the model state is a dictionary, try to find the right keys
-                        if "model_state_dict" in model_state:
-                            state_dict = model_state["model_state_dict"]
-                        else:
-                            state_dict = model_state
-                    else:
-                        state_dict = model_state
-                    
-                    # Load into both q_network and target_q_network
-                    agent.models["q_network"].load_state_dict(state_dict)
-                    agent.models["target_q_network"].load_state_dict(state_dict)
-                    print(f"Successfully loaded model for traffic light: {tl_id}")
-                    
-                except Exception as load_error:
-                    print(f"Failed to load model for {tl_id}: {load_error}")
-                    # Try the old method as fallback
-                    try:
-                        # Extract episode number for loading
-                        if episode_info == "best":
-                            load_episode = 0  # Best model is typically saved as episode 0
-                        elif episode_info == "final":
-                            load_episode = "final"
-                        elif episode_info == "latest":
-                            load_episode = 0
-                        elif isinstance(episode_info, int):
-                            load_episode = episode_info
-                        else:
-                            load_episode = 0
-                            
-                        print(f"Fallback: Loading model with episode parameter: {load_episode}")
-                        dqn_simulation.load_model(episode=load_episode)
-                        break  # Exit the loop if fallback succeeds
-                    except Exception as fallback_error:
-                        print(f"Fallback method also failed: {fallback_error}")
-                        raise load_error
-                        
-        print(f"Successfully loaded DQN model: {os.path.basename(model_file_path)}")
-        print("DQN simulation configured in TESTING MODE - no training will occur")
-        
-    except Exception as e:
-        print(f"Error loading DQN model: {e}")
-        print(f"Tried to load: {model_file_path}")
-        print("Skipping DQN simulation.")
-        return
     
     # Set up SUMO
     # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
@@ -557,6 +617,69 @@ def test_dqn_simulation(config, path, specific_model_file=None):
     else:
         print("DEBUG: DQN simulation does not have completion_tracker attribute")
     
+    # Collect detailed metrics data
+    metrics_data = {}
+    if hasattr(dqn_simulation, 'history'):
+        history = dqn_simulation.history
+        if history:
+            # Handle nested structure where metrics are organized by traffic light ID
+            # Calculate average metrics over the simulation with safe division
+            
+            # For reward - extract values from nested dict structure
+            if 'reward' in history:
+                reward_values = []
+                for tl_id, values in history['reward'].items():
+                    # Convert numpy types to regular Python floats/ints
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    reward_values.extend(converted_values)
+                metrics_data['reward'] = sum(reward_values) / max(len(reward_values), 1) if reward_values else 0
+            else:
+                metrics_data['reward'] = 0
+            
+            # For waiting time - use 'waiting_time' key
+            if 'waiting_time' in history:
+                waiting_values = []
+                for tl_id, values in history['waiting_time'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    waiting_values.extend(converted_values)
+                metrics_data['avg_waiting_time'] = sum(waiting_values) / max(len(waiting_values), 1) if waiting_values else 0
+            else:
+                metrics_data['avg_waiting_time'] = 0
+            
+            # For travel delay - use 'travel_delay' key  
+            if 'travel_delay' in history:
+                delay_values = []
+                for tl_id, values in history['travel_delay'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    delay_values.extend(converted_values)
+                metrics_data['avg_travel_delay'] = sum(delay_values) / max(len(delay_values), 1) if delay_values else 0
+            else:
+                metrics_data['avg_travel_delay'] = 0
+            
+            # For throughput - use 'outflow' key
+            if 'outflow' in history:
+                outflow_values = []
+                for tl_id, values in history['outflow'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    outflow_values.extend(converted_values)
+                metrics_data['throughput'] = sum(outflow_values) / max(len(outflow_values), 1) if outflow_values else 0
+            else:
+                metrics_data['throughput'] = 0
+            
+            # For queue length - use 'queue_length' key
+            if 'queue_length' in history:
+                queue_values = []
+                for tl_id, values in history['queue_length'].items():
+                    converted_values = [float(v) if hasattr(v, 'item') else v for v in values]
+                    queue_values.extend(converted_values)
+                metrics_data['avg_queue_length'] = sum(queue_values) / max(len(queue_values), 1) if queue_values else 0
+            else:
+                metrics_data['avg_queue_length'] = 0
+                
+        print(f"DQN simulation metrics collected: {metrics_data}")
+    else:
+        print("Warning: DQN simulation has no history attribute for metrics collection")
+    
     # Save metrics and plots
     print("Saving DQN simulation metrics and plots...")
     dqn_simulation.save_plot(episode=1)
@@ -569,7 +692,299 @@ def test_dqn_simulation(config, path, specific_model_file=None):
     if hasattr(dqn_simulation, 'completion_tracker'):
         dqn_simulation.completion_tracker.reset()
         
-    return completion_data
+    return completion_data, metrics_data
+
+
+def display_metrics_comparison(all_metrics_results, simulations_to_run):
+    """
+    Display a detailed comparison of metrics across all simulation types.
+    
+    Args:
+        all_metrics_results (dict): Dictionary containing metrics data for each simulation type
+        simulations_to_run (list): List of simulation types that were run
+    """
+    print("\n" + "="*70)
+    print("DETAILED METRICS COMPARISON")
+    print("="*70)
+    
+    # Define metric names and units for better display
+    metric_info = {
+        'reward': ('Total Reward', ''),
+        'avg_waiting_time': ('Avg Waiting Time', 's'),
+        'avg_travel_delay': ('Avg Travel Delay', 's'),
+        'throughput': ('Throughput (Outflow)', 'vehicles/step'),
+        'avg_queue_length': ('Avg Queue Length', 'vehicles')
+    }
+    
+    # Method mapping for display names
+    method_mapping = {
+        'base': 'Baseline (Fixed)',
+        'actuated': 'Research Actuated',
+        'dqn': 'SKRL DQN'
+    }
+    
+    # Check if we have metrics data
+    available_methods = []
+    for method in simulations_to_run:
+        if method in all_metrics_results and 'metrics' in all_metrics_results[method]:
+            available_methods.append(method)
+    
+    if not available_methods:
+        print("No metrics data available for comparison.")
+        return
+    
+    print("Methods compared:", ", ".join([method_mapping.get(method, method.title()) for method in available_methods]))
+    print()
+    
+    # Display each metric comparison
+    for metric_key, (metric_name, unit) in metric_info.items():
+        print(f"\n{metric_name}:")
+        print("-" * (len(metric_name) + 1))
+        
+        values = {}
+        for method in available_methods:
+            if metric_key in all_metrics_results[method]['metrics']:
+                value = all_metrics_results[method]['metrics'][metric_key]
+                values[method] = value
+                method_display = method_mapping.get(method, method.title())
+                print(f"  {method_display:20}: {value:8.2f} {unit}")
+        
+        # Find best and worst values
+        if values:
+            if metric_key == 'reward' or metric_key == 'throughput':
+                # Higher is better for reward and throughput
+                best_method = max(values, key=values.get)
+                worst_method = min(values, key=values.get)
+            else:
+                # Lower is better for waiting time, travel delay, queue length
+                best_method = min(values, key=values.get)
+                worst_method = max(values, key=values.get)
+            
+            best_display = method_mapping.get(best_method, best_method.title())
+            print(f"  → Best: {best_display} ({values[best_method]:.2f} {unit})")
+            
+            # Calculate improvements vs baseline if available
+            if 'base' in values and best_method != 'base':
+                baseline_value = values['base']
+                best_value = values[best_method]
+                
+                if baseline_value != 0:
+                    if metric_key == 'reward' or metric_key == 'throughput':
+                        improvement = ((best_value - baseline_value) / abs(baseline_value)) * 100
+                    else:
+                        improvement = ((baseline_value - best_value) / baseline_value) * 100
+                    
+                    print(f"  → Improvement vs Baseline: {improvement:+.1f}%")
+    
+    # Overall performance summary
+    print("\n" + "="*50)
+    print("OVERALL PERFORMANCE SUMMARY")
+    print("="*50)
+    
+    # Calculate performance scores for each method
+    performance_scores = {}
+    
+    for method in available_methods:
+        score = 0
+        metric_count = 0
+        
+        if 'metrics' in all_metrics_results[method]:
+            metrics = all_metrics_results[method]['metrics']
+            
+            # Normalize and score each metric (0-100 scale)
+            all_values = {metric: [] for metric in metric_info.keys()}
+            
+            # Collect all values for normalization
+            for m in available_methods:
+                if 'metrics' in all_metrics_results[m]:
+                    for metric_key in metric_info.keys():
+                        if metric_key in all_metrics_results[m]['metrics']:
+                            all_values[metric_key].append(all_metrics_results[m]['metrics'][metric_key])
+            
+            # Calculate normalized scores
+            for metric_key in metric_info.keys():
+                if metric_key in metrics and all_values[metric_key]:
+                    value = metrics[metric_key]
+                    min_val = min(all_values[metric_key])
+                    max_val = max(all_values[metric_key])
+                    
+                    if max_val != min_val:
+                        if metric_key == 'reward' or metric_key == 'throughput':
+                            # Higher is better
+                            normalized_score = ((value - min_val) / (max_val - min_val)) * 100
+                        else:
+                            # Lower is better
+                            normalized_score = ((max_val - value) / (max_val - min_val)) * 100
+                        
+                        score += normalized_score
+                        metric_count += 1
+            
+            if metric_count > 0:
+                performance_scores[method] = score / metric_count
+    
+    # Display performance ranking
+    if performance_scores:
+        sorted_methods = sorted(performance_scores.items(), key=lambda x: x[1], reverse=True)
+        
+        print("Performance Ranking (0-100 scale, higher is better):")
+        for i, (method, score) in enumerate(sorted_methods, 1):
+            method_display = method_mapping.get(method, method.title())
+            print(f"  {i}. {method_display:20}: {score:5.1f}/100")
+        
+        print(f"\n🏆 Best Overall Performance: {method_mapping.get(sorted_methods[0][0], sorted_methods[0][0].title())}")
+
+
+def test_green_time_comparison(config, path, green_times=[5, 10, 15, 20, 25]):
+    """Test performance across different green time durations"""
+    print("\n" + "="*60)
+    print("TESTING GREEN TIME COMPARISON")
+    print("="*60)
+    
+    results = {}
+    
+    for green_time in green_times:
+        print(f"\nTesting with {green_time}s green time...")
+        
+        # Modify agent config for this green time
+        modified_config = config.copy()
+        modified_config["agent"] = config["agent"].copy()
+        modified_config["agent"]["min_green_time"] = green_time
+        modified_config["agent"]["max_green_time"] = green_time  # Fixed green time
+        
+        # Test actuated simulation with fixed green time
+        completion_data, metrics_data = test_actuated_simulation(modified_config, path)
+        
+        results[green_time] = {
+            'completion_tracker': completion_data,
+            'metrics': metrics_data
+        }
+    
+    # Generate comparison plots
+    create_green_time_comparison_plots(results, path)
+    
+    return results
+
+
+def create_green_time_comparison_plots(results, save_path):
+    """Create plots comparing performance across green times"""
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import numpy as np
+    
+    print("\nGenerating green time comparison plots...")
+    
+    # Extract data for plotting
+    green_times = []
+    avg_waiting_times = []
+    avg_queue_lengths = []
+    avg_travel_delays = []
+    throughputs = []
+    avg_travel_times = []
+    completed_counts = []
+    
+    for green_time in sorted(results.keys()):
+        data = results[green_time]
+        if 'metrics' in data and 'completion_tracker' in data:
+            metrics = data['metrics']
+            completion = data['completion_tracker']
+            
+            green_times.append(green_time)
+            avg_waiting_times.append(metrics.get('avg_waiting_time', 0))
+            avg_queue_lengths.append(metrics.get('avg_queue_length', 0))
+            avg_travel_delays.append(metrics.get('avg_travel_delay', 0))
+            throughputs.append(metrics.get('throughput', 0))
+            
+            if completion:
+                avg_travel_times.append(completion.get('avg_travel_time', 0))
+                completed_counts.append(completion.get('completed_count', 0))
+            else:
+                avg_travel_times.append(0)
+                completed_counts.append(0)
+    
+    # Create subplots
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+    fig.suptitle('Traffic Signal Performance vs Green Time Duration', fontsize=16, fontweight='bold')
+    
+    # Plot 1: Average Waiting Time
+    axes[0, 0].plot(green_times, avg_waiting_times, 'o-', linewidth=2, markersize=8, color='red')
+    axes[0, 0].set_title('Average Waiting Time vs Green Time')
+    axes[0, 0].set_xlabel('Green Time Duration (seconds)')
+    axes[0, 0].set_ylabel('Average Waiting Time (seconds)')
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    # Plot 2: Average Queue Length
+    axes[0, 1].plot(green_times, avg_queue_lengths, 'o-', linewidth=2, markersize=8, color='orange')
+    axes[0, 1].set_title('Average Queue Length vs Green Time')
+    axes[0, 1].set_xlabel('Green Time Duration (seconds)')
+    axes[0, 1].set_ylabel('Average Queue Length (vehicles)')
+    axes[0, 1].grid(True, alpha=0.3)
+    
+    # Plot 3: Throughput
+    axes[0, 2].plot(green_times, throughputs, 'o-', linewidth=2, markersize=8, color='green')
+    axes[0, 2].set_title('Throughput vs Green Time')
+    axes[0, 2].set_xlabel('Green Time Duration (seconds)')
+    axes[0, 2].set_ylabel('Throughput (vehicles/step)')
+    axes[0, 2].grid(True, alpha=0.3)
+    
+    # Plot 4: Average Travel Delay
+    axes[1, 0].plot(green_times, avg_travel_delays, 'o-', linewidth=2, markersize=8, color='purple')
+    axes[1, 0].set_title('Average Travel Delay vs Green Time')
+    axes[1, 0].set_xlabel('Green Time Duration (seconds)')
+    axes[1, 0].set_ylabel('Average Travel Delay (seconds)')
+    axes[1, 0].grid(True, alpha=0.3)
+    
+    # Plot 5: Average Travel Time
+    axes[1, 1].plot(green_times, avg_travel_times, 'o-', linewidth=2, markersize=8, color='blue')
+    axes[1, 1].set_title('Average Travel Time vs Green Time')
+    axes[1, 1].set_xlabel('Green Time Duration (seconds)')
+    axes[1, 1].set_ylabel('Average Travel Time (seconds)')
+    axes[1, 1].grid(True, alpha=0.3)
+    
+    # Plot 6: Completed Vehicle Count
+    axes[1, 2].plot(green_times, completed_counts, 'o-', linewidth=2, markersize=8, color='brown')
+    axes[1, 2].set_title('Completed Vehicles vs Green Time')
+    axes[1, 2].set_xlabel('Green Time Duration (seconds)')
+    axes[1, 2].set_ylabel('Number of Completed Vehicles')
+    axes[1, 2].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_path = os.path.join(save_path, 'green_time_comparison.png')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    print(f"Green time comparison plot saved to: {plot_path}")
+    
+    # Create summary table
+    table_data = []
+    for green_time in sorted(results.keys()):
+        data = results[green_time]
+        if 'metrics' in data and 'completion_tracker' in data:
+            metrics = data['metrics']
+            completion = data['completion_tracker']
+            
+            row = {
+                'Green Time (s)': green_time,
+                'Avg Waiting Time (s)': round(metrics.get('avg_waiting_time', 0), 2),
+                'Avg Queue Length': round(metrics.get('avg_queue_length', 0), 2),
+                'Avg Travel Delay (s)': round(metrics.get('avg_travel_delay', 0), 2),
+                'Throughput (veh/step)': round(metrics.get('throughput', 0), 4),
+                'Completed Vehicles': completion.get('completed_count', 0) if completion else 0,
+                'Avg Travel Time (s)': round(completion.get('avg_travel_time', 0), 2) if completion else 0
+            }
+            table_data.append(row)
+    
+    # Save summary table
+    df = pd.DataFrame(table_data)
+    csv_path = os.path.join(save_path, 'green_time_performance_summary.csv')
+    df.to_csv(csv_path, index=False)
+    print(f"Performance summary saved to: {csv_path}")
+    
+    # Print summary
+    print("\nGREEN TIME PERFORMANCE SUMMARY:")
+    print("=" * 80)
+    print(df.to_string(index=False))
+    
+    plt.show()
 
 
 def main():
@@ -579,7 +994,7 @@ def main():
                        help='Path to testing configuration file')
     parser.add_argument('--simulations', '-s', 
                        nargs='+', 
-                       choices=['base', 'actuated', 'dqn', 'all'],
+                       choices=['base', 'actuated', 'dqn', 'all', 'green-time'],
                        default=['all'],
                        help='Simulation types to run')
     parser.add_argument('--gui', '-g', 
@@ -592,6 +1007,11 @@ def main():
     parser.add_argument('--list-models', '-l',
                        action='store_true',
                        help='List available model files in the specified model folder and exit')
+    parser.add_argument('--green-times', 
+                       nargs='+', 
+                       type=int,
+                       default=[5, 10, 15, 20, 25],
+                       help='Green time durations to test for green-time simulation (seconds)')
     
     args = parser.parse_args()
     
@@ -656,6 +1076,42 @@ def main():
     if 'all' in simulations_to_run:
         simulations_to_run = ['base', 'actuated', 'dqn']
     
+    # Handle green-time testing
+    # if 'green-time' in simulations_to_run:
+    #     print("\nStarting green time comparison testing...")
+    #     print(f"Testing green times: {args.green_times} seconds")
+        
+    #     # Generate routes for green time testing
+    #     print("\n" + "="*50)
+    #     print("GENERATING ROUTES FOR GREEN TIME TESTING")
+    #     print("="*50)
+        
+    #     simulation_path = config["sumo_cfg_file"].split("/")[1]
+    #     demand_level = 'medium'  # Use medium demand for consistent testing
+        
+    #     print(f"Generating routes for {demand_level} demand level...")
+    #     Intersection.generate_residential_demand_routes(
+    #         config,
+    #         simulation_path,
+    #         demand_level=demand_level,
+    #         enable_bicycle=True,
+    #         enable_pedestrian=True,
+    #         enable_motorcycle=True,
+    #         enable_passenger=True,
+    #         enable_truck=True,
+    #     )
+        
+    #     # Run green time comparison
+    #     try:
+    #         green_time_results = test_green_time_comparison(config, path, args.green_times)
+    #         print(f"\nGreen time comparison completed successfully!")
+    #     except Exception as e:
+    #         print(f"Error during green time testing: {e}")
+    #         import traceback
+    #         traceback.print_exc()
+        
+    #     return  # Exit early for green-time testing
+    
     print("\nStarting multi-simulation testing...")
     print(f"Running simulations: {', '.join(simulations_to_run)}")
     print(f"Configuration: {args.config}")
@@ -670,11 +1126,12 @@ def main():
     # Run selected simulations
     overall_start = time.time()
     
-    # Collect completion tracker results
+    # Collect completion tracker results and metrics
     completion_results = {}
+    all_metrics_results = {}
     
     simulation_path = config["sumo_cfg_file"].split("/")[1]
-    demand_levels = ['low', 'medium', 'high']
+    demand_levels = ['medium']
     
     for demand_level in demand_levels:
         if args.config != "config/testing_testngatu6x1EastWestOverflow.yaml":
@@ -692,19 +1149,43 @@ def main():
     
         try:
             if 'base' in simulations_to_run:
-                base_completion = test_base_simulation(config, path)
-                if base_completion:
-                    completion_results['baseline'] = {'completion_tracker': base_completion}
+                result = test_base_simulation(config, path)
+                if result:
+                    if isinstance(result, tuple) and len(result) == 2:
+                        base_completion, base_metrics = result
+                        completion_results['baseline'] = {'completion_tracker': base_completion}
+                        all_metrics_results['base'] = {'completion_tracker': base_completion, 'metrics': base_metrics}
+                    else:
+                        # Backward compatibility - only completion data returned
+                        base_completion = result
+                        completion_results['baseline'] = {'completion_tracker': base_completion}
+                        all_metrics_results['base'] = {'completion_tracker': base_completion, 'metrics': {}}
             
             if 'actuated' in simulations_to_run:
-                actuated_completion = test_actuated_simulation(config, path)
-                if actuated_completion:
-                    completion_results['actuated'] = {'completion_tracker': actuated_completion}
+                result = test_actuated_simulation(config, path)
+                if result:
+                    if isinstance(result, tuple) and len(result) == 2:
+                        actuated_completion, actuated_metrics = result
+                        completion_results['actuated'] = {'completion_tracker': actuated_completion}
+                        all_metrics_results['actuated'] = {'completion_tracker': actuated_completion, 'metrics': actuated_metrics}
+                    else:
+                        # Backward compatibility - only completion data returned
+                        actuated_completion = result
+                        completion_results['actuated'] = {'completion_tracker': actuated_completion}
+                        all_metrics_results['actuated'] = {'completion_tracker': actuated_completion, 'metrics': {}}
             
             if 'dqn' in simulations_to_run:
-                dqn_completion = test_dqn_simulation(config, path)
-                if dqn_completion:
-                    completion_results['dqn'] = {'completion_tracker': dqn_completion}
+                result = test_dqn_simulation(config, path, args.model_file)
+                if result:
+                    if isinstance(result, tuple) and len(result) == 2:
+                        dqn_completion, dqn_metrics = result
+                        completion_results['dqn'] = {'completion_tracker': dqn_completion}
+                        all_metrics_results['dqn'] = {'completion_tracker': dqn_completion, 'metrics': dqn_metrics}
+                    else:
+                        # Backward compatibility - only completion data returned
+                        dqn_completion = result
+                        completion_results['dqn'] = {'completion_tracker': dqn_completion}
+                        all_metrics_results['dqn'] = {'completion_tracker': dqn_completion, 'metrics': {}}
 
         except Exception as e:
                 print(f"Error during testing: {e}")
@@ -719,7 +1200,7 @@ def main():
         visualization = Visualization(path=path, dpi=100)
         
         # Generate plots comparing all simulation types
-        metrics = ["density_avg", "travel_time_avg", "outflow_avg", "queue_length_avg", "waiting_time_avg", "junction_throughput_avg", "stopped_vehicles_avg"]
+        metrics = ["density_avg", "travel_time_avg", "outflow_avg", "queue_length_avg", "waiting_time_avg", "junction_throughput_avg", "stopped_vehicles_avg", "travel_delay_avg"]
         names = []
         
         # Add simulation names based on what was run
@@ -826,6 +1307,16 @@ def main():
         
     except Exception as e:
         print(f"Warning: Could not generate completion tracker plots: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Display detailed metrics comparison
+    try:
+        print("\nGenerating detailed metrics comparison...")
+        display_metrics_comparison(all_metrics_results, simulations_to_run)
+        
+    except Exception as e:
+        print(f"Warning: Could not generate metrics comparison: {e}")
         import traceback
         traceback.print_exc()
     
