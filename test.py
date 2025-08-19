@@ -247,7 +247,8 @@ def test_base_simulation(config, path):
         accident_manager = AccidentManager(
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
-            junction_id_list=[junction["id"] for junction in config['accident']['junction']]
+            # junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
     
     # Initialize base simulation
@@ -990,7 +991,7 @@ def create_green_time_comparison_plots(results, save_path):
 def main():
     parser = argparse.ArgumentParser(description='Test traffic signal control with different simulation types')
     parser.add_argument('--config', '-c', 
-                       default='config/testing_testngatu6x1.yaml',
+                       default='config/testing_testngatu6x1-4.yaml',
                        help='Path to testing configuration file')
     parser.add_argument('--simulations', '-s', 
                        nargs='+', 

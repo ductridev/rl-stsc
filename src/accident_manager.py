@@ -3,18 +3,20 @@ import random
 from shapely.geometry import Point, Polygon
 
 class AccidentManager:
-    def __init__(self,  start_step, duration=1000, junction_id_list = [], edge_id_list = [],):
+    def __init__(self,  start_step, duration=1000, junction_id_list = [], edge_id_list = [], detection_id_list = []):
         """
         Initialize the AccidentManager class.
 
         Args:
             junction_id (list): List ID of the junction where the accident may occurs.
             edge_id (list ): List ID of the edge where the accident occurs.
+            detection_id (list): List ID of the detectors where the accident may occurs.
             start_step (int): Step at which the accident should start.
             duration (int): Duration for which the accident lasts.
         """
         self.junction_id_list = junction_id_list
         self.edge_id_list = edge_id_list
+        self.detection_id_list = detection_id_list
         self.start_step = start_step
         self.duration = duration
         self.accident_active = False
@@ -72,6 +74,34 @@ class AccidentManager:
 
         return total_vehicle_count, vehicle_ids_in_edge_list
     
+    def count_vehicles_on_detectors(self):
+        """
+        Counts the number of vehicles on specific detectors.
+
+        Returns:
+            int: Number of vehicles on the specified detectors.
+            list: List of vehicle IDs on the detectors.    
+        """
+        if not self.detection_id_list:
+            print("No detector IDs provided.")
+            return 0, []
+        
+        vehicle_ids_in_detectors = []
+        total_vehicle_count = 0
+        
+        for detector_id in self.detection_id_list:
+            try:
+                # Get vehicles in the detector area
+                vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)
+                total_vehicle_count += vehicle_count
+                vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
+                vehicle_ids_in_detectors.extend(vehicle_ids)
+            except traci.TraCIException:
+                print(f"Warning: Detector {detector_id} not found or inaccessible.")
+                continue
+
+        return total_vehicle_count, vehicle_ids_in_detectors
+    
     def random_stop_vehicle(self, vehicle_ids):
         """
         Randomly stops a vehicle in vehicle list.
@@ -101,17 +131,26 @@ class AccidentManager:
 
     def create_accident(self, current_step):
         """
-        Creates an accident at the specified junction.
+        Creates an accident at the specified junction, edge, or detector.
 
         Args:
             current_step (int): Current simulation step.
         """
         if current_step == self.start_step and not self.accident_active:
-            vehicle_list = self.count_vehicles_on_junction()[1] + self.count_vehicles_on_edge()[1]
+            # Collect vehicles from all specified locations
+            junction_vehicles = self.count_vehicles_on_junction()[1]
+            edge_vehicles = self.count_vehicles_on_edge()[1]
+            detector_vehicles = self.count_vehicles_on_detectors()[1]
+            
+            vehicle_list = junction_vehicles + edge_vehicles + detector_vehicles
+            
             if vehicle_list:
                 self.stopped_vehicle = self.random_stop_vehicle(vehicle_list)
                 self.accident_active = True
                 print(f"Accident started at step {current_step}.")
+                print(f"Vehicle sources: {len(junction_vehicles)} from junctions, "
+                      f"{len(edge_vehicles)} from edges, "
+                      f"{len(detector_vehicles)} from detectors.")
             else:
                 print(f"No vehicles found to stop at step {current_step}.")
         if current_step == self.start_step + self.duration and self.accident_active:
