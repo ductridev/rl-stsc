@@ -221,9 +221,62 @@ class ActuatedSimulation(SUMO):
         return False, "extension_expired"
 
     def select_next_phase(self, tl, current_phase_idx):
-        """Cycle to next phase in sequence (research standard)"""
-        next_phase_idx = (current_phase_idx + 1) % len(tl["phase"])
-        return next_phase_idx
+        """Select phase with highest demand (highest queue length + waiting time)"""
+        tl_id = tl["id"]
+        best_phase_idx = current_phase_idx
+        best_demand = -1
+        
+        # Evaluate demand for each phase
+        for phase_idx, phase_str in enumerate(tl["phase"]):
+            # Skip current phase to ensure we switch
+            if phase_idx == current_phase_idx:
+                continue
+                
+            # Get movements (detectors) for this phase
+            movements = self.get_movements_from_phase(tl, phase_str)
+            
+            # Calculate total demand for this phase
+            phase_demand = 0.0
+            for detector_id in movements:
+                try:
+                    # Get queue length (halting vehicles)
+                    queue_length = traci.lanearea.getLastStepHaltingNumber(detector_id)
+                    
+                    # Get waiting time for vehicles in this detector area
+                    lane_id = traci.lanearea.getLaneID(detector_id)
+                    waiting_time = traci.lane.getWaitingTime(lane_id)
+                    
+                    # Get number of vehicles for normalization
+                    vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)
+                    
+                    # Combine queue length and normalized waiting time as demand metric
+                    # Higher weight on queue length as it represents immediate demand
+                    normalized_waiting = waiting_time / max(vehicle_count, 1)  # Avoid division by zero
+                    phase_demand += (queue_length * 2.0) + (normalized_waiting / 10.0)  # Scale waiting time
+                    
+                except Exception:
+                    # If detector data unavailable, use lane-based fallback
+                    try:
+                        for lane in traci.trafficlight.getControlledLanes(tl_id):
+                            if str(phase_idx + 1) in lane:  # Simple lane-phase mapping
+                                queue_length = traci.lane.getLastStepHaltingNumber(lane)
+                                waiting_time = traci.lane.getWaitingTime(lane)
+                                vehicle_count = traci.lane.getLastStepVehicleNumber(lane)
+                                normalized_waiting = waiting_time / max(vehicle_count, 1)
+                                phase_demand += (queue_length * 2.0) + (normalized_waiting / 10.0)
+                    except Exception:
+                        pass  # Skip this phase if data unavailable
+            
+            # Update best phase if this has higher demand
+            if phase_demand > best_demand:
+                best_demand = phase_demand
+                best_phase_idx = phase_idx
+        
+        # Fallback to sequential if no better phase found or all demands are zero
+        if best_phase_idx == current_phase_idx or best_demand <= 0:
+            best_phase_idx = (current_phase_idx + 1) % len(tl["phase"])
+            
+        return best_phase_idx
 
     def _record_actuated_step_metrics(self, tl):
         """
