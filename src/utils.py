@@ -188,10 +188,9 @@ def import_train_configuration(file_path):
         # Intersection configuration
         config['traffic_lights'] = content['traffic_lights']
 
-        # Accident configuration
-        config["junction_id_list"] = [junction["id"] for junction in content['accident']['junction']]
-        config["start_step"] = content['accident']['start_step']
-        config["duration"] = content['accident']['duration']
+        # Accident configuration (if exists)
+        if 'accident' in content:
+            config['accident'] = content['accident']
         config['sumocfg_path'] = content['dir']['sumocfg_path']
         print("Configuration loaded successfully.")
         return config

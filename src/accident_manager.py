@@ -21,6 +21,7 @@ class AccidentManager:
         self.duration = duration
         self.accident_active = False
         self.stopped_vehicle = None
+        self.accident_created_step = 0
 
     def count_vehicles_on_junction(self):
         """
@@ -113,8 +114,12 @@ class AccidentManager:
             str: ID of the stopped vehicle.
         """
         vehicle_id_stop = random.choice(vehicle_ids)
-        traci.vehicle.setSpeed(vehicle_id_stop, 0)
-        traci.vehicle.setLaneChangeMode(vehicle_id_stop, 0)
+        if traci.vehicletype.getVehicleClass(traci.vehicle.getTypeID(vehicle_id_stop)) == "pedestrian":
+            traci.vehicle.setParameter(vehicle_id_stop, "impatience",  0)
+        else:
+            traci.vehicle.setSpeed(vehicle_id_stop, 0)
+            traci.vehicle.setLaneChangeMode(vehicle_id_stop, 0)
+
         print(f"🚦 Vehicle {vehicle_id_stop} stopped.")
         return vehicle_id_stop
 
@@ -129,6 +134,54 @@ class AccidentManager:
             except traci.TraCIException:
                 print(f"Vehicle {self.stopped_vehicle} could not be removed (not found).")
 
+    def is_phase_blocked_by_vehicle(self, tl_id: str, phase_state: str, movements: list[str]) -> bool:
+        """
+        Check if the given phase string is blocked by the vehicle.
+        
+        Parameters:
+        phase_state (str): Phase string (e.g., "GrGr")
+        
+        Returns:
+        bool: True if blocked, False otherwise
+        """
+        if self.stopped_vehicle is None:
+            return False  # No stopped vehicle to block the phase
+
+        if self.stopped_vehicle not in traci.vehicle.getIDList():
+            return False  # Vehicle not present
+
+        road_id = traci.vehicle.getRoadID(self.stopped_vehicle)
+        lane_id = traci.vehicle.getLaneID(self.stopped_vehicle)
+
+        # Get controlled links (list of lists of (fromEdge, toEdge, viaLane))
+        controlled_links = traci.trafficlight.getControlledLinks(tl_id)
+
+        # Match vehicle’s current road/lane with a controlled link index
+        for link_idx, link_entries in enumerate(controlled_links):
+            for (from_edge, _, _) in link_entries:
+                if lane_id == from_edge:
+                    # If this link is GREEN in the given phase → it's blocked
+                    if link_idx < len(phase_state) and phase_state[link_idx] in ("G", "g"):
+                        return True
+
+        for det in movements:
+            if traci.vehicle.getLaneID(self.stopped_vehicle) == traci.lanearea.getLaneID(det):
+                return True
+        
+        # Check collisions
+        for col in traci.simulation.getCollisions():
+            col_lane = col.lane
+
+            # Match collision lane to a controlled link index
+            for link_idx, link_entries in enumerate(controlled_links):
+                for (from_edge, _, via_lane) in link_entries:
+                    if col_lane in (from_edge, via_lane):
+                        # If this link is GREEN in the phase → blocked
+                        if link_idx < len(phase_state) and phase_state[link_idx] in ("G", "g"):
+                            return True
+
+        return False
+
     def create_accident(self, current_step):
         """
         Creates an accident at the specified junction, edge, or detector.
@@ -136,7 +189,7 @@ class AccidentManager:
         Args:
             current_step (int): Current simulation step.
         """
-        if current_step == self.start_step and not self.accident_active:
+        if current_step >= self.start_step and current_step < self.start_step + self.duration and not self.accident_active:
             # Collect vehicles from all specified locations
             junction_vehicles = self.count_vehicles_on_junction()[1]
             edge_vehicles = self.count_vehicles_on_edge()[1]
@@ -147,13 +200,15 @@ class AccidentManager:
             if vehicle_list:
                 self.stopped_vehicle = self.random_stop_vehicle(vehicle_list)
                 self.accident_active = True
+                self.accident_created_step = current_step
                 print(f"Accident started at step {current_step}.")
                 print(f"Vehicle sources: {len(junction_vehicles)} from junctions, "
                       f"{len(edge_vehicles)} from edges, "
                       f"{len(detector_vehicles)} from detectors.")
             else:
                 print(f"No vehicles found to stop at step {current_step}.")
-        if current_step == self.start_step + self.duration and self.accident_active:
+        if current_step >= self.accident_created_step + self.duration and current_step <= self.accident_created_step + self.duration * 2 and self.accident_active:
             self.remove_stopped_vehicle()
             self.accident_active = False
+            self.stopped_vehicle = None  # Reset stopped vehicle
             print(f"Accident ended at step {current_step}.")

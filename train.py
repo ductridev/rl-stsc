@@ -34,84 +34,6 @@ import os
 import glob
 
 
-def run_post_training_tests(shared_path, latest_model_path=None):
-    """
-    Run test simulations for all 6 config files at the end of training.
-    
-    Args:
-        shared_path: Path where models and results are saved
-        latest_model_path: Path to the latest model (if None, will auto-detect)
-    """
-    print("\n" + "="*80)
-    print("RUNNING POST-TRAINING TEST SIMULATIONS")
-    print("="*80)
-    
-    # Import test utilities
-    from src.utils import import_test_configuration, set_sumo, set_test_path
-    from src.simulation_test import Simulation
-    from src.visualization import Visualization
-    from src.accident_manager import AccidentManager
-    
-    # Test config files to run
-    test_config_files = [
-        "config/testing_testngatu6x1-1.yaml",
-        "config/testing_testngatu6x1-2.yaml", 
-        "config/testing_testngatu6x1-3.yaml",
-        "config/testing_testngatu6x1-4.yaml",
-        "config/testing_testngatu6x1-5.yaml",
-        "config/testing_testngatu6x1-6.yaml"
-    ]
-    
-    # Find latest model path if not provided
-    if latest_model_path is None:
-        latest_model_path = find_latest_trained_model(shared_path)
-        if latest_model_path is None:
-            print("ERROR: Could not find latest trained model. Skipping post-training tests.")
-            return
-    
-    print(f"Using latest model path: {latest_model_path}")
-    
-    # Create test results directory
-    test_results_path = os.path.join(shared_path, "post_training_tests")
-    os.makedirs(test_results_path, exist_ok=True)
-    
-    test_results = {}
-    
-    for config_file in test_config_files:
-        try:
-            print(f"\n{'-'*60}")
-            print(f"TESTING WITH CONFIG: {config_file}")
-            print(f"{'-'*60}")
-            
-            # Load test configuration
-            config = import_test_configuration(config_file)
-            
-            # Override model_folder with latest model path
-            config['model_folder'] = latest_model_path
-            
-            # Set test path for this config
-            config_name = os.path.basename(config_file).replace('.yaml', '')
-            test_path = set_test_path(f"post_training_test_{config_name}")
-            
-            # Run DQN test simulation
-            result = test_dqn_simulation_standalone(config, test_path, latest_model_path)
-            test_results[config_file] = result
-            
-            print(f"Test completed for {config_file}")
-            
-        except Exception as e:
-            print(f"ERROR testing config {config_file}: {str(e)}")
-            test_results[config_file] = {"error": str(e)}
-    
-    # Save test results summary
-    save_test_results_summary(test_results, test_results_path)
-    
-    print(f"\n{'-'*80}")
-    print("POST-TRAINING TEST SIMULATIONS COMPLETED")
-    print(f"Results saved to: {test_results_path}")
-    print(f"{'-'*80}")
-
-
 def find_latest_trained_model(shared_path):
     """
     Find the latest trained model from the training session.
@@ -177,7 +99,8 @@ def test_dqn_simulation_standalone(config, path, model_file_path):
         accident_manager = AccidentManager(
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
-            junction_id_list=[junction["id"] for junction in config['accident']['junction']]
+            junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
     
     # Initialize DQN simulation in testing mode
@@ -684,58 +607,32 @@ def generate_routes_if_needed(config_file, config, demand = "high", global_episo
     """
     if config_file != "config/training_testngatu6x1EastWestOverflow.yaml":
         print("Generating routes...")
-        # if global_episode == 30:
-        #     generate_and_save_random_intervals(
-        #         sumo_cfg_file=config["sumo_cfg_file"],
-        #         total_duration=7200,
-        #         min_interval=3600,
-        #         max_interval=3600,
-        #         base_weight=0.0,
-        #         high_min=33,
-        #         high_max=400,
-        #         min_active_sides=1,
-        #         max_active_sides=1,
-        #         edge_groups=config["edge_groups"],
-        #     )
-        # elif global_episode == 30:
-        #     generate_and_save_random_intervals(
-        #         sumo_cfg_file=config["sumo_cfg_file"],
-        #         total_duration=7200,
-        #         min_interval=3600,
-        #         max_interval=3600,
-        #         base_weight=0.0,
-        #         high_min=33,
-        #         high_max=400,
-        #         min_active_sides=2,
-        #         max_active_sides=2,
-        #         edge_groups=config["edge_groups"],
-        #     )
-        # elif global_episode == 40:
-        #     generate_and_save_random_intervals(
-        #         sumo_cfg_file=config["sumo_cfg_file"],
-        #         total_duration=7200,
-        #         min_interval=3600,
-        #         max_interval=3600,
-        #         base_weight=0.0,
-        #         high_min=33,
-        #         high_max=400,
-        #         min_active_sides=1,
-        #         max_active_sides=1,
-        #         edge_groups=config["edge_groups"],
-        #     )
-        # else:
-        generate_and_save_random_intervals(
-            sumo_cfg_file=config["sumo_cfg_file"],
-            total_duration=3600,
-            min_interval=360,
-            max_interval=360,
-            base_weight=0.0,
-            high_min=100,
-            high_max=500,
-            min_active_sides=1,
-            max_active_sides=4,
-            edge_groups=config["edge_groups"],
-        )
+        if global_episode % 12 == 0:
+            generate_and_save_random_intervals(
+                sumo_cfg_file=config["sumo_cfg_file"],
+                total_duration=7200,
+                min_interval=3600,
+                max_interval=3600,
+                base_weight=0.0,
+                high_min=100,
+                high_max=400,
+                min_active_sides=1,
+                max_active_sides=1,
+                edge_groups=config["edge_groups"],
+            )
+        else:
+            generate_and_save_random_intervals(
+                sumo_cfg_file=config["sumo_cfg_file"],
+                total_duration=3600,
+                min_interval=360,
+                max_interval=360,
+                base_weight=0.0,
+                high_min=100,
+                high_max=500,
+                min_active_sides=1,
+                max_active_sides=4,
+                edge_groups=config["edge_groups"],
+            )
 
         Intersection.generate_residential_demand_routes(
             config,
@@ -818,9 +715,10 @@ def run_baseline_simulations(config_files, shared_path, shared_visualization, ph
         baseline_visualization = shared_visualization if shared_visualization else Visualization(path=baseline_path, dpi=100)
         
         accident_manager = AccidentManager(
-            start_step=config["start_step"],
-            duration=config["duration"],
-            junction_id_list=config["junction_id_list"],
+            start_step=config['accident']['start_step'],
+            duration=config['accident']['duration'],
+            junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
         
         # Initialize SimulationBase
@@ -1000,6 +898,7 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
     Returns:
         tuple: (simulation_skrl, shared_path, shared_visualization)
     """
+    accident_manager = None
     # Initialize shared components only once
     if shared_simulation_skrl is None:
         # Set model save path (use first config's model path)
@@ -1010,9 +909,10 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
         
         # Initialize accident manager for this config
         accident_manager = AccidentManager(
-            start_step=config["start_step"],
-            duration=config["duration"],
-            junction_id_list=config["junction_id_list"],
+            start_step=config['accident']['start_step'],
+            duration=config['accident']['duration'],
+            junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
         
         save_interval = config.get("save_interval", 10)
@@ -1037,9 +937,10 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
     else:
         # Update existing simulation with new config parameters
         accident_manager = AccidentManager(
-            start_step=config["start_step"],
-            duration=config["duration"],
-            junction_id_list=config["junction_id_list"],
+            start_step=config['accident']['start_step'],
+            duration=config['accident']['duration'],
+            junction_id_list=[junction["id"] for junction in config['accident']['junction']],
+            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
         )
         
         shared_simulation_skrl.accident_manager = accident_manager
@@ -1805,14 +1706,6 @@ def main():
     
     print(f"\nAll results saved to: {shared_path}")
     print("=" * 85)
-    
-    # Run post-training test simulations
-    try:
-        print("\nStarting post-training test simulations...")
-        run_post_training_tests(shared_path)
-    except Exception as e:
-        print(f"Error during post-training tests: {str(e)}")
-        print("Training completed successfully, but post-training tests failed.")
 
 
 if __name__ == "__main__":
