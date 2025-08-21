@@ -116,7 +116,7 @@ class Simulation(SUMO):
             "waiting_time": {},
             "desra_usage": {},  # Track DESRA vs DQN action selections
             "completed_travel_time": {},  # New: track average completed vehicle travel times
-            "junction_throughput": {},  # New: track vehicles entering junctions
+            "junction_arrival": {},  # New: track vehicles entering junctions
             "stopped_vehicles": {},  # New: track number of stopped vehicles
         }
 
@@ -289,7 +289,7 @@ class Simulation(SUMO):
                 "step_density_sum": 0,
                 "step_queue_length_sum": 0,
                 "step_waiting_time_sum": 0,
-                "step_junction_throughput_sum": 0,
+                "step_arrival_sum": 0,
                 "step_stopped_vehicles_sum": 0,
                 "step_old_vehicle_ids": [],
                 "step_reward_sum": 0
@@ -421,9 +421,9 @@ class Simulation(SUMO):
                 junction_id = tl.get("junction_id", tl_id)  # Use junction_id if available, else use tl_id
                 new_count, new_vehicles = self.junction_tracker.update_junction(junction_id)
                 
-                # Accumulate throughput for this step instead of directly appending
+                # Accumulate arrival for this step instead of directly appending
                 if new_count > 0:
-                    st["step_junction_throughput_sum"] += new_count
+                    st["step_arrival_sum"] += new_count
 
             # Update DESRA traffic parameters for real-time adaptation
             # Only update every 100 steps to reduce computational overhead
@@ -451,7 +451,7 @@ class Simulation(SUMO):
 
                 # Calculate metrics
                 new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-                outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
+                outflow = abs(len(new_ids) - len(st["old_vehicle_ids"]))
                 st["old_vehicle_ids"] = new_ids
 
                 sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
@@ -570,11 +570,11 @@ class Simulation(SUMO):
         self.history["outflow"][tl_id].append(st["step_outflow_sum"])
         st["step_outflow_sum"] = 0
         
-        # Add junction throughput to history (sum over 300 steps)
-        if tl_id not in self.history["junction_throughput"]:
-            self.history["junction_throughput"][tl_id] = []
-        self.history["junction_throughput"][tl_id].append(st["step_junction_throughput_sum"])
-        st["step_junction_throughput_sum"] = 0
+        # Add junction arrival to history (sum over 300 steps)
+        if tl_id not in self.history["junction_arrival"]:
+            self.history["junction_arrival"][tl_id] = []
+        self.history["junction_arrival"][tl_id].append(st["step_arrival_sum"])
+        st["step_arrival_sum"] = 0
 
     def _finalize_episode(self, episode: int):
         """Finalize episode and handle plotting/saving"""
@@ -929,7 +929,7 @@ class Simulation(SUMO):
 
         # Only collect specified system metrics
         target_metrics = [
-            "reward", "queue_length", "travel_delay", "waiting_time", "outflow", "junction_throughput", "stopped_vehicles"
+            "reward", "queue_length", "travel_delay", "waiting_time", "outflow", "junction_arrival", "stopped_vehicles"
         ]
 
         for metric, data_per_tls in self.history.items():

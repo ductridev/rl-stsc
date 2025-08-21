@@ -127,7 +127,7 @@ class TrafficMetrics:
         """Get sum of queue lengths for a traffic light"""
         queue_lengths = []
         for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            length = traci.lane.getLastStepHaltingNumber(lane)
+            length = traci.lane.getLastStepLength(lane)
             if length <= 0:
                 queue_lengths.append(0.0)
             else:
@@ -230,14 +230,8 @@ class TrafficMetrics:
         """Get vehicle IDs in a phase"""
         lane_idxs = [detector["id"] for detector in tl["detectors"]]
 
-        green_lanes = [
-            lane_idxs[i]
-            for i, light_state in enumerate(phase_str)
-            if light_state.upper() == "G" and i < len(lane_idxs)
-        ]
-
         vehicle_ids = []
-        for lane in green_lanes:
+        for lane in lane_idxs:
             try:
                 vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(lane))
             except:

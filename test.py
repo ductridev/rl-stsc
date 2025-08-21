@@ -715,8 +715,8 @@ def display_metrics_comparison(all_metrics_results, simulations_to_run):
         'reward': ('Total Reward', ''),
         'avg_waiting_time': ('Avg Waiting Time', 's'),
         'avg_travel_delay': ('Avg Travel Delay', 's'),
-        'throughput': ('Throughput (Outflow)', 'vehicles/step'),
-        'avg_queue_length': ('Avg Queue Length', 'vehicles')
+        'throughput': ('Throughput (Outflow)', 'vehicles/300 steps'),
+        'avg_queue_length': ('Avg Queue Length', 'meters')
     }
     
     # Method mapping for display names
@@ -1203,7 +1203,7 @@ def main():
         visualization = Visualization(path=path, dpi=100)
         
         # Generate plots comparing all simulation types
-        metrics = ["density_avg", "travel_time_avg", "outflow_avg", "queue_length_avg", "waiting_time_avg", "junction_throughput_avg", "stopped_vehicles_avg", "travel_delay_avg"]
+        metrics = ["density_avg", "travel_time_avg", "outflow_avg", "queue_length_avg", "waiting_time_avg", "junction_arrival_avg", "stopped_vehicles_avg", "travel_delay_avg"]
         names = []
         
         # Add simulation names based on what was run

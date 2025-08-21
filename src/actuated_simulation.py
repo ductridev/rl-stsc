@@ -95,7 +95,7 @@ class ActuatedSimulation(SUMO):
             "queue_length": {},
             "waiting_time": {},
             "completed_travel_time": {},  # New: track average completed vehicle travel times
-            "junction_throughput": {},  # New: track vehicles entering junctions
+            "junction_arrival": {},  # New: track vehicles entering junctions
             "stopped_vehicles": {},  # New: track number of stopped vehicles
         }
 
@@ -152,7 +152,7 @@ class ActuatedSimulation(SUMO):
                     "outflow": 0,
                     "queue": 0,
                     "waiting": 0,
-                    "junction_throughput": 0,
+                    "junction_arrival": 0,
                     "stopped_vehicles": 0,
                     "old_ids": [],
                 },
@@ -420,7 +420,7 @@ class ActuatedSimulation(SUMO):
 
         # Calculate metrics
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-        outflow = sum(1 for vid in st["old_vehicle_ids"] if vid not in new_ids)
+        outflow = abs(len(new_ids) - len(st["old_vehicle_ids"]))
         st["old_vehicle_ids"] = new_ids
 
         sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
@@ -464,13 +464,13 @@ class ActuatedSimulation(SUMO):
             self.history["outflow"][tl_id].append(st["step"]["outflow"])
             
             # Add junction throughput to history (sum over 300 steps)
-            if tl_id not in self.history["junction_throughput"]:
-                self.history["junction_throughput"][tl_id] = []
-            self.history["junction_throughput"][tl_id].append(st["step"]["junction_throughput"])
+            if tl_id not in self.history["junction_arrival"]:
+                self.history["junction_arrival"][tl_id] = []
+            self.history["junction_arrival"][tl_id].append(st["step"]["junction_arrival"])
             
             # Reset step counters
             st["step"]["outflow"] = 0
-            st["step"]["junction_throughput"] = 0
+            st["step"]["junction_arrival"] = 0
 
     def run(self, episode):
         print("Simulation started (Traffic-Actuated)")
@@ -513,7 +513,7 @@ class ActuatedSimulation(SUMO):
                 
                 # Accumulate throughput for this step instead of directly appending
                 if new_count > 0:
-                    st["step"]["junction_throughput"] += new_count
+                    st["step"]["junction_arrival"] += new_count
 
             # Print vehicle stats every 1000 steps
             if self.step % 1000 == 0:
@@ -601,7 +601,7 @@ class ActuatedSimulation(SUMO):
             "travel_delay",
             "travel_time",
             "waiting_time",
-            "junction_throughput",
+            "junction_arrival",
             "stopped_vehicles",
         ]
 
