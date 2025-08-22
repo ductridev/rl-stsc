@@ -45,12 +45,15 @@ class ActuatedSimulation(SUMO):
         self.path = path
         self.save_interval = save_interval
 
-        # Research-standard actuated control parameters (following Brilon & Laubert, 1994)
+        # Research-standard actuated control parameters (following MUTCD and HCM standards)
         self.min_green_time = min_green_time      # Research standard: 10s minimum 
         self.max_green_time = max_green_time      # Research standard: 40s maximum
         self.extension_time = extension_time      # Research standard: 5s extension time
+        self.gap_out_time = 3                     # Research standard: 3s gap-out time (no vehicles detected)
         self.detection_threshold = detection_threshold  # Research standard: 1 vehicle
         self.interphase_duration = 3              # Yellow time between phases
+        self.all_red_time = 2                     # All-red clearance time (safety clearance)
+        self.detector_zone_length = 50            # Detection zone length in meters (approach detection)
         
         # Extension counter tracking per traffic light
         self.extension_counters = {}
@@ -85,6 +88,7 @@ class ActuatedSimulation(SUMO):
         self.travel_time = {}
         self.waiting_time = {}
         self.phase = {}  # Track phases
+        self.phase_not_selected_count = {}  # Track how many times each phase was skipped during selection
 
         self.history = {
             "reward": {},
@@ -110,8 +114,10 @@ class ActuatedSimulation(SUMO):
             self.travel_time[traffic_light_id] = 0
             self.waiting_time[traffic_light_id] = 0
             self.phase[traffic_light_id] = {}
+            self.phase_not_selected_count[traffic_light_id] = {}
             for phase in traffic_light["phase"]:
                 self.phase[traffic_light_id][phase] = 0
+                self.phase_not_selected_count[traffic_light_id][phase] = 0
 
             for key in self.history:
                 self.history[key][traffic_light_id] = []
@@ -140,9 +146,12 @@ class ActuatedSimulation(SUMO):
                 "current_phase_index": 0,  # Track which phase we're in
                 "green_time_remaining": self.min_green_time,
                 "yellow_time_remaining": 0,
+                "all_red_time_remaining": 0,  # Add all-red timing
                 "in_yellow": False,
+                "in_all_red": False,  # Add all-red state tracking
                 "phase_start_time": 0,
                 "extension_counter": 0,  # Counter for extension mechanism
+                "no_vehicle_gap_timer": 0,  # Gap-out timer for actuated control
                 "waiting_for_extension": False,  # Whether in extension period
                 # step‐accumulators
                 "step": {
@@ -163,7 +172,7 @@ class ActuatedSimulation(SUMO):
             self.vehicles_detected_during_extension[tl_id] = False
 
     def check_detector_activation(self, tl, current_phase_idx):
-        """Check if vehicles are detected on current green phase approaches"""
+        """Check if vehicles are detected on current green phase approaches using proper detector zones"""
         tl_id = tl["id"]
         current_phase_str = tl["phase"][current_phase_idx]
         movements = self.get_movements_from_phase(tl, current_phase_str)
@@ -171,63 +180,104 @@ class ActuatedSimulation(SUMO):
         vehicles_detected = False
         for detector_id in movements:
             try:
-                # Check for vehicle presence on approach lanes
+                # Primary method: Use lane area detectors if available
                 lane_id = traci.lanearea.getLaneID(detector_id)
-                # Check vehicles within ~50m of intersection (approach detection)
-                vehicle_count = traci.lane.getLastStepVehicleNumber(lane_id)
-                if vehicle_count > 0:
+                
+                # Check for vehicles in detector zone (within detector area)
+                vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)
+                if vehicle_count >= self.detection_threshold:
                     vehicles_detected = True
                     break
-            except:
-                # Fallback: check queue length as proxy for approach vehicles
-                try:
-                    queue_len = traci.lanearea.getLastStepHaltingNumber(detector_id)
-                    if queue_len > 0:
+                    
+                # Also check for approaching vehicles (additional detection logic)
+                # Get vehicles on the approach lane within detection zone
+                lane_vehicles = traci.lane.getLastStepVehicleIDs(lane_id)
+                lane_length = traci.lane.getLength(lane_id)
+                
+                for vehicle_id in lane_vehicles:
+                    # Check if vehicle is within detector zone (last 50m of approach)
+                    vehicle_position = traci.vehicle.getLanePosition(vehicle_id)
+                    distance_to_stop_line = lane_length - vehicle_position
+                    
+                    if distance_to_stop_line <= self.detector_zone_length:
                         vehicles_detected = True
                         break
-                except:
-                    pass
+                        
+                if vehicles_detected:
+                    break
+                    
+            except Exception:
+                # Fallback: check queue length and lane occupancy as proxy
+                try:
+                    # Check for queued vehicles (stopped vehicles indicate demand)
+                    queue_len = traci.lanearea.getLastStepHaltingNumber(detector_id)
+                    if queue_len >= self.detection_threshold:
+                        vehicles_detected = True
+                        break
+                        
+                    # Alternative: Check lane occupancy
+                    lane_id = traci.lanearea.getLaneID(detector_id)
+                    vehicle_count = traci.lane.getLastStepVehicleNumber(lane_id)
+                    if vehicle_count >= self.detection_threshold:
+                        vehicles_detected = True
+                        break
+                        
+                except Exception:
+                    # Final fallback: Use controlled lanes
+                    for lane in traci.trafficlight.getControlledLanes(tl_id):
+                        if f"_{current_phase_idx + 1}_" in lane:  # Simple phase-lane mapping
+                            vehicle_count = traci.lane.getLastStepVehicleNumber(lane)
+                            if vehicle_count >= self.detection_threshold:
+                                vehicles_detected = True
+                                break
         
         return vehicles_detected
 
     def should_extend_green_phase(self, tl, st):
-        """Research-standard extension logic: extend if vehicles detected during extension period"""
+        """
+        Research-standard extension logic implementing gap-out timing.
+        Gap-out: Green phase ends when no vehicles detected for gap_out_time seconds.
+        """
         tl_id = tl["id"]
         
         # Check if vehicles are detected on current green approaches
         vehicles_detected = self.check_detector_activation(tl, st["current_phase_index"])
         
-        # Extension logic following research standard:
+        # Extension logic following MUTCD and HCM standards:
         # 1. Wait minimum green time first
-        # 2. Then start extension counter 
-        # 3. Reset counter if vehicles detected
-        # 4. Switch when counter reaches zero OR max green reached
+        # 2. After minimum green, implement gap-out timing
+        # 3. Extend green if vehicles detected (reset gap timer)
+        # 4. End green when no vehicles detected for gap_out_time OR max green reached
         
         if st["green_time_remaining"] > 0:
             # Still in minimum green period
             return True, "minimum_green"
             
-        # Past minimum green - now in extension period
+        # Past minimum green - now in extension/gap-out period
         if not st["waiting_for_extension"]:
-            # Start extension period
+            # Start gap-out timing
             st["waiting_for_extension"] = True
-            st["extension_counter"] = self.extension_time
-            # print(f"TL {tl_id}: Starting extension period ({self.extension_time}s)")
+            st["extension_counter"] = self.gap_out_time  # Start gap-out timer
+            st["no_vehicle_gap_timer"] = 0  # Track consecutive time with no vehicles
+            # print(f"TL {tl_id}: Starting gap-out period ({self.gap_out_time}s)")
         
-        # Check for vehicle detection during extension
+        # Gap-out logic: Track time with no vehicles detected
         if vehicles_detected:
-            # Reset extension counter when vehicles detected
-            st["extension_counter"] = self.extension_time
+            # Vehicles detected - reset gap timer and continue green
+            st["no_vehicle_gap_timer"] = 0
             self.vehicles_detected_during_extension[tl_id] = True
-            return True, "extended_due_to_vehicles"
-        
-        # Countdown extension timer
-        if st["extension_counter"] > 0:
-            st["extension_counter"] -= 1
-            return True, "extension_countdown"
-        
-        # Extension period expired - time to switch
-        return False, "extension_expired"
+            return True, "vehicles_detected_continue_green"
+        else:
+            # No vehicles detected - increment gap timer
+            st["no_vehicle_gap_timer"] += 1
+            
+            # Check if gap-out time reached (no vehicles for gap_out_time seconds)
+            if st["no_vehicle_gap_timer"] >= self.gap_out_time:
+                # Gap-out condition met - end green phase
+                return False, "gap_out_expired"
+            else:
+                # Still within gap-out period
+                return True, f"gap_out_countdown_{self.gap_out_time - st['no_vehicle_gap_timer']}"
 
     def select_next_phase(self, tl, current_phase_idx):
         """Select phase with highest demand (highest queue length + waiting time)"""
@@ -287,29 +337,143 @@ class ActuatedSimulation(SUMO):
             
         return best_phase_idx
 
+    def update_phase_selection_tracking(self, tl_id, selected_phase_str):
+        """Update tracking when a phase is selected - reset its counter, increment others"""
+        # Reset the counter for the phase that was selected
+        self.phase_not_selected_count[tl_id][selected_phase_str] = 0
+        
+        # Increment counter for all other phases (they were skipped this time)
+        for phase in self.phase_not_selected_count[tl_id]:
+            if phase != selected_phase_str:
+                self.phase_not_selected_count[tl_id][phase] += 1
+
+    def find_phase_needing_priority(self, tl, max_not_selected=6):
+        """Find phase that hasn't been selected for max_not_selected consecutive times"""
+        for phase, count in self.phase_not_selected_count[tl["id"]].items():
+            if count >= max_not_selected:
+                # Check if this phase has vehicles
+                movements = self.get_movements_from_phase(tl, phase)  # Fix: use correct traffic light
+                for detector_id in movements:
+                    try:
+                        # Check if there are vehicles in the detector area
+                        vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)
+                        if vehicle_count > 0:
+                            # This phase has demand - return it
+                            print(f"Phase {phase} needs priority (not selected {count} times)")
+                            return phase
+                    except Exception:
+                        # If detector data unavailable, skip this phase
+                        pass
+        return None
+
+    def get_phase_tracking_info(self, tl_id):
+        """Get current phase selection tracking information for debugging"""
+        return self.phase_not_selected_count[tl_id].copy()
+
+    def validate_actuated_setup(self):
+        """Validate that the actuated simulation is properly configured"""
+        validation_issues = []
+        
+        for tl in self.traffic_lights:
+            tl_id = tl["id"]
+            
+            # Check if traffic light has detector configuration
+            if "detectors" not in tl or not tl["detectors"]:
+                validation_issues.append(f"Traffic light {tl_id} missing detector configuration")
+                continue
+            
+            # Check if phases are properly defined
+            if "phase" not in tl or len(tl["phase"]) < 2:
+                validation_issues.append(f"Traffic light {tl_id} needs at least 2 phases for actuated control")
+            
+            # Check detector-phase mapping
+            for phase_idx, phase_str in enumerate(tl["phase"]):
+                active_street = str(phase_idx + 1)
+                phase_detectors = [det for det in tl["detectors"] if det["street"] == active_street]
+                if not phase_detectors:
+                    validation_issues.append(f"Traffic light {tl_id} phase {phase_idx} ({phase_str}) has no associated detectors")
+        
+        # Check timing parameters
+        if self.min_green_time < 5:
+            validation_issues.append("Minimum green time should be at least 5 seconds")
+        if self.max_green_time <= self.min_green_time:
+            validation_issues.append("Maximum green time should be greater than minimum green time")
+        if self.gap_out_time < 2:
+            validation_issues.append("Gap-out time should be at least 2 seconds")
+        
+        if validation_issues:
+            print("⚠️  Actuated Control Validation Issues:")
+            for issue in validation_issues:
+                print(f"   • {issue}")
+            return False
+        else:
+            print("✅ Actuated control setup validation passed")
+            return True
+
+    def print_actuated_status(self, tl_id):
+        """Print current actuated control status for debugging"""
+        if tl_id not in self.tl_states:
+            print(f"No state found for traffic light {tl_id}")
+            return
+            
+        st = self.tl_states[tl_id]
+        phase_tracking = self.get_phase_tracking_info(tl_id)
+        
+        status = f"TL {tl_id} Status:\n"
+        status += f"  Current Phase: {st['current_phase_index']} ({st['phase']})\n"
+        status += f"  Green Remaining: {st['green_time_remaining']}s\n"
+        status += f"  In Yellow: {st['in_yellow']} (remaining: {st['yellow_time_remaining']}s)\n"
+        status += f"  In All-Red: {st['in_all_red']} (remaining: {st['all_red_time_remaining']}s)\n"
+        status += f"  Waiting for Extension: {st['waiting_for_extension']}\n"
+        status += f"  Gap Timer: {st['no_vehicle_gap_timer']}/{self.gap_out_time}s\n"
+        status += f"  Phase Start Time: {st['phase_start_time']}\n"
+        status += f"  Phase Duration: {self.step - st['phase_start_time']}s\n"
+        status += f"  Phase Selection Count: {phase_tracking}\n"
+        
+        print(status)
+
     def _record_actuated_step_metrics(self, tl):
         """
-        Research-standard actuated control logic following Brilon & Laubert (1994).
-        Implements extension mechanism with vehicle detection.
+        Research-standard actuated control logic following MUTCD and HCM standards.
+        Implements proper phase sequence: Green -> Yellow -> All-Red -> Next Green
         """
         tl_id = tl["id"]
         st = self.tl_states[tl_id]
 
-        # Handle yellow phase countdown
-        if st["in_yellow"] and st["yellow_time_remaining"] > 0:
-            st["yellow_time_remaining"] -= 1
-            if st["yellow_time_remaining"] == 0:
-                # Yellow phase ended, apply the new phase
-                st["in_yellow"] = False
+        # Handle all-red phase countdown (clearance time for safety)
+        if st["in_all_red"] and st["all_red_time_remaining"] > 0:
+            st["all_red_time_remaining"] -= 1
+            if st["all_red_time_remaining"] == 0:
+                # All-red phase ended, apply the new green phase
+                st["in_all_red"] = False
                 new_phase_str = tl["phase"][st["current_phase_index"]]
                 traci.trafficlight.setRedYellowGreenState(tl_id, new_phase_str)
                 st["phase"] = new_phase_str
                 st["green_time_remaining"] = self.min_green_time
                 st["waiting_for_extension"] = False
                 st["extension_counter"] = 0
+                st["no_vehicle_gap_timer"] = 0
                 st["phase_start_time"] = self.step
                 self.vehicles_detected_during_extension[tl_id] = False
-                # print(f"TL {tl_id}: Applied new phase {st['current_phase_index']}: {new_phase_str}")
+                # print(f"TL {tl_id}: Applied new green phase {st['current_phase_index']}: {new_phase_str}")
+            # Collect metrics even during all-red phase
+            self._collect_step_metrics(tl, st)
+            return
+
+        # Handle yellow phase countdown
+        if st["in_yellow"] and st["yellow_time_remaining"] > 0:
+            st["yellow_time_remaining"] -= 1
+            if st["yellow_time_remaining"] == 0:
+                # Yellow phase ended, start all-red clearance
+                st["in_yellow"] = False
+                st["in_all_red"] = True
+                st["all_red_time_remaining"] = self.all_red_time
+                
+                # Apply all-red phase (all signals red)
+                current_phase = st["phase"]
+                all_red_phase = "".join("r" if c in "Gy" else c for c in current_phase)
+                traci.trafficlight.setRedYellowGreenState(tl_id, all_red_phase)
+                # print(f"TL {tl_id}: Starting all-red clearance ({self.all_red_time}s)")
             # Collect metrics even during yellow phase
             self._collect_step_metrics(tl, st)
             return
@@ -318,14 +482,12 @@ class ActuatedSimulation(SUMO):
         if st["green_time_remaining"] > 0:
             st["green_time_remaining"] -= 1
 
-        should_change_phase = None
+        current_phase = st["phase"]
 
-        for phase in tl["phase"]:
-            if self.phase[tl_id][phase] > 6:
-                should_change_phase = phase
-                break
+        # Check if any phase needs priority (hasn't been selected for 6+ times)
+        should_change_phase = self.find_phase_needing_priority(tl, max_not_selected=6)
 
-        # Check if we should change to the phase never call last 6
+        # Check if we should change to the phase never selected in last 6 decisions
         if should_change_phase is None:
             # Check if maximum green time exceeded (force switch)
             phase_duration = self.step - st["phase_start_time"]
@@ -334,55 +496,73 @@ class ActuatedSimulation(SUMO):
                 should_continue = False
                 reason = "max_green_exceeded"
             else:
-                # Apply research-standard extension logic
+                # Apply research-standard gap-out logic
                 should_continue, reason = self.should_extend_green_phase(tl, st)
 
             if not should_continue:
-                # Time to switch phases
+                # Time to switch phases - this is a phase selection decision
                 new_phase_idx = self.select_next_phase(tl, st["current_phase_index"])
+                new_phase_str = tl["phase"][new_phase_idx]
+                
+                # Update phase selection tracking - the selected phase resets to 0, others increment
+                self.update_phase_selection_tracking(tl_id, new_phase_str)
                 
                 # print(f"TL {tl_id}: Switching from phase {st['current_phase_index']} to {new_phase_idx} (reason: {reason})")
                 
                 # Calculate reward for the completed phase
                 self._update_metrics_and_reward(tl, st)
                 
-                # Start yellow phase transition
+                # Start yellow phase transition (proper phase sequence)
                 st["current_phase_index"] = new_phase_idx
                 st["in_yellow"] = True
                 st["yellow_time_remaining"] = self.interphase_duration
                 
-                # Apply yellow phase (replace G with y)
-                current_phase = st["phase"]
+                # Apply yellow phase (replace G with y, keep others)
                 yellow_phase = current_phase.replace("G", "y")
                 traci.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
                 
-                # Reset extension tracking
+                # Reset extension and gap-out tracking
                 st["waiting_for_extension"] = False
                 st["extension_counter"] = 0
+                st["no_vehicle_gap_timer"] = 0
                 self.vehicles_detected_during_extension[tl_id] = False
 
         else:
-            # Force switch to the phase that has not been called in the last X steps
-            new_phase_idx = phase_to_index(should_change_phase, self.actions_map[tl["id"]], 0)
+            # Force switch to the phase that has not been selected in the last 6 decisions
+            # Find the index of this phase
+            new_phase_idx = None
+            for i, phase_str in enumerate(tl["phase"]):
+                if phase_str == should_change_phase:
+                    new_phase_idx = i
+                    break
             
-            # print(f"TL {tl_id}: Switching from phase {st['current_phase_index']} to {new_phase_idx} (reason: {reason})")
+            if new_phase_idx is None:
+                # Fallback if phase not found - use sequential
+                new_phase_idx = (st["current_phase_index"] + 1) % len(tl["phase"])
+                should_change_phase = tl["phase"][new_phase_idx]
+            
+            # Update phase selection tracking for the forced selection
+            self.update_phase_selection_tracking(tl_id, should_change_phase)
+            
+            print(f"TL {tl_id}: Force switching from phase {st['current_phase_index']} to {new_phase_idx} "
+                  f"(phase {should_change_phase} not selected for 6+ decisions)")
             
             # Calculate reward for the completed phase
             self._update_metrics_and_reward(tl, st)
             
-            # Start yellow phase transition
+            # Start yellow phase transition (proper phase sequence)
             st["current_phase_index"] = new_phase_idx
             st["in_yellow"] = True
             st["yellow_time_remaining"] = self.interphase_duration
             
-            # Apply yellow phase (replace G with y)
-            current_phase = st["phase"]
+            # Apply yellow phase (replace G with y, keep others)
             yellow_phase = current_phase.replace("G", "y")
             traci.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
             
-            # Reset extension tracking
+            # Reset extension and gap-out tracking
             st["waiting_for_extension"] = False
             st["extension_counter"] = 0
+            st["no_vehicle_gap_timer"] = 0
             self.vehicles_detected_during_extension[tl_id] = False
 
         # Record metrics for this step
@@ -411,12 +591,6 @@ class ActuatedSimulation(SUMO):
         """Collect traffic metrics for current step"""
         tl_id = tl["id"]
         current_phase = st["phase"]
-
-        for phase in tl["phase"]:
-            if phase != current_phase:
-                self.phase[tl_id][phase] += 1
-            else:
-                self.phase[tl_id][phase] = 0
 
         # Calculate metrics
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
@@ -475,6 +649,12 @@ class ActuatedSimulation(SUMO):
     def run(self, episode):
         print("Simulation started (Traffic-Actuated)")
         print("---------------------------------------")
+        
+        # Validate actuated control setup before starting
+        if not self.validate_actuated_setup():
+            print("❌ Actuated control setup validation failed. Please check configuration.")
+            return 0
+        
         sim_start = time.time()
 
         # Initialize per‐TL state for actuated control
@@ -486,6 +666,12 @@ class ActuatedSimulation(SUMO):
         # Warm up 50 steps
         for _ in range(50):
             traci.simulationStep()
+
+        print(f"Actuated Control Parameters:")
+        print(f"  Min Green: {self.min_green_time}s, Max Green: {self.max_green_time}s")
+        print(f"  Gap-out Time: {self.gap_out_time}s, Yellow: {self.interphase_duration}s, All-Red: {self.all_red_time}s")
+        print(f"  Detection Zone: {self.detector_zone_length}m, Detection Threshold: {self.detection_threshold} vehicles")
+        print("---------------------------------------")
 
         # Main simulation loop
         while self.step < self.max_steps:
@@ -524,6 +710,19 @@ class ActuatedSimulation(SUMO):
                     f"Total Departed={current_stats['total_departed']}, "
                     f"Total Arrived={current_stats['total_arrived']}"
                 )
+                
+            # Optional: Print actuated control status for debugging (uncomment to enable)
+            # if self.step % 500 == 0:
+            #     for tl in self.traffic_lights:
+            #         self.print_actuated_status(tl["id"])
+                
+            # Optional: Print phase tracking info for debugging every 2000 steps
+            if self.step % 2000 == 0:
+                for tl in self.traffic_lights:
+                    tl_id = tl["id"]
+                    phase_info = self.get_phase_tracking_info(tl_id)
+                    current_phase = self.tl_states[tl_id]["current_phase_index"]
+                    print(f"TL {tl_id} - Current Phase: {current_phase}, Selection Count: {phase_info}")
 
             # Collect per‐TL metrics and handle actuated control
             for tl in self.traffic_lights:
