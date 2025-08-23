@@ -10,7 +10,10 @@ The primary objective of RL-STSC is to develop an intelligent traffic signal con
 - **Multi-Agent and Multi-Intersection Coordination:** Managing multiple intersections simultaneously introduces additional complexity, as actions at one intersection can affect traffic at others.
 - **Exploration vs. Exploitation:** The agent must balance trying new strategies (exploration) with leveraging learned policies (exploitation) to optimize long-term performance.
 
-## Environment Setup
+
+## Experiment Tracking
+
+After each training or testing run, a snapshot of the configuration is automatically saved as `config_snapshot.yaml` (YAML format) in the results folder. This supports reproducibility and experiment management.
 
 The environment simulates a traffic network using the SUMO (Simulation of Urban MObility) simulator. The RL agent interacts with this environment by controlling traffic lights at intersections. Key parameters include:
 
@@ -19,7 +22,10 @@ The environment simulates a traffic network using the SUMO (Simulation of Urban 
 - **Reward Signal:** The environment provides feedback based on traffic efficiency metrics (e.g., reduced waiting time, improved flow), calculated as a weighted sum of normalized metrics.
 - **Simulation Parameters:** Configurable via YAML, including simulation steps, memory buffer sizes, traffic light configurations, and agent hyperparameters.
 
+
 ## Agent Design and States
+
+The agent state now includes DESRA hints and accident features for robust decision-making. The codebase is modularized and uses SKRL for agent management and training. See [MODULARIZATION_STATUS.md](MODULARIZATION_STATUS.md) for details.
 
 The RL agent is implemented as a Deep Q-Network (DQN) with optional attention mechanisms ([SENet](https://link.springer.com/article/10.1007/s40747-025-01841-9)). The agent design includes:
 

@@ -96,7 +96,10 @@ agent:
   hidden_size: 256             # New: hidden layer size
 ```
 
-## Model Saving and Loading
+
+## Model Saving, Loading, and Config Snapshots
+
+After each training or testing run, a snapshot of the configuration is automatically saved as `config_snapshot.yaml` (YAML format) in the results folder. This supports reproducibility and experiment management.
 
 The SKRL version provides methods to save and load trained models:
 
@@ -108,8 +111,10 @@ simulation.save_models(episode=10)
 simulation.load_models(episode=10)
 ```
 
+
 Models are saved per traffic light with the naming convention:
 `{path}skrl_dqn_{traffic_light_id}_episode_{episode}.pt`
+Config snapshots are saved alongside results as `config_snapshot.json`.
 
 ## Performance Benefits
 

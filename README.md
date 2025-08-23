@@ -105,11 +105,11 @@ We integrate **DESRA** (DEcentralized Spillback Resistant Acyclic) as a rule-bas
 The input to the DQN model becomes:
 
 ```python
-[...per-phase states..., desra_hint, desra_green_time]
+[...per-phase states..., desra_phase_idx]
 ```
 Where per-phase states will be
 ```python
-[free_capacity, density, waiting_time, queue_length]
+[waiting_time, num_vehicles, highest_queue_length]
 ```
 
 - This maintains compatibility with the existing architecture while improving spillback awareness and decision robustness.
@@ -140,12 +140,21 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 - Supports scalable learning as city-size grows (many intersections).
 - Allows the system to evaluate the robustness of traffic signal control under unexpected disruptions like accident.
 
-### Training Logic
 
-Check [TRAINING.md](TRAINING.md)
+### Training Logic
+See [TRAINING.md](TRAINING.md) for details on batch training, target network, and experience replay. After each training run, a snapshot of the configuration used is automatically saved as `config_snapshot.yaml` (YAML format) in the results folder for reproducibility.
+
+### Testing and Evaluation
+After each testing run, a snapshot of the configuration is also saved as `config_snapshot.yaml` (YAML format) in the results folder.
+
+### Modularization & SKRL Integration
+The codebase is now fully modularized, with SKRL-based agent management, factory patterns for environment/model creation, and clean separation of concerns. See [MODULARIZATION_STATUS.md](MODULARIZATION_STATUS.md) for details.
+
+### Model Saving/Loading
+Models are saved per traffic light with the convention: `skrl_model_{traffic_light_id}_episode_{episode}.pt` and config snapshots are saved alongside results.
 
 ### Project Methodology Summary
-Check [SUMMARY.md](SUMMARY.md)
+See [SUMMARY.md](SUMMARY.md) for a high-level overview.
 
 ## License
 

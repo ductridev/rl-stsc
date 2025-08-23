@@ -29,7 +29,10 @@ The SUMO-based traffic signal control simulation has been **successfully modular
 - ✅ Experience replay memory handling
 - ✅ Clean separation from original simulation.py
 
+
 ## ✅ Key Features Implemented
+
+- ✅ **Config Snapshot Saving**: After each training or testing run, a snapshot of the configuration is automatically saved as `config_snapshot.yaml` (YAML format) in the results folder for reproducibility.
 
 ### Modular Architecture
 - ✅ **Separation of Concerns**: Each module has a single responsibility
