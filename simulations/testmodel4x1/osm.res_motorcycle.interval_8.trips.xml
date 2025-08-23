@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-02 13:30:03.674598 by randomTrips.py UNKNOWN
+<configuration>
+    <net-file value="osm.net.xml.gz"/>
+    <weights-prefix value="random_edge_priority_interval_8"/>
+    <output-trip-file value="osm.res_motorcycle.interval_8.trips.xml"/>
+    <prefix value="res_motorcycle_int8"/>
+    <trip-attributes value="departLane='best'"/>
+    <fringe-start-attributes value="departSpeed='max'"/>
+    <vehicle-class value="motorcycle"/>
+    <vclass value="motorcycle"/>
+    <remove-loops value="True"/>
+    <validate value="True"/>
+    <begin value="2888.0"/>
+    <end value="3248.0"/>
+    <insertion-rate value="1750.0"/>
+</configuration>
+-->
+
+<!-- generated on 2025-08-02 13:30:03 by Eclipse SUMO duarouter Version 1.22.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_motorcycle.interval_8.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_motorcycle.interval_8.trips.xml.tmp"/>
+        <alternatives-output value="NUL"/>
+        <write-trips value="true"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="2888.0"/>
+        <end value="3248.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_motorcycle_int8_motorcycle" vClass="motorcycle"/>
+    <trip id="res_motorcycle_int80" type="res_motorcycle_int8_motorcycle" depart="2888.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int81" type="res_motorcycle_int8_motorcycle" depart="2890.06" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int82" type="res_motorcycle_int8_motorcycle" depart="2892.11" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int83" type="res_motorcycle_int8_motorcycle" depart="2894.17" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int85" type="res_motorcycle_int8_motorcycle" depart="2898.29" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int86" type="res_motorcycle_int8_motorcycle" depart="2900.34" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int87" type="res_motorcycle_int8_motorcycle" depart="2902.40" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int88" type="res_motorcycle_int8_motorcycle" depart="2904.46" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int89" type="res_motorcycle_int8_motorcycle" depart="2906.51" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int810" type="res_motorcycle_int8_motorcycle" depart="2908.57" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int813" type="res_motorcycle_int8_motorcycle" depart="2914.74" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int814" type="res_motorcycle_int8_motorcycle" depart="2916.80" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int815" type="res_motorcycle_int8_motorcycle" depart="2918.86" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int816" type="res_motorcycle_int8_motorcycle" depart="2920.91" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int817" type="res_motorcycle_int8_motorcycle" depart="2922.97" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_motorcycle_int818" type="res_motorcycle_int8_motorcycle" depart="2925.03" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int819" type="res_motorcycle_int8_motorcycle" depart="2927.09" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int820" type="res_motorcycle_int8_motorcycle" depart="2929.14" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int821" type="res_motorcycle_int8_motorcycle" depart="2931.20" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_motorcycle_int822" type="res_motorcycle_int8_motorcycle" depart="2933.26" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int823" type="res_motorcycle_int8_motorcycle" depart="2935.31" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int827" type="res_motorcycle_int8_motorcycle" depart="2943.54" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int828" type="res_motorcycle_int8_motorcycle" depart="2945.60" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int829" type="res_motorcycle_int8_motorcycle" depart="2947.66" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_motorcycle_int830" type="res_motorcycle_int8_motorcycle" depart="2949.71" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int831" type="res_motorcycle_int8_motorcycle" depart="2951.77" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int832" type="res_motorcycle_int8_motorcycle" depart="2953.83" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int833" type="res_motorcycle_int8_motorcycle" depart="2955.89" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int834" type="res_motorcycle_int8_motorcycle" depart="2957.94" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_motorcycle_int839" type="res_motorcycle_int8_motorcycle" depart="2968.23" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int841" type="res_motorcycle_int8_motorcycle" depart="2972.34" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int843" type="res_motorcycle_int8_motorcycle" depart="2976.46" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int844" type="res_motorcycle_int8_motorcycle" depart="2978.51" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int847" type="res_motorcycle_int8_motorcycle" depart="2984.69" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int848" type="res_motorcycle_int8_motorcycle" depart="2986.74" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int849" type="res_motorcycle_int8_motorcycle" depart="2988.80" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int851" type="res_motorcycle_int8_motorcycle" depart="2992.91" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int852" type="res_motorcycle_int8_motorcycle" depart="2994.97" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int853" type="res_motorcycle_int8_motorcycle" depart="2997.03" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int854" type="res_motorcycle_int8_motorcycle" depart="2999.09" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int856" type="res_motorcycle_int8_motorcycle" depart="3003.20" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int857" type="res_motorcycle_int8_motorcycle" depart="3005.26" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int858" type="res_motorcycle_int8_motorcycle" depart="3007.31" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int859" type="res_motorcycle_int8_motorcycle" depart="3009.37" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int860" type="res_motorcycle_int8_motorcycle" depart="3011.43" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int861" type="res_motorcycle_int8_motorcycle" depart="3013.49" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int862" type="res_motorcycle_int8_motorcycle" depart="3015.54" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int863" type="res_motorcycle_int8_motorcycle" depart="3017.60" departLane="best" departSpeed="max" from="E18" to="E31.622"/>
+    <trip id="res_motorcycle_int864" type="res_motorcycle_int8_motorcycle" depart="3019.66" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int866" type="res_motorcycle_int8_motorcycle" depart="3023.77" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int867" type="res_motorcycle_int8_motorcycle" depart="3025.83" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int868" type="res_motorcycle_int8_motorcycle" depart="3027.89" departLane="best" departSpeed="max" from="E18" to="E31.622"/>
+    <trip id="res_motorcycle_int869" type="res_motorcycle_int8_motorcycle" depart="3029.94" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int870" type="res_motorcycle_int8_motorcycle" depart="3032.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int873" type="res_motorcycle_int8_motorcycle" depart="3038.17" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int874" type="res_motorcycle_int8_motorcycle" depart="3040.23" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_motorcycle_int875" type="res_motorcycle_int8_motorcycle" depart="3042.29" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int876" type="res_motorcycle_int8_motorcycle" depart="3044.34" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_motorcycle_int877" type="res_motorcycle_int8_motorcycle" depart="3046.40" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int878" type="res_motorcycle_int8_motorcycle" depart="3048.46" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_motorcycle_int879" type="res_motorcycle_int8_motorcycle" depart="3050.51" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int882" type="res_motorcycle_int8_motorcycle" depart="3056.69" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int883" type="res_motorcycle_int8_motorcycle" depart="3058.74" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int884" type="res_motorcycle_int8_motorcycle" depart="3060.80" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int885" type="res_motorcycle_int8_motorcycle" depart="3062.86" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int886" type="res_motorcycle_int8_motorcycle" depart="3064.91" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int887" type="res_motorcycle_int8_motorcycle" depart="3066.97" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int888" type="res_motorcycle_int8_motorcycle" depart="3069.03" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int889" type="res_motorcycle_int8_motorcycle" depart="3071.09" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_motorcycle_int890" type="res_motorcycle_int8_motorcycle" depart="3073.14" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int891" type="res_motorcycle_int8_motorcycle" depart="3075.20" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int892" type="res_motorcycle_int8_motorcycle" depart="3077.26" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_motorcycle_int893" type="res_motorcycle_int8_motorcycle" depart="3079.31" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int894" type="res_motorcycle_int8_motorcycle" depart="3081.37" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_motorcycle_int895" type="res_motorcycle_int8_motorcycle" depart="3083.43" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_motorcycle_int897" type="res_motorcycle_int8_motorcycle" depart="3087.54" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_motorcycle_int898" type="res_motorcycle_int8_motorcycle" depart="3089.60" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int899" type="res_motorcycle_int8_motorcycle" depart="3091.66" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8100" type="res_motorcycle_int8_motorcycle" depart="3093.71" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8101" type="res_motorcycle_int8_motorcycle" depart="3095.77" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8102" type="res_motorcycle_int8_motorcycle" depart="3097.83" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8104" type="res_motorcycle_int8_motorcycle" depart="3101.94" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_motorcycle_int8107" type="res_motorcycle_int8_motorcycle" depart="3108.11" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8108" type="res_motorcycle_int8_motorcycle" depart="3110.17" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8109" type="res_motorcycle_int8_motorcycle" depart="3112.23" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_motorcycle_int8110" type="res_motorcycle_int8_motorcycle" depart="3114.29" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8111" type="res_motorcycle_int8_motorcycle" depart="3116.34" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8113" type="res_motorcycle_int8_motorcycle" depart="3120.46" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8115" type="res_motorcycle_int8_motorcycle" depart="3124.57" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int8116" type="res_motorcycle_int8_motorcycle" depart="3126.63" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8117" type="res_motorcycle_int8_motorcycle" depart="3128.69" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int8118" type="res_motorcycle_int8_motorcycle" depart="3130.74" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8119" type="res_motorcycle_int8_motorcycle" depart="3132.80" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8120" type="res_motorcycle_int8_motorcycle" depart="3134.86" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_motorcycle_int8121" type="res_motorcycle_int8_motorcycle" depart="3136.91" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8122" type="res_motorcycle_int8_motorcycle" depart="3138.97" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int8123" type="res_motorcycle_int8_motorcycle" depart="3141.03" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_motorcycle_int8125" type="res_motorcycle_int8_motorcycle" depart="3145.14" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_motorcycle_int8126" type="res_motorcycle_int8_motorcycle" depart="3147.20" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_motorcycle_int8127" type="res_motorcycle_int8_motorcycle" depart="3149.26" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8128" type="res_motorcycle_int8_motorcycle" depart="3151.31" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int8130" type="res_motorcycle_int8_motorcycle" depart="3155.43" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8132" type="res_motorcycle_int8_motorcycle" depart="3159.54" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8133" type="res_motorcycle_int8_motorcycle" depart="3161.60" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8134" type="res_motorcycle_int8_motorcycle" depart="3163.66" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8136" type="res_motorcycle_int8_motorcycle" depart="3167.77" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8137" type="res_motorcycle_int8_motorcycle" depart="3169.83" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int8139" type="res_motorcycle_int8_motorcycle" depart="3173.94" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_motorcycle_int8140" type="res_motorcycle_int8_motorcycle" depart="3176.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8142" type="res_motorcycle_int8_motorcycle" depart="3180.11" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8143" type="res_motorcycle_int8_motorcycle" depart="3182.17" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8144" type="res_motorcycle_int8_motorcycle" depart="3184.23" departLane="best" departSpeed="max" from="E30" to="E22.488"/>
+    <trip id="res_motorcycle_int8145" type="res_motorcycle_int8_motorcycle" depart="3186.29" departLane="best" departSpeed="max" from="E18" to="E31.622"/>
+    <trip id="res_motorcycle_int8147" type="res_motorcycle_int8_motorcycle" depart="3190.40" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8149" type="res_motorcycle_int8_motorcycle" depart="3194.51" departLane="best" departSpeed="max" from="E18" to="E31.622"/>
+    <trip id="res_motorcycle_int8150" type="res_motorcycle_int8_motorcycle" depart="3196.57" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8151" type="res_motorcycle_int8_motorcycle" depart="3198.63" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_motorcycle_int8152" type="res_motorcycle_int8_motorcycle" depart="3200.69" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int8153" type="res_motorcycle_int8_motorcycle" depart="3202.74" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_motorcycle_int8154" type="res_motorcycle_int8_motorcycle" depart="3204.80" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8155" type="res_motorcycle_int8_motorcycle" depart="3206.86" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8156" type="res_motorcycle_int8_motorcycle" depart="3208.91" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_motorcycle_int8157" type="res_motorcycle_int8_motorcycle" depart="3210.97" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8158" type="res_motorcycle_int8_motorcycle" depart="3213.03" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_motorcycle_int8160" type="res_motorcycle_int8_motorcycle" depart="3217.14" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8161" type="res_motorcycle_int8_motorcycle" depart="3219.20" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8163" type="res_motorcycle_int8_motorcycle" depart="3223.31" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+    <trip id="res_motorcycle_int8164" type="res_motorcycle_int8_motorcycle" depart="3225.37" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8166" type="res_motorcycle_int8_motorcycle" depart="3229.49" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8167" type="res_motorcycle_int8_motorcycle" depart="3231.54" departLane="best" departSpeed="max" from="E31" to="E31.622"/>
+    <trip id="res_motorcycle_int8170" type="res_motorcycle_int8_motorcycle" depart="3237.71" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_motorcycle_int8171" type="res_motorcycle_int8_motorcycle" depart="3239.77" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_motorcycle_int8172" type="res_motorcycle_int8_motorcycle" depart="3241.83" departLane="best" departSpeed="max" from="E30" to="E31.622"/>
+</routes>

@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-07 09:24:04 by Eclipse SUMO duarouter Version 1.23.1
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_ped.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_ped.rou.xml"/>
+    </output>
+
+    <report>
+        <ignore-errors value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vehicle id="res_ped_int00" depart="0.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int01" depart="36.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int02" depart="72.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int03" depart="108.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int04" depart="144.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int05" depart="180.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int06" depart="216.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int07" depart="252.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int08" depart="288.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int09" depart="324.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int010" depart="360.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int011" depart="396.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int012" depart="432.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int013" depart="468.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int014" depart="504.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int015" depart="540.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int017" depart="612.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int018" depart="648.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int019" depart="684.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int020" depart="720.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int021" depart="756.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int022" depart="792.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int023" depart="828.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int024" depart="864.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int025" depart="900.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int027" depart="972.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int028" depart="1008.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int029" depart="1044.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int030" depart="1080.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int031" depart="1116.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int033" depart="1188.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int034" depart="1224.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int036" depart="1296.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int037" depart="1332.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int038" depart="1368.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int039" depart="1404.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int040" depart="1440.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int042" depart="1512.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int043" depart="1548.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int044" depart="1584.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.38" probability="1.00000000" edges="E22 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int045" depart="1620.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int046" depart="1656.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int047" depart="1692.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E22 E22.488"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int048" depart="1728.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.55" probability="1.00000000" edges="E22 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int10" depart="1801.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int11" depart="1836.98" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int12" depart="1872.96" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int13" depart="1908.94" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int14" depart="1944.92" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int15" depart="1980.90" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int16" depart="2016.88" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int17" depart="2052.86" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int18" depart="2088.84" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int19" depart="2124.82" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int110" depart="2160.80" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int111" depart="2196.78" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int113" depart="2268.74" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int114" depart="2304.72" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int115" depart="2340.70" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int116" depart="2376.68" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E31 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int117" depart="2412.66" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int118" depart="2448.64" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int119" depart="2484.62" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int120" depart="2520.60" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int122" depart="2592.56" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int125" depart="2700.50" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int126" depart="2736.48" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E31 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int127" depart="2772.46" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int128" depart="2808.44" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int130" depart="2880.40" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int131" depart="2916.38" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int132" depart="2952.36" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E31 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int133" depart="2988.34" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int135" depart="3060.30" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E31 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int139" depart="3204.22" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int141" depart="3276.18" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E31 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int142" depart="3312.16" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int143" depart="3348.14" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int144" depart="3384.12" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.56" probability="1.00000000" edges="E31 E18.410"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int145" depart="3420.10" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int148" depart="3528.04" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="289.36" probability="1.00000000" edges="E31 E30.558"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped_int149" depart="3564.02" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="290.10" probability="1.00000000" edges="E31 E31.622"/>
+        </routeDistribution>
+    </vehicle>
+</routes>

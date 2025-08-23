@@ -13,7 +13,7 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
     """
     import os
     import sys
-    import traci
+    import libsumo as traci
 
     # Add SUMO tools to Python path
     sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
@@ -50,6 +50,26 @@ def set_train_path(model_name):
     data_path = os.path.join(models_path, 'model_'+new_version, '')
     os.makedirs(os.path.dirname(data_path), exist_ok=True)
     return data_path 
+
+def set_load_model_path(model_name):
+    """
+    Create a model path for loading an existing model.
+    Args:
+        model_name (str): Name of the model to load.
+    Returns:
+        str: The model path for loading the existing model.
+    """
+    import os
+
+    models_path = os.path.join(os.getcwd(), model_name, '')
+    os.makedirs(os.path.dirname(models_path), exist_ok=True)
+
+    dir_content = os.listdir(models_path)
+    if dir_content:
+        previous_versions = [int(name.split("_")[1]) for name in dir_content]
+        newest_version = str(max(previous_versions) - 1)
+    data_path = os.path.join(models_path, 'model_'+newest_version, '')
+    return data_path
 
 def set_test_path(model_name):
     """
@@ -110,18 +130,22 @@ def import_train_configuration(file_path):
         # Memory configuration
         config['memory_size_min'] = content['memory']['memory_size_min']
         config['memory_size_max'] = content['memory']['memory_size_max']
+        config['sample_size'] = content['memory']['sample_size']
 
         # Agent configuration
         config['agent'] = {}
         config['agent']['num_states'] = content['agent']['num_states']
         config['agent']['gamma'] = content['agent']['gamma']
-        config['agent']['green_duration_deltas'] = content['agent']['green_duration_deltas']
         config['agent']['num_layers'] = content['agent']['model']['num_layers']
         config['agent']['batch_size'] = content['agent']['model']['batch_size']
+        config['agent']['sample_size'] = content['memory']['sample_size']
         config['agent']['learning_rate'] = content['agent']['model']['learning_rate']
-        config['agent']['decay_rate'] = content['agent']['model']['decay_rate']
+        config['agent']['decay_episode'] = content['agent']['model']['decay_episode']
         config['agent']['min_epsilon'] = content['agent']['model']['min_epsilon']
+        config['agent']['initial_epsilon'] = content['agent']['model']['initial_epsilon']
         config['agent']['weight'] = content['agent']['weight']
+        config['agent']['model'] = content['agent']['model']
+        config['agent']['model']['loss_type'] = content['agent']['model']['loss_type']
         # # Green duration agent
         # config['green_duration_agent'] = {}
         # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
@@ -141,28 +165,42 @@ def import_train_configuration(file_path):
         # config['selector_phase_agent']['batch_size'] = content['selector_phase_agent']['model']['batch_size']
         # config['selector_phase_agent']['learning_rate'] = content['selector_phase_agent']['model']['learning_rate']
 
+        # Traffic demand configuration
+        config['vehicle_counts'] = content['vehicle_counts']
+        config['vehicle_counts']['low'] = content['vehicle_counts']['low']
+        config['vehicle_counts']['medium'] = content['vehicle_counts']['medium']
+        config['vehicle_counts']['high'] = content['vehicle_counts']['high']
+
+        # Random demand
+        config["edge_groups"] = content["edge_groups"]
+
         # Training configuration
         config['training_epochs'] = content['model']['training_epochs']
+        config['save_model_name'] = content['model'].get('save_model_name', 'dqn_model')
+        config['load_model_name'] = content['model'].get('load_model_name', None)
+        config['load_q_table_name'] = content['model'].get('load_q_table_name', None)
+        config['save_interval'] = content['model'].get('save_interval', 10)
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
+        config['training_steps'] = content['model']['training_steps']
+        config['updating_target_network_steps'] = content['model']['updating_target_network_steps']
 
         # Intersection configuration
         config['traffic_lights'] = content['traffic_lights']
 
-        # Accident configuration
-        config["junction_id_list"] = [junction["id"] for junction in content['accident']['junction']]
-        config["start_step"] = content['accident']['start_step']
-        config["duration"] = content['accident']['duration']
-
+        # Accident configuration (if exists)
+        if 'accident' in content:
+            config['accident'] = content['accident']
+        config['sumocfg_path'] = content['dir']['sumocfg_path']
         print("Configuration loaded successfully.")
         return config
     
 def import_test_configuration(file_path):
     """
-    Import the testing configuration from a INI file.
+    Import the testing configuration from a YAML file.
 
     Args:
-        file_path (str): Path to the INI configuration file.
+        file_path (str): Path to the YAML configuration file.
 
     Returns:
         dict: The testing configuration as a dictionary.
@@ -172,7 +210,7 @@ def import_test_configuration(file_path):
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"The configuration file {file_path} does not exist.")
 
-    # Read the INI file
+    # Read the YAML file
     import yaml
 
     with open(file_path, 'r') as file:
@@ -187,21 +225,30 @@ def import_test_configuration(file_path):
         config['episode_seed'] = content['simulation']['episode_seed']
         config['interphase_duration'] = content['simulation']['interphase_duration']
 
-        config['agent']['num_states'] = content['agent']['num_states']
-        # # Green duration agent configuration
-        # config['green_duration_agent']['num_states'] = content['green_duration_agent']['num_states']
-        # config['green_duration_agent']['num_actions'] = content['green_duration_agent']['num_actions']
-
-        # # Selector phase agent
-        # config['selector_phase_agent']['num_states'] = content['selector_phase_agent']['num_states']
-        # config['selector_phase_agent']['num_actions'] = content['selector_phase_agent']['num_actions']
+        # Agent configuration
+        config['agent'] = content['agent']
 
         # Testing configuration
         config['models_path_name'] = content['dir']['models_path_name']
         config['sumo_cfg_file'] = content['dir']['sumocfg_file_name']
-        config['model_to_test'] = content['dir']['model_to_test']
+        config['sumocfg_path'] = content['dir']['sumocfg_path']
+        config['model_to_test'] = content['dir'].get('model_to_test', 'dqn_model')
+        config['model_folder'] = content['dir']['model_folder']
 
         # Intersection configuration
         config['traffic_lights'] = content['traffic_lights']
+        
+        # Vehicle counts (if exists)
+        if 'vehicle_counts' in content:
+            config['vehicle_counts'] = content['vehicle_counts']
+        
+        # Edge groups (if exists)
+        if 'edge_groups' in content:
+            config['edge_groups'] = content['edge_groups']
+        
+        # Accident configuration (if exists)
+        if 'accident' in content:
+            config['accident'] = content['accident']
 
+        print("Testing configuration loaded successfully.")
         return config

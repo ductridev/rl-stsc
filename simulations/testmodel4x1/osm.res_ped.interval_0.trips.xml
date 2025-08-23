@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-02 13:30:28.333989 by randomTrips.py UNKNOWN
+<configuration>
+    <net-file value="osm.net.xml.gz"/>
+    <weights-prefix value="random_edge_priority_interval_0"/>
+    <output-trip-file value="osm.res_ped.interval_0.trips.xml"/>
+    <prefix value="res_ped_int0"/>
+    <trip-attributes value="departLane='best'"/>
+    <fringe-start-attributes value="departSpeed='max'"/>
+    <vclass value="pedestrian"/>
+    <via-edge-types value="footway,path,sidewalk"/>
+    <remove-loops value="True"/>
+    <validate value="True"/>
+    <end value="360.0"/>
+    <insertion-rate value="100.0"/>
+</configuration>
+-->
+
+<!-- generated on 2025-08-02 13:30:28 by Eclipse SUMO duarouter Version 1.22.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_ped.interval_0.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_ped.interval_0.trips.xml.tmp"/>
+        <alternatives-output value="NUL"/>
+        <write-trips value="true"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="0.0"/>
+        <end value="360.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <trip id="res_ped_int01" depart="36.00" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_ped_int02" depart="72.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_ped_int03" depart="108.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_ped_int04" depart="144.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_ped_int06" depart="216.00" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_ped_int07" depart="252.00" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_ped_int09" depart="324.00" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+</routes>

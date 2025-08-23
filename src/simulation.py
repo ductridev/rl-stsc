@@ -1,47 +1,55 @@
-from src.model import DQN
-from src.memory import ReplayMemory
-from src.visualization import Visualization
-from src.normalizer import Normalizer
-from src.desra import DESRA
-from src.sumo import SUMO
-from src.accident_manager import AccidentManager
+"""
+Main simulation class using SKRL for reinforcement learning.
+Refactored to use separate modules for better organization.
+"""
 
-import traci
 import numpy as np
-import random
 import torch
 import time
-import torch.nn as nn
-import copy
+import libsumo as traci
+from collections import defaultdict, deque
+from typing import Dict, List, Any, Tuple
+import sys
+import os
 
-GREEN_ACTION = 0
-RED_ACTION = 1
+# Add current directory to path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
-
-def index_to_action(index, actions_map):
-    return actions_map[index]["phase"], actions_map[index]["duration"]
-
-
-def phase_to_index(phase, actions_map, duration):
-    for i, action in actions_map.items():
-        if action["phase"] == phase:
-            return i
+from visualization import Visualization
+from normalizer import Normalizer
+from desra import DESRA
+from .sumo import SUMO
+from accident_manager import AccidentManager
+from vehicle_tracker import VehicleTracker
+from agents.skrl_agent_manager import SKRLAgentManager
+from sim_utils.phase_manager import index_to_action, phase_to_index
+from sim_utils.traffic_metrics import TrafficMetrics, VehicleCompletionTracker, JunctionVehicleTracker
+from comparison_utils import SimulationComparison
 
 
 class Simulation(SUMO):
+    """Traffic light simulation using SKRL for reinforcement learning"""
+
     def __init__(
         self,
-        memory: ReplayMemory,
         visualization: Visualization,
-        agent_cfg,
-        max_steps,
-        traffic_lights,
+        agent_cfg: Dict,
+        max_steps: int,
+        traffic_lights: List[Dict],
         accident_manager: AccidentManager,
-        interphase_duration=3,
-        epoch=1000,
-        path=None,
+        interphase_duration: int = 3,
+        epoch: int = 1000,
+        path: str = None,
+        training_steps: int = 300,
+        updating_target_network_steps: int = 100,
+        save_interval: int = 2,
+        memory_size: Tuple[int, int] = (10000, 100000)
     ):
-        self.memory = memory
+        # Initialize parent class
+        super().__init__()
+
+        # Core configuration
         self.visualization = visualization
         self.agent_cfg = agent_cfg
         self.max_steps = max_steps
@@ -50,604 +58,1181 @@ class Simulation(SUMO):
         self.interphase_duration = interphase_duration
         self.epoch = epoch
         self.path = path
-        self.weight = agent_cfg["weight"]
-        self.green_time_normalizer = Normalizer()
-        self.outflow_rate_normalizer = Normalizer()
-        self.density_normalizer = Normalizer()
-        self.travel_time_normalizer = Normalizer()
-        self.travel_speed_normalizer = Normalizer()
+        self.training_steps = training_steps
+        self.updating_target_network_steps = updating_target_network_steps
+        self.save_interval = save_interval
+        self.memory_size = memory_size
+        self.green_time = 10
 
+        # Testing mode flag to disable training operations
+        self.testing_mode = False
+        
+        # DESRA-DQN Hybrid Configuration
+        self.use_desra_guidance = agent_cfg.get("use_desra_guidance", True)  # Enable DESRA-DQN hybrid
+        self.desra_min_probability = agent_cfg.get("desra_min_probability", 0.1)  # Minimum DESRA usage (10%)
+        self.desra_epsilon_multiplier = agent_cfg.get("desra_epsilon_multiplier", 0.5)  # Scale with epsilon
+
+        # Normalizers
+        self.outflow_rate_normalizer = Normalizer(0, 100)
+        self.queue_length_normalizer = Normalizer(0, 300)
+        self.num_vehicles_normalizer = Normalizer(0, 100)
+        self.travel_time_normalizer = Normalizer(0, 500)
+        self.travel_delay_normalizer = Normalizer(0, 50)
+        self.waiting_time_normalizer = Normalizer(0, 500)
+
+        # Vehicle tracking
+        self.vehicle_tracker = VehicleTracker(path=self.path)
+
+        # Vehicle completion tracking for episode-end travel time analysis
+        self.completion_tracker = VehicleCompletionTracker()
+
+        # Junction vehicle tracking for throughput analysis
+        self.junction_tracker = JunctionVehicleTracker()
+
+        # Simulation state
         self.step = 0
+        self.global_step = 0
         self.num_actions = {}
         self.actions_map = {}
 
-        self.agent_reward = {}
+        # Agent states and memories
+        self.reward = {}
         self.agent_state = {}
         self.agent_old_state = {}
-        self.agent_memory = {}
 
+        # Traffic metrics
+        self.arrival_buffers = defaultdict(lambda: deque())
+        self.last_desra_time = {}
+        self.queue_length = {}
         self.outflow_rate = {}
-        self.old_outflow_rate = {}
-        self.travel_speed = {}
+        self.travel_delay = {}
         self.travel_time = {}
-        self.density = {}
-        self.old_travel_speed = {}
-        self.old_travel_time = {}
-        self.old_density = {}
-        self.green_time = {}
-        self.green_time_old = {}
+        self.waiting_time = {}
+        self.phase = {}
+        
+        # Global accumulated waiting time snapshot for reward
+        # FIX: initialize as None (not a dict) to avoid TypeError in first reward calc
+        self.prev_global_wait = None
 
+        # History tracking
         self.history = {
-            "agent_reward": {},
-            "travel_speed": {},
+            "reward": {},
+            "travel_delay": {},
             "travel_time": {},
             "density": {},
-            "outflow_rate": {},
-            "green_time": {},
+            "outflow": {},
             "q_value": {},
             "max_next_q_value": {},
             "target": {},
             "loss": {},
+            "queue_length": {},
+            "waiting_time": {},
+            "desra_usage": {},  # Track DESRA vs DQN action selections
+            "completed_travel_time": {},  # New: track average completed vehicle travel times
+            "junction_arrival": {},  # New: track vehicles entering junctions
+            "stopped_vehicles": {},  # New: track number of stopped vehicles
         }
+        
+        # DESRA usage tracking
+        self.desra_action_count = {}
+        self.dqn_action_count = {}
 
-        self.initState()
-
-        if torch.cuda.is_available():
-            print(f"GPU: {torch.cuda.get_device_name(0)} is available.")
-        else:
-            print("No GPU available. Training will run on CPU.")
-
+        # Setup device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {self.device}")
 
-        self.agent: DQN = DQN(
-            num_layers=self.agent_cfg["num_layers"],
-            batch_size=self.agent_cfg["batch_size"],
-            learning_rate=self.agent_cfg["learning_rate"],
-            input_dim=self.agent_cfg["num_states"],
-            output_dims=self.get_output_dims(),
-            gamma=self.agent_cfg["gamma"],
-            device=self.device,
-        )
-
+        # DESRA setup
         self.desra = DESRA(interphase_duration=self.interphase_duration)
 
-        if torch.cuda.device_count() > 1:
-            print(f"Using {torch.cuda.device_count()} GPUs")
-            self.agent = nn.DataParallel(self.agent)
+        # DESRA configuration (default to detector-specific parameters)
+        self.desra_use_global_params = False
+        self.desra_global_saturation_flow = None
+        self.desra_global_critical_density = None
+        self.desra_global_jam_density = None
 
-        self.agent = self.agent.to(self.device)
-        self.target_net = copy.deepcopy(self.agent)
-        self.target_net.eval()
+        # Comparison utility
+        self.comparison = SimulationComparison(path=self.path) if self.path else None
 
-        self.longest_phase, self.longest_phase_len, self.longest_phase_id = (
-            self.get_longest_phase()
-        )
+        # Traffic light states
+        self.tl_states = {}
 
-    def get_longest_phase(self):
-        max_len = -1
-        longest_phase = None
-        longest_id = None
+        # For backward compatibility with training script
+        self.agent = self  # Point to self so training script can access methods
 
-        for tl_id, actions in self.actions_map.items():
-            for action in actions.values():
-                phase = action["phase"]
-                if len(phase) > max_len:
-                    max_len = len(phase)
-                    longest_phase = phase
-                    longest_id = tl_id
+        # Initialize state
+        self.initState()
 
-        return longest_phase, max_len, longest_id
+        # Decision counter for tracking training steps
+        self.decision_counter = 0  # counts phase decisions per episode
+
+    @property
+    def agents(self):
+        """Property to access SKRL agents for compatibility"""
+        return self.agent_manager.agents
+
+    @property
+    def memories(self):
+        """Property to access SKRL memories for compatibility"""
+        return self.agent_manager.memories
+
+    @property
+    def models(self):
+        """Property to access SKRL models for compatibility"""
+        return self.agent_manager.models
+
+    def save(self):
+        """Save all SKRL models to a path"""
+        if self.path:
+            self.agent_manager.save_models(self.path)
+
+    def save_checkpoint(self, episode: int = None):
+        """Save all SKRL model checkpoints"""
+        if self.path:
+            self.agent_manager.save_checkpoints(self.path, episode)
 
     def initState(self):
+        """Initialize simulation state for all traffic lights"""
         for traffic_light in self.traffic_lights:
             traffic_light_id = traffic_light["id"]
-            self.agent_memory[traffic_light_id] = self.memory
-
-            # Initialize the green time
-            self.green_time[traffic_light_id] = 20
-
-            # Initialize the old green time
-            self.green_time_old[traffic_light_id] = 20
 
             # Initialize the number of actions
-            self.num_actions[traffic_light_id] = len(
-                self.agent_cfg["green_duration_deltas"]
-            ) * len(traffic_light["phase"])
+            self.num_actions[traffic_light_id] = len(traffic_light["phase"])
 
             # Initialize the action map
             self.actions_map[traffic_light_id] = {}
+            for i, phase in enumerate(traffic_light["phase"]):
+                self.actions_map[traffic_light_id][i] = {"phase": phase}
 
-            # We will convert from number of phases and green delta to phase index and green delta
-            i = 0
-
-            for phase in traffic_light["phase"]:
-                for green_delta in self.agent_cfg["green_duration_deltas"]:
-                    self.actions_map[traffic_light_id][i] = {
-                        "phase": phase,
-                        "duration": green_delta,
-                    }
-
-                    i += 1
-
-            # Initialize the agent reward
-            self.agent_reward[traffic_light_id] = 0
-
-            # Initialize the agent state
+            # Initialize metrics
+            self.reward[traffic_light_id] = 0
             self.agent_state[traffic_light_id] = 0
-
-            # Initialize the agent old state
             self.agent_old_state[traffic_light_id] = 0
-
-            # Initialize the old outflow rate
-            self.old_outflow_rate[traffic_light_id] = 0
-
-            # Initialize the outflow rate
+            self.queue_length[traffic_light_id] = 0
             self.outflow_rate[traffic_light_id] = 0
-
-            # Initialize the old travel speed
-            self.old_travel_speed[traffic_light_id] = 0
-
-            # Initialize the travel speed
-            self.travel_speed[traffic_light_id] = 0
-
-            # Initialize the old travel time
-            self.old_travel_time[traffic_light_id] = 0
-
-            # Initialize the travel time
+            self.travel_delay[traffic_light_id] = 0
             self.travel_time[traffic_light_id] = 0
+            self.waiting_time[traffic_light_id] = 0
+            self.phase[traffic_light_id] = None
 
-            # Initialize the old density
-            self.old_density[traffic_light_id] = 0
+            # Initialize DESRA tracking
+            self.desra_action_count[traffic_light_id] = 0
+            self.dqn_action_count[traffic_light_id] = 0
 
-            # Initialize the density
-            self.density[traffic_light_id] = 0
-
-            # Initialize the history
+            # Initialize history
             for key in self.history:
                 self.history[key][traffic_light_id] = []
 
-    def get_output_dims(self):
-        """
-        Get multiple outputs of the agent for each traffic light
+            # Initialize arrival buffers
+            for phase in traffic_light["phase"]:
+                for det in self.get_movements_from_phase(traffic_light, phase):
+                    _ = self.arrival_buffers[det]
 
-        Returns:
-            output_dims (list[int]): The output dimension of the agent
-        """
+        # Setup SKRL agent manager
+        self.agent_manager = SKRLAgentManager(
+            simulation_instance=self,
+            agent_cfg=self.agent_cfg,
+            traffic_lights=self.traffic_lights,
+            updating_target_network_steps=self.updating_target_network_steps,
+            device=self.device,
+        )
 
-        output_dims = []
-        for traffic_light in self.traffic_lights:
-            output_dims.append(self.num_actions[traffic_light["id"]])
+    def select_action(
+        self, tl_id: str, state: np.ndarray, desra_phase_idx: int
+    ) -> int:
+        """Select action using hybrid DESRA-DQN approach"""
+        
+        # Initialize tracking for this traffic light if needed
+        if tl_id not in self.desra_action_count:
+            self.desra_action_count[tl_id] = 0
+            self.dqn_action_count[tl_id] = 0
+        
+        # Get DQN agent's action preference
+        dqn_action = self.agent_manager.select_action(tl_id, state, self.global_step, 10, desra_phase_idx)
 
-        return output_dims
+        return int(dqn_action)
+        
+        # If DESRA guidance is disabled OR in testing mode, just use DQN
+        if not self.use_desra_guidance or self.testing_mode:
+            self.dqn_action_count[tl_id] += 1
+            return int(dqn_action)
+        
+        # DESRA-DQN Hybrid Strategy
+        agent = self.agent_manager.agents[tl_id]
+        
+        # Get current exploration rate (epsilon) from SKRL agent
+        current_epsilon = 0.1  # Default fallback
+        
+        # Force epsilon to 0 during testing mode (no exploration)
+        if self.testing_mode:
+            current_epsilon = 0.0
+        elif hasattr(agent, 'cfg') and 'exploration' in agent.cfg:
+            # Calculate current epsilon based on SKRL's schedule
+            timestep = self.global_step
+            total_timesteps = agent.cfg['exploration'].get('timesteps', 324000)
+            initial_epsilon = agent.cfg['exploration'].get('initial_epsilon', 0.95)
+            final_epsilon = agent.cfg['exploration'].get('final_epsilon', 0.05)
+            
+            if timestep < total_timesteps:
+                # Exponential decay
+                decay_rate = -np.log(final_epsilon / initial_epsilon) / total_timesteps
+                current_epsilon = initial_epsilon * np.exp(-decay_rate * timestep)
+                current_epsilon = max(final_epsilon, current_epsilon)
+            else:
+                current_epsilon = final_epsilon
+        
+        # Decide whether to use DESRA or DQN
+        import random
+        if random.random() < current_epsilon:
+            # Use DESRA recommendation with logging and tracking
+            self.desra_action_count[tl_id] += 1
+            if self.step % 1000 == 0:  # Log occasionally to avoid spam
+                total_actions = self.desra_action_count[tl_id] + self.dqn_action_count[tl_id]
+                desra_percent = (self.desra_action_count[tl_id] / max(total_actions, 1)) * 100
+                print(f"TL {tl_id}: DESRA guidance {desra_percent:.1f}% (action {desra_phase_idx} vs DQN {dqn_action}), ε={current_epsilon:.3f}")
+            return int(desra_phase_idx)
+        else:
+            # Use DQN recommendation
+            self.dqn_action_count[tl_id] += 1
+            return int(dqn_action)
 
-    def run(self, epsilon, episode):
+    def store_transition(
+        self,
+        tl_id: str,
+        state: np.ndarray,
+        action: int,
+        reward: float,
+        next_state: np.ndarray,
+        done: bool,
+    ):
+        """Store transition in agent's memory"""
+        self.agent_manager.store_transition(
+            tl_id, state, action, reward, next_state, done, self.global_step, self.green_time
+        )
+
+    def run(self, episode: int):
+        """Run simulation with SKRL agents"""
         print("Simulation started")
+        if self.testing_mode:
+            print("TESTING MODE: Training disabled, epsilon=0 (pure exploitation), DESRA disabled (pure DQN)")
         print("Simulating...")
         print("---------------------------------------")
 
-        start = time.time()
+        # Ensure local waiting time and queue baseline is reset at the start of each episode
+        if hasattr(self, 'prev_local_wait'):
+            self.prev_local_wait = {}
+        else:
+            self.prev_local_wait = {}
+            
+        if hasattr(self, 'prev_local_queue'):
+            self.prev_local_queue = {}
+        else:
+            self.prev_local_queue = {}
 
-        # Initialize per-light state tracking
-        tl_states = {}
+        # Build detector list
+        self.all_detectors = [
+            det
+            for tl in self.traffic_lights
+            for phase_str in tl["phase"]
+            for det in self.get_movements_from_phase(tl, phase_str)
+        ]
+
+        # Initialize DESRA timing
+        for det in self.all_detectors:
+            self.last_desra_time[det] = traci.simulation.getTime()
+
+        start_time = time.time()
+
+        # Initialize traffic light states
         for tl in self.traffic_lights:
             tl_id = tl["id"]
-            tl_states[tl_id] = {
-                "green_time_remaining": 0,
-                "travel_speed_sum": 0,
-                "density_sum": 0,
+            self.tl_states[tl_id] = {
+                "green_time_remaining": self.green_time,
+                "yellow_time_remaining": 0,
+                "interphase": False,
+                "travel_delay_sum": 0,
+                "travel_time_sum": 0,
+                "waiting_time": 0,
                 "outflow": 0,
+                "queue_length": 0,
                 "old_vehicle_ids": [],
                 "state": None,
                 "action_idx": None,
-                "phase": None,
-                "green_time": 0,
+                "phase": tl["phase"][0],
+                "old_phase": tl["phase"][0],
+                "green_time": self.green_time,
+                "step_travel_delay_sum": 0,
+                "step_travel_time_sum": 0,
+                "step_outflow_sum": 0,
+                "step_density_sum": 0,
+                "step_queue_length_sum": 0,
+                "step_waiting_time_sum": 0,
+                "step_junction_arrival_sum": 0,
+                "step_stopped_vehicles_sum": 0,
+                "step_old_vehicle_ids": [],
+                "step_reward_sum": 0
             }
 
-        while self.step < self.max_steps:
-            for tl in self.traffic_lights:
-                tl_id = tl["id"]
-                tl_state = tl_states[tl_id]
+        num_vehicles = 0
+        num_vehicles_out = 0
 
-                # If time to choose a new action
-                if tl_state["green_time_remaining"] == 0:
-                    state, base_green_time = self.get_state(tl)
-                    action_idx = self.select_action(
-                        tl_id,
-                        self.agent,
-                        state,
-                        epsilon,
-                    )
-
-                    phase, green_delta = index_to_action(
-                        action_idx,
-                        self.actions_map[tl_id],
-                    )
-
-                    green_time = max(
-                        base_green_time, self.green_time[tl_id] + green_delta
-                    )
-
-                    green_time = min(green_time, self.max_steps - self.step)
-
-                    self.set_green_phase(tl_id, green_time, phase)
-
-                    tl_state.update(
-                        {
-                            "green_time": green_time,
-                            "green_time_remaining": green_time,
-                            "travel_speed_sum": 0,
-                            "density_sum": 0,
-                            "outflow": 0,
-                            "old_vehicle_ids": self.get_vehicles_in_phase(tl, phase),
-                            "state": state,
-                            "action_idx": action_idx,
-                            "phase": phase,
-                        }
-                    )
-
-            self.accident_manager.create_accident(current_step=self.step)
+        # Warm up 50 steps
+        for _ in range(50):
             traci.simulationStep()
-            self.step += 1
 
+        while self.step <= self.max_steps:
+            # Action selection for each traffic light
             for tl in self.traffic_lights:
                 tl_id = tl["id"]
-                tl_state = tl_states[tl_id]
+                state = self.tl_states[tl_id]
 
-                if tl_state["green_time_remaining"] > 0:
-                    phase = tl_state["phase"]
-                    new_vehicle_ids = self.get_vehicles_in_phase(tl, phase)
-                    outflow = sum(
-                        1
-                        for vid in tl_state["old_vehicle_ids"]
-                        if vid not in new_vehicle_ids
-                    )
-                    tl_state["outflow"] += outflow
-                    tl_state["travel_speed_sum"] += self.get_avg_speed(tl)
-                    tl_state["travel_time_sum"] += self.get_avg_travel_time(tl)
-                    tl_state["density_sum"] += self.get_avg_density(tl)
-                    tl_state["old_vehicle_ids"] = new_vehicle_ids
-                    tl_state["green_time_remaining"] -= 1
+                # Handle yellow phase countdown
+                if state["yellow_time_remaining"] > 0:
+                    state["yellow_time_remaining"] -= 1
+                    continue
 
-                    if tl_state["green_time_remaining"] == 0:
-                        green_time = tl_state["green_time"]
+                # Skip if green phase is still running
+                if state["green_time_remaining"] > 0:
+                    continue
 
-                        self.outflow_rate[tl_id] = tl_state["outflow"] / green_time
-                        self.travel_speed[tl_id] = (
-                            tl_state["travel_speed_sum"] / green_time
-                        )
-                        self.travel_time[tl_id] = (
-                            tl_state["travel_time_sum"] / green_time
-                        )
-                        self.density[tl_id] = tl_state["density_sum"] / green_time
+                # Handle interphase (yellow) transition
+                if not state["interphase"] and state["old_phase"] != state["phase"]:
+                    self.set_yellow_phase(tl_id, state["phase"])
+                    state["yellow_time_remaining"] = self.interphase_duration
+                    state["interphase"] = True
+                    continue
 
-                        reward = self.get_reward(tl_id)
-                        next_state, _ = self.get_state(tl)
-                        done = self.step >= self.max_steps
+                # Green phase ended - select new action
+                state["interphase"] = False
 
-                        self.agent_memory[tl_id].push(
-                            tl_state["state"],
-                            tl_state["action_idx"],
-                            reward,
-                            next_state,
-                            done,
-                        )
+                # Get current state
+                current_state, desra_phase_idx = self.get_state(tl, state["phase"])
 
-                        self.history["agent_reward"][tl_id].append(reward)
-                        self.history["travel_speed"][tl_id].append(
-                            self.travel_speed[tl_id]
-                        )
-                        self.history["travel_time"][tl_id].append(
-                            self.travel_time[tl_id]
-                        )
-                        self.history["density"][tl_id].append(self.density[tl_id])
-                        self.history["outflow_rate"][tl_id].append(
-                            self.outflow_rate[tl_id]
-                        )
-                        self.history["green_time"][tl_id].append(green_time)
+                # print(f"Total training loss for {tl_id}: {loss}")
 
-                        self.green_time_old[tl_id] = self.green_time[tl_id]
-                        self.green_time[tl_id] = green_time
+                # Pre-interaction (epsilon schedule etc.) based on decision count
+                self.agent_manager.pre_interaction(tl_id, self.decision_counter, state["green_time"])
 
-        simulation_time = time.time() - start
+                # Select action using SKRL agent
+                action_idx = self.select_action(
+                    tl_id, current_state, desra_phase_idx
+                )
+
+                # Convert action to phase
+                new_phase = index_to_action(action_idx, self.actions_map[tl_id])
+
+                # Calculate green time
+                green_time = max(
+                    1, min(state["green_time"], self.max_steps - self.step)
+                )
+
+                # Apply new phase
+                self.set_green_phase(tl_id, green_time, new_phase)
+
+                # Update state
+                state.update(
+                    {
+                        "phase": new_phase,
+                        "old_phase": state["phase"],
+                        "green_time": green_time,
+                        "old_vehicle_ids": TrafficMetrics.get_vehicles_in_phase(
+                            tl, new_phase
+                        ),
+                        "green_time_remaining": green_time,
+                        "state": current_state,
+                        "action_idx": action_idx,
+                    }
+                )
+                # Increment decision counter once per action selection
+                self.decision_counter += 1
+
+            # Simulation step with error handling
+            if self.accident_manager:
+                self.accident_manager.create_accident(current_step=self.step)
+
+            try:
+                traci.simulationStep()
+                num_vehicles += traci.simulation.getDepartedNumber()
+                num_vehicles_out += traci.simulation.getArrivedNumber()
+            except Exception as e:
+                print(f"SUMO simulation error at step {self.step}: {e}")
+                # Try to handle common SUMO errors
+                if "has no valid route" in str(e):
+                    print("Route validation error detected - attempting to continue...")
+                    # Remove problematic vehicles and continue
+                    try:
+                        # Get list of vehicles and remove any with route issues
+                        vehicle_ids = traci.vehicle.getIDList()
+                        for vid in vehicle_ids:
+                            try:
+                                route = traci.vehicle.getRoute(vid)
+                                if not route or len(route) == 0:
+                                    print(f"Removing vehicle {vid} with invalid route")
+                                    traci.vehicle.remove(vid)
+                            except:
+                                print(f"Removing problematic vehicle {vid}")
+                                try:
+                                    traci.vehicle.remove(vid)
+                                except:
+                                    pass  # Vehicle might already be removed
+                        # Try simulation step again
+                        traci.simulationStep()
+                        num_vehicles += traci.simulation.getDepartedNumber()
+                        num_vehicles_out += traci.simulation.getArrivedNumber()
+                    except Exception as e2:
+                        print(f"Failed to recover from SUMO error: {e2}")
+                        print("Ending episode early due to simulation error")
+                        break
+                else:
+                    print(f"Unhandled SUMO error: {e}")
+                    print("Ending episode early due to simulation error")
+                    break
+            self.step += 1
+            self.global_step += 1
+            # Removed per-step update_step calls (no direct _update usage)
+
+            # Update vehicle tracking
+            self.vehicle_tracker.update_stats(self.step)
+
+            # Track completed vehicles for travel time analysis
+            self.completion_tracker.update_completed_vehicles()
+
+            # Update junction throughput tracking
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                st = self.tl_states[tl_id]
+                # Assume junction_id is in the traffic light config, or derive from tl_id
+                junction_id = tl.get("junction_id", tl_id)  # Use junction_id if available, else use tl_id
+                new_count, new_vehicles = self.junction_tracker.update_junction(junction_id)
+                
+                # Accumulate throughput for this step instead of directly appending
+                if new_count > 0:
+                    st["step_junction_arrival_sum"] += new_count
+
+            # Update DESRA traffic parameters for real-time adaptation
+            # Only update every 100 steps to reduce computational overhead
+            if self.step % 100 == 0:
+                current_time = traci.simulation.getTime()
+                for det in self.all_detectors:
+                    self.desra.update_traffic_parameters(det, current_time)
+
+            # Print stats periodically
+            if self.step % 1000 == 0:
+                current_stats = self.vehicle_tracker.get_current_stats()
+                print(
+                    f"Step {self.step}: Running={current_stats['total_running']}, "
+                    f"Departed={current_stats['total_departed']}, "
+                    f"Arrived={current_stats['total_arrived']}"
+                )
+
+            self._record_arrivals()
+
+            # Collect metrics and handle phase transitions
+            for tl in self.traffic_lights:
+                tl_id = tl["id"]
+                st = self.tl_states[tl_id]
+                current_phase = st["phase"]
+
+                # Calculate metrics
+                new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+                outflow = abs(len(new_ids) - len(st["old_vehicle_ids"]))
+                st["old_vehicle_ids"] = new_ids
+
+                sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
+                sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
+                sum_density = TrafficMetrics.get_sum_density(tl)
+                sum_queue_length = TrafficMetrics.get_sum_queue_length(tl)
+                sum_waiting_time = TrafficMetrics.get_sum_waiting_time(tl)
+                mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
+                stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
+
+                # Update metrics
+                st["step_outflow_sum"] += outflow
+                st["step_travel_delay_sum"] += sum_travel_delay
+                st["step_travel_time_sum"] += sum_travel_time
+                st["step_density_sum"] += sum_density
+                st["step_queue_length_sum"] += sum_queue_length
+                st["step_waiting_time_sum"] += mean_waiting_time
+                st["step_stopped_vehicles_sum"] += stopped_vehicles_count
+
+                st["outflow"] += outflow
+                st["travel_delay_sum"] = sum_travel_delay
+                st["travel_time_sum"] = sum_travel_time
+                st["queue_length"] = sum_queue_length
+                st["waiting_time"] = sum_waiting_time
+
+                # Handle green time countdown
+                if st["green_time_remaining"] > 1:
+                    st["green_time_remaining"] -= 1
+                else:
+                    # Phase ended - finalize and store experience
+                    self._finalize_phase_skrl(tl, tl_id, st)
+                    st["green_time_remaining"] -= 1
+
+                # Post-interaction before do new interaction
+                self.agent_manager.post_interaction(tl_id, self.global_step, self.max_steps)
+
+                # Periodic metric flushing
+                if self.step > 0 and self.step % 300 == 0:
+                    self._flush_step_metrics(tl, tl_id, st)
 
         traci.close()
-
-        print("Simulation ended")
-        print("---------------------------------------")
-
-        print("Training...")
-        start_time = time.time()
-
-        if episode % 10 == 0:
-            self.target_net.load_state_dict(self.agent.state_dict())
-
-        for _ in range(self.epoch):
-            self.training()
-        training_time = time.time() - start_time
-
-        print("Training ended")
-        print("---------------------------------------")
-
-        self.save_plot(episode=episode)
-
-        self.step = 0
-
-        total_reward = 0
-        for traffic_light in self.traffic_lights:
-            total_reward += np.sum(self.history["agent_reward"][traffic_light["id"]])
-
-        print("Total reward:", total_reward, "- Epsilon:", epsilon)
-
-        return simulation_time, training_time
-
-    def training(self):
-        """
-        Retrieve a batch from each traffic light memory and train the agent.
-        """
-        for traffic_light in self.traffic_lights:
-            traffic_light_id = traffic_light["id"]
-            batch = self.agent_memory[traffic_light_id].get_samples(
-                self.agent.batch_size
-            )
-
-            if len(batch) > 0:
-                states, actions, rewards, next_states, done = zip(*batch)
-
-                metrics = self.agent.train_batch(
-                    states,
-                    actions,
-                    rewards,
-                    next_states,
-                    output_dim=self.num_actions[traffic_light_id],
-                    done=done,
-                    target_net=self.target_net,
-                )
-
-                self.history["q_value"][traffic_light_id].append(metrics["avg_q_value"])
-                self.history["max_next_q_value"][traffic_light_id].append(
-                    metrics["avg_max_next_q_value"]
-                )
-                self.history["target"][traffic_light_id].append(metrics["avg_target"])
-                self.history["loss"][traffic_light_id].append(metrics["loss"])
-
-    def get_reward(self, traffic_light_id):
-        return (
-            self.weight["green_time"]
-            * self.green_time_normalizer.normalize(
-                self.green_time_old[traffic_light_id]
-                - self.green_time[traffic_light_id]
-            )
-            + self.weight["outflow_rate"]
-            * self.outflow_rate_normalizer.normalize(
-                self.outflow_rate[traffic_light_id]
-                - self.old_outflow_rate[traffic_light_id]
-            )
-            + self.weight["travel_speed"]
-            * self.travel_speed_normalizer.normalize(
-                self.travel_speed[traffic_light_id]
-                - self.old_travel_speed[traffic_light_id]
-            )
-            + self.weight["travel_time"]
-            * self.travel_time_normalizer.normalize(
-                self.old_travel_time[traffic_light_id]
-                - self.travel_time[traffic_light_id]
-            )
-            + self.weight["density"]
-            * self.density_normalizer.normalize(
-                self.old_density[traffic_light_id] - self.density[traffic_light_id]
-            )
+        sim_time = time.time() - start_time
+        print(
+            f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} arrived."
         )
 
-    def save_plot(self, episode):
-        # We simplify by averaging the history over all traffic lights
-        avg_history = {}
+        # Save vehicle statistics
+        self.vehicle_tracker.print_summary("skrl_dqn")
+        self.vehicle_tracker.save_logs(episode, "skrl_dqn")
+        # self.vehicle_tracker.reset()
 
+        # Print DESRA parameter summary
+        self.print_desra_summary()
+
+        return sim_time, self._finalize_episode(episode)
+
+    def _finalize_phase_skrl(self, tl: Dict, tl_id: str, st: Dict):
+        """Finalize phase and store experience in SKRL memory"""
+        self.queue_length[tl_id] = st["queue_length"]
+        self.outflow_rate[tl_id] = st["outflow"]
+        self.travel_delay[tl_id] = st["travel_delay_sum"]
+        self.travel_time[tl_id] = st["travel_time_sum"]
+        self.waiting_time[tl_id] = st["waiting_time"]
+
+        # Calculate reward
+        reward = self.get_reward(tl_id, st["phase"])
+
+        # Get next state
+        next_state, desra_phase_idx = self.get_state(tl, st["phase"])
+
+        # Check if done
+        done = self.step >= self.max_steps
+
+        # Store transition in SKRL memory (skip if in testing mode)
+        if st["state"] is not None and not self.testing_mode:
+            self.store_transition(
+                tl_id=tl_id,
+                state=st["state"],
+                action=st["action_idx"],
+                reward=reward,
+                next_state=next_state,
+                done=done,
+            )
+
+        # Always record reward when phase ends (not just every 60 steps)
+        st["step_reward_sum"] += reward
+
+        # Reset phase metrics
+        for key in [
+            "travel_delay_sum",
+            "travel_time_sum",
+            "outflow",
+            "queue_length",
+            "waiting_time",
+        ]:
+            st[key] = 0
+
+    def _record_arrivals(self):
+        """Record vehicle arrivals for DESRA"""
+        t = traci.simulation.getTime()
+        for tl in self.traffic_lights:
+            for phase_str in tl["phase"]:
+                for det in self.get_movements_from_phase(tl, phase_str):
+                    lane_id = traci.lanearea.getLaneID(det)
+                    incoming = [
+                        link[0]
+                        for link in traci.lane.getLinks(lane_id)
+                        if link[0] != lane_id
+                    ]
+                    raw_count = sum(
+                        traci.lane.getLastStepVehicleNumber(l) for l in incoming
+                    )
+                    self.arrival_buffers[det].append((t, raw_count))
+
+    def _flush_step_metrics(self, tl: Dict, tl_id: str, st: Dict):
+        """Flush step metrics to history"""
+        # Calculate averages
+        avg = lambda name: st[f"step_{name}_sum"] / 300
+
+        # Append to history
+        for metric in [
+            "travel_delay",
+            "travel_time",
+            "density",
+            "queue_length",
+            "waiting_time",
+            "stopped_vehicles",
+            "reward"
+        ]:
+            val = avg(metric)
+            self.history[metric][tl_id].append(val)
+            st[f"step_{metric}_sum"] = 0
+
+        self.history["outflow"][tl_id].append(st["step_outflow_sum"])
+        st["step_outflow_sum"] = 0
+        
+        # Add junction throughput to history (sum over 300 steps)
+        if tl_id not in self.history["junction_arrival"]:
+            self.history["junction_arrival"][tl_id] = []
+        self.history["junction_arrival"][tl_id].append(st["step_junction_arrival_sum"])
+        st["step_junction_arrival_sum"] = 0
+
+    def _finalize_episode(self, episode: int):
+        """Finalize episode and handle plotting/saving"""
+        print("Training completed")
+        print("---------------------------------------")
+
+        # Record episode-end completed vehicle travel time for all traffic lights
+        episode_avg_travel_time = self.completion_tracker.get_average_total_travel_time()
+        for tl in self.traffic_lights:
+            tl_id = tl["id"]
+            if tl_id not in self.history["completed_travel_time"]:
+                self.history["completed_travel_time"][tl_id] = []
+            self.history["completed_travel_time"][tl_id].append(episode_avg_travel_time)
+        
+        print(f"Episode {episode}: {self.completion_tracker.get_completed_count()} vehicles completed, "
+              f"average travel time: {episode_avg_travel_time:.2f}s")
+
+        # Save plots
+        self.save_plot(episode=episode)
+        
+        # Print DESRA usage summary
+        self.print_desra_usage_summary()
+
+        # Reset step counter for next episode
+        self.step = 0
+        
+        # Clear arrival buffers to prevent memory leak
+        self.clear_arrival_buffers()
+        
+        # Clear DESRA buffers to prevent memory accumulation
+        if hasattr(self.desra, 'clear_buffers'):
+            self.desra.clear_buffers()
+            
+        # Clear agent memories periodically to prevent accumulation
+        # if episode % 5 == 0:  # Clear every 5 episodes to balance performance and memory
+        #     if hasattr(self.agent_manager, 'clear_memories'):
+        #         self.agent_manager.clear_memories()
+
+        # Reset global waiting snapshot for next episode
+        if hasattr(self, 'prev_local_wait'):
+            self.prev_local_wait = {}
+        if hasattr(self, 'prev_local_queue'):
+            self.prev_local_queue = {}
+
+        # Reset decision counter
+        self.decision_counter = 0  # reset decision counter
+        
+        # Reset DESRA tracking for next episode
+        self.reset_desra_tracking()
+
+        # Reset junction tracking for next episode
+        self.junction_tracker.reset_all()
+
+        # Reset vehicle stop tracking for next episode
+        TrafficMetrics.reset_vehicle_stop_tracker()
+
+        return 0.0  # Return dummy training time
+
+    def reset_history(self):
+        """Reset history for next episode"""
+        for key in self.history:
+            for tl_id in self.history[key]:
+                self.history[key][tl_id] = []
+
+    def clear_arrival_buffers(self):
+        """Clear arrival buffers to prevent memory accumulation"""
+        for det in self.arrival_buffers:
+            self.arrival_buffers[det].clear()
+        print("Cleared arrival buffers to prevent memory leaks")
+
+    def save_model(self, episode: int):
+        """Save SKRL models"""
+        if self.path:
+            self.agent_manager.save_models(self.path, episode)
+            print(f"Saved models at episode {episode}")
+
+    def load_model(self, episode: int):
+        """Load SKRL models"""
+        if self.path:
+            self.agent_manager.load_models(self.path, episode)
+
+    def get_state(self, tl: Dict, phase: str) -> np.ndarray:
+        """Get state representation for a traffic light phase"""
+        state_vector = []
+
+        for phase_idx, phase_str in enumerate(tl["phase"]):
+            movements = self.get_movements_from_phase(tl, phase_str)
+
+            num_vehicles = 0
+            highest_queue_length = 0
+
+            lane_waiting_time = 0.0
+            for det in movements:
+                for veh in traci.lanearea.getLastStepVehicleIDs(det):
+                    # Get cumulative waiting time for all vehicles in lane
+                    lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
+                # Get number of vehicles currently in lane
+                num_vehicles += traci.lanearea.getLastStepVehicleNumber(det)
+
+                queue_length = TrafficMetrics.get_queue_length(det)
+                highest_queue_length = queue_length if queue_length > highest_queue_length else highest_queue_length
+
+            # Fill per-phase features
+            state_vector.append([
+                lane_waiting_time / num_vehicles if num_vehicles > 0 else 0,
+                num_vehicles,
+                highest_queue_length,
+            ])
+
+        q_arr_dict = self._compute_arrival_flows()
+        current_time = traci.simulation.getTime()
+
+        (
+            use_global_params,
+            global_saturation_flow,
+            global_critical_density,
+            global_jam_density,
+        ) = self.get_desra_parameters(tl["id"])
+
+        best_phase, desra_green = self.desra.select_phase_with_desra_hints(
+            tl,
+            q_arr_dict,
+            current_time=current_time,
+            use_global_params=use_global_params,
+            global_saturation_flow=global_saturation_flow,
+            global_critical_density=global_critical_density,
+            global_jam_density=global_jam_density,
+        )
+
+        # Convert DESRA phase to index
+        desra_phase_idx = phase_to_index(best_phase, self.actions_map[tl["id"]], 0)
+
+        # Check if desra does not select empty phase follow the state vector
+        best_phase_idx = self.choose_best_phase(state_vector, desra_phase_idx)
+
+        for i in range(len(state_vector)):
+            is_desra = 1.0 if i == best_phase_idx else 0.0
+            state_vector[i].append(is_desra)
+
+        flat_state = [f for phase_features in state_vector for f in phase_features]
+
+        # Current phase to index
+        current_phase_idx = phase_to_index(phase, self.actions_map[tl["id"]], 0)
+
+        # flat_state.extend([current_phase_idx, best_phase_idx])
+
+        # assert (
+        #     len(state_vector) == self.agent_cfg["num_states"]
+        # ), f"State vector length {len(state_vector)} does not match input_dim {self.agent_cfg['num_states']}"
+
+        return np.array(flat_state, dtype=np.float32), best_phase_idx
+    
+    def choose_best_phase(self, state_vector, desra_phase_idx):
+        """
+        Select the best traffic light phase based on:
+        1. DESRA suggestion (if valid and non-zero)
+        2. Rule-based comparison: choose the phase that dominates
+            others in at least 2 out of 3 features.
+        """
+
+        # state_vector is already shaped like [[f1,f2,f3], [f1,f2,f3], ...]
+        phases = np.array(state_vector, dtype=float)
+        num_phases = len(phases)
+
+        # --- 1. Check DESRA suggestion ---
+        if desra_phase_idx is not None and 0 <= desra_phase_idx < num_phases:
+            desra_phase = phases[desra_phase_idx]
+            if not np.allclose(desra_phase, [0., 0., 0.]):  # reject [0,0,0]
+                return desra_phase_idx
+
+        # --- 2. Rule-based selection (2/3 better elements) ---
+        best_idx = 0
+        for i in range(1, num_phases):
+            # Count how many features of phase i are better than current best
+            better_count = np.sum(phases[i] > phases[best_idx])
+            if better_count >= 2:
+                best_idx = i
+
+        return best_idx
+
+    def get_reward(self, tl_id: str, phase: str) -> float:
+        """Reward = decrease in LOCAL waiting time and queue length for this specific traffic light.
+        Uses the difference in waiting time and queue length before and after the action to provide
+        proper credit assignment for multi-agent learning."""
+
+        weight = self.agent_cfg["weight"]
+        
+        # Get current waiting time and queue length for this specific traffic light
+        current_local_wait = 0.0
+        current_local_queue = 0.0
+        tl_data = None
+        for tl in self.traffic_lights:
+            if tl["id"] == tl_id:
+                tl_data = tl
+                break
+        
+        if tl_data is None:
+            return 0.0
+            
+        current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
+        # current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
+        
+        # Initialize per-TL waiting time and queue length tracking if not exists
+        if not hasattr(self, 'prev_local_wait'):
+            self.prev_local_wait = {}
+        # if not hasattr(self, 'prev_local_queue'):
+        #     self.prev_local_queue = {}
+        
+        # First calculation for this TL returns 0 (no baseline)
+        # if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
+        #     reward = 0.0
+        # else:
+        # Reward = reduction in waiting time and queue length (positive if decreased)
+        # waiting_reduction = current_local_wait
+        # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
+
+        # waiting_norm = self.waiting_time_normalizer.normalize(current_local_wait)
+        # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
+        
+        # Scale rewards based on magnitude to improve learning signal
+        # Use square root to reduce impact of extreme values
+        # waiting_reward = 0.0
+        # if waiting_reduction > 0:
+        #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
+        # elif waiting_reduction < 0:
+        #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
+        
+        # queue_reward = 0.0
+        # if queue_reduction > 0:
+        #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
+        # elif queue_reduction < 0:
+        #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
+        
+        # Combined reward: waiting time has higher weight than queue length
+        # reward = waiting_reward + queue_reward
+        reward = -current_local_wait
+        
+        # Update snapshots for this traffic light
+        self.prev_local_wait[tl_id] = current_local_wait
+        # self.prev_local_queue[tl_id] = current_local_queue
+        return float(reward)
+
+    def get_movements_from_phase(self, tl: Dict, phase_str: str) -> List[str]:
+        """Get movement detectors from a phase"""
+        return TrafficMetrics.get_movements_from_phase(tl, phase_str)
+
+    def get_yellow_phase(self, green_phase: str) -> str:
+        """Convert green phase to yellow phase"""
+        return green_phase.replace("G", "y")
+
+    def set_yellow_phase(self, tl_id: str, green_phase: str):
+        """Set yellow phase for a traffic light"""
+        yellow_phase = self.get_yellow_phase(green_phase)
+        traci.trafficlight.setPhaseDuration(tl_id, 3)
+        traci.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
+
+    def set_green_phase(self, tl_id: str, green_time: int, phase: str):
+        """Set green phase for a traffic light"""
+        traci.trafficlight.setPhaseDuration(tl_id, green_time)
+        traci.trafficlight.setRedYellowGreenState(tl_id, phase)
+
+    def _compute_arrival_flows(self):
+        """Turn each detector's deque of (t,count) into a veh/s over
+        the exact interval since the last DESRA call."""
+        now = traci.simulation.getTime()
+        q_arrivals = {}
+        for det, buf in self.arrival_buffers.items():
+            t0 = self.last_desra_time[det]
+            # only keep entries newer than t0
+            recent = [(ts, c) for ts, c in buf if ts > t0]
+            total_veh = sum(c for ts, c in recent)
+            dt = max(now - t0, 1e-6)
+            q_arrivals[det] = total_veh / dt
+            # purge old entries to free memory
+            while buf and buf[0][0] <= t0:
+                buf.popleft()
+            # record next baseline
+            self.last_desra_time[det] = now
+        return q_arrivals
+
+    def estimate_fd_params(self, tl_id, window=60, min_history=10, ema_alpha=None):
+        """
+        Legacy method for estimating fundamental diagram parameters.
+
+        NOTE: This method is kept for backward compatibility. The new DESRA class
+        now handles real-time parameter estimation internally using detector-specific
+        traffic measurements. Use DESRA.get_detector_parameters() instead.
+
+        Estimate per-lane saturation_flow, critical_density, jam_density for a traffic light
+        using recent flow and density history.
+        """
+        # Grab the last `window` points
+        flow_hist = self.history["outflow"].get(tl_id, [])[-window:]
+        density_hist = self.history["density"].get(tl_id, [])[-window:]
+
+        # Not enough data: use defaults
+        if len(flow_hist) < min_history or len(density_hist) < min_history:
+            return 0.5, 0.06, 0.18
+
+        flow_arr = np.array(flow_hist)
+        dens_arr = np.array(density_hist)
+
+        # 1) Saturation flow: use the 90th percentile to avoid spikes
+        s_emp = np.percentile(flow_arr, 90)
+
+        # 2) Critical density: density at the 90th percentile of flow
+        threshold = np.percentile(flow_arr, 90)
+        # pick the density corresponding to the first time flow crosses that threshold
+        idx = np.argmax(flow_arr >= threshold)
+        k_c_emp = dens_arr[idx]
+
+        # 3) Jam density: use a high percentile to avoid a single noise spike
+        k_j_emp = np.percentile(dens_arr, 95)
+
+        # 4) Ensure jam > critical by at least 20%
+        if k_j_emp <= k_c_emp * 1.2:
+            k_j_emp = k_c_emp * 1.2 + 1e-3
+
+        # 5) Optional EMA smoothing
+        if ema_alpha is not None:
+            # initialize on first call
+            current_s = getattr(self, "_ema_saturation_flow", s_emp)
+            current_kc = getattr(self, "_ema_critical_density", k_c_emp)
+            current_kj = getattr(self, "_ema_jam_density", k_j_emp)
+
+            s_new = (1 - ema_alpha) * current_s + ema_alpha * s_emp
+            kc_new = (1 - ema_alpha) * current_kc + ema_alpha * k_c_emp
+            kj_new = (1 - ema_alpha) * current_kj + ema_alpha * k_j_emp
+
+            # store for next call
+            self._ema_saturation_flow = s_new
+            self._ema_critical_density = kc_new
+            self._ema_jam_density = kj_new
+
+            return s_new, kc_new, kj_new
+
+        return s_emp, k_c_emp, k_j_emp
+
+    def save_plot(self, episode: int):
+        """Save episode plots"""
+        # Average history over all traffic lights
+        avg_history = {}
         for metric, data_per_tls in self.history.items():
-            # Collect valid histories
             data_lists = [data for data in data_per_tls.values() if len(data) > 0]
             if not data_lists:
                 continue
-
-            # Truncate to minimum length across all lists
             min_length = min(len(data) for data in data_lists)
             data_lists = [data[:min_length] for data in data_lists]
-
-            # Average per timestep
             avg_data = [
                 sum(step_vals) / len(step_vals) for step_vals in zip(*data_lists)
             ]
+            avg_history[metric] = avg_data
 
-            # Take the last 100 entries (or all if less)
-            avg_history[metric] = avg_data[-100:]
-
-        if episode % 100 == 0:
-            print(f"Saving models at episode {episode} ...")
-            model_path = self.path + f"model_episode_{episode}.pth"
-            self.agent.save(model_path)
-            print("Models saved")
-            print("---------------------------------------")
-
+        # Save and plot averaged metrics
+        if episode % self.save_interval == 0:
             print("Generating plots at episode", episode, "...")
             for metric, data in avg_history.items():
-                self.visualization.save_data_and_plot(
+                # Save data with correct naming convention for visualization  
+                self.visualization.save_data(
                     data=data,
-                    filename=f"{metric}_avg_episode_{episode}",
-                    xlabel="Step",
-                    ylabel=metric.replace("_", " ").title(),
+                    filename=f"skrl_dqn_{metric}_avg_episode_{episode}",
                 )
+
+            # Save metrics as DataFrame
+            self.save_metrics_to_dataframe(episode=episode)
+
             print("Plots at episode", episode, "generated")
             print("---------------------------------------")
 
-    def set_yellow_phase(self, phase):
-        """
-        Set the traffic light to yellow phase.
-        """
-        traci.trafficlight.setPhase(self.traffic_light_id, phase)
-        traci.trafficlight.setPhaseDuration(
-            self.traffic_light_id, self.interphase_duration
-        )
+    def save_metrics_to_dataframe(self, episode=None):
+        """Save metrics per traffic light as pandas DataFrame"""
+        import pandas as pd
 
-    def set_green_phase(self, tlsId, duration, new_phase):
-        traci.trafficlight.setPhaseDuration(tlsId, duration)
-        traci.trafficlight.setRedYellowGreenState(tlsId, new_phase)
+        data_records = []
 
-    def update_phase(self, phase_idxs, num_phases):
-        """
-        Update the phase of the traffic light
-        """
-        phase_str = num_phases * ["r"]
-        return self.replace_chars(phase_str, phase_idxs, "G")
-
-    def replace_chars(self, s, indexes, replacements):
-        s_list = list(s)
-
-        if isinstance(replacements, str):
-            # One replacement character for all indices
-            for i in indexes:
-                if 0 <= i < len(s_list):
-                    s_list[i] = replacements
-        else:
-            # Each index has a corresponding replacement
-            for i, c in zip(indexes, replacements):
-                if 0 <= i < len(s_list):
-                    s_list[i] = c
-
-        return "".join(s_list)
-
-    def select_action(self, traffic_light_id, agent: DQN, state, epsilon):
-        """
-        Select an action using epsilon-greedy policy.
-        Args:
-            state (np.array): current state of the simulation
-            epsilon (float): exploration rate for epsilon-greedy policy
-        Returns:
-            int: selected action
-        """
-        if random.random() < epsilon:
-            return random.randint(0, self.num_actions[traffic_light_id] - 1)
-        else:
-            state = torch.from_numpy(state).to(self.device, dtype=torch.float32)
-            with torch.no_grad():
-                q_values: torch.Tensor = agent.predict_one(
-                    state, self.num_actions[traffic_light_id]
-                )
-                return q_values.argmax().item()
-
-    def get_state(self, traffic_light):
-        """
-        Get the current state at a specific traffic light in the simulation.
-
-        Returns:
-            np.ndarray: 1D array representing the full input state
-            int: green time
-        """
-        states = [] # state of phases, phase_idx, green_time
-
-        for phase_str in traffic_light["phase"]:
-            movements = self.get_movements_from_phase(traffic_light, phase_str)
-
-            state = [
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ] # free_capacity, density, waiting_time, queue_length
-            for detector_id in movements:
-                free_capacity = self.get_free_capacity(detector_id)
-                density = self.get_density(detector_id)
-                waiting_time = self.get_waiting_time(detector_id)
-                queue_length = self.get_queue_length(detector_id)
-
-                state[0] += free_capacity
-                state[1] += density
-                state[2] = max(state[2], waiting_time)
-                state[3] = max(state[3], queue_length)
-
-            state[0] /= len(movements)
-            state[1] /= len(movements)
-
-            states.append(state)
-
-        # Get green times and outflows
-        phase, green_time = self.desra.select_phase(traffic_light)
-
-        states.append(phase_to_index(phase, self.actions_map[traffic_light["id"]], 0))
-        states.append(green_time)
-
-        return np.array(states, dtype=np.float32), green_time
-
-    def get_queue_length(self, detector_id):
-        """
-        Get the queue length of a lane.
-        """
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
-
-    def get_free_capacity(self, detector_id):
-        """
-        Get the free capacity of a lane.
-        """
-        lane_length = traci.lanearea.getLength(detector_id)
-        occupied_length = (
-            traci.lanearea.getLastStepOccupancy(detector_id) / 100 * lane_length
-        )
-
-        return (lane_length - occupied_length) / lane_length
-
-    def get_density(self, detector_id):
-        """
-        Get the density of vehicles on a lane.
-        """
-        return traci.lanearea.getLastStepOccupancy(detector_id)
-
-    def get_waiting_time(self, detector_id):
-        """
-        Estimate waiting time by summing waiting times of all vehicles in the lane.
-        """
-        vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
-
-        total_waiting_time = 0.0
-        for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getWaitingTime(vid)
-        return total_waiting_time
-
-    def get_avg_speed(self, traffic_light):
-        speeds = []
-        for detector in traffic_light["detectors"]:
-            try:
-                speed = traci.lanearea.getLastStepMeanSpeed(detector["id"])
-                speeds.append(speed)
-            except:
-                pass
-        return np.mean(speeds) if speeds else 0.0
-
-    def get_avg_travel_time(self, traffic_light):
-        travel_times = []
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            travel_times.append(traci.lane.getTraveltime(lane))
-        return np.mean(travel_times) if travel_times else 0.0
-
-    def get_avg_density(self, traffic_light):
-        densities = []
-        for detector in traffic_light["detectors"]:
-            try:
-                densities.append(traci.lanearea.getLastStepOccupancy(detector["id"]))
-            except:
-                pass
-        return np.mean(densities) if densities else 0.0
-
-    def get_num_phases(self, traffic_light):
-        """
-        Returns the number of custom-defined traffic light phases.
-        """
-        return len(traffic_light["phase"])
-
-    def get_movements_from_phase(self, traffic_light, phase_str):
-        detectors = [det["id"] for det in traffic_light["detectors"]]
-        active_detectors = [
-            detectors[i]
-            for i, state in enumerate(phase_str)
-            if state.upper() == "G" and i < len(detectors)
+        # Only collect specified system metrics
+        target_metrics = [
+            "reward", "queue_length", "travel_delay", "waiting_time", "outflow", "junction_arrival", "stopped_vehicles"
         ]
-        return active_detectors
+
+        for metric, data_per_tls in self.history.items():
+            if metric in target_metrics:
+                for tl_id, data_list in data_per_tls.items():
+                    if len(data_list) > 0:
+                        for time_step, value in enumerate(data_list):
+                            data_records.append(
+                                {
+                                    "traffic_light_id": tl_id,
+                                    "metric": metric,
+                                    "time_step": time_step,
+                                    "value": value,
+                                    "episode": episode,
+                                    "simulation_type": "skrl_dqn",
+                                }
+                            )
+
+        df = pd.DataFrame(data_records)
+
+        # Save to CSV if path is provided
+        if hasattr(self, "path") and self.path:
+            filename = (
+                f"{self.path}skrl_dqn_metrics_episode_{episode}.csv"
+                if episode is not None
+                else f"{self.path}skrl_dqn_metrics.csv"
+            )
+            df.to_csv(filename, index=False)
+            print(f"SKRL DQN metrics DataFrame saved to {filename}")
+
+        return df
+
+    def configure_desra_parameters(
+        self,
+        use_global_params=False,
+        global_saturation_flow=None,
+        global_critical_density=None,
+        global_jam_density=None,
+    ):
+        """
+        Configure DESRA to use either global or detector-specific parameters.
+
+        Args:
+            use_global_params: If True, use global parameters for all detectors
+            global_saturation_flow: Global saturation flow rate (veh/s)
+            global_critical_density: Global critical density (veh/m)
+            global_jam_density: Global jam density (veh/m)
+        """
+        self.desra_use_global_params = use_global_params
+        self.desra_global_saturation_flow = global_saturation_flow
+        self.desra_global_critical_density = global_critical_density
+        self.desra_global_jam_density = global_jam_density
+
+        print(f"DESRA configured: use_global_params={use_global_params}")
+        if use_global_params:
+            print(
+                f"Global parameters: s={global_saturation_flow}, "
+                f"kc={global_critical_density}, kj={global_jam_density}"
+            )
+
+    def get_desra_parameters(self, tl_id):
+        """
+        Get DESRA parameters for a traffic light, either global or detector-specific.
+
+        Args:
+            tl_id: Traffic light ID
+
+        Returns:
+            Tuple of (use_global_params, global_saturation_flow, global_critical_density, global_jam_density)
+        """
+        if hasattr(self, "desra_use_global_params") and self.desra_use_global_params:
+            return (
+                True,
+                getattr(self, "desra_global_saturation_flow", None),
+                getattr(self, "desra_global_critical_density", None),
+                getattr(self, "desra_global_jam_density", None),
+            )
+        else:
+            return (False, None, None, None)
+
+    def get_desra_statistics(self):
+        """
+        Get current DESRA parameter estimates for all detectors.
+
+        Returns:
+            Dict with detector statistics including estimated parameters and buffer sizes
+        """
+        stats = {}
+        for det in self.all_detectors:
+            params = self.desra.get_detector_parameters(det)
+            stats[det] = {
+                "estimated_saturation_flow": params["saturation_flow"],
+                "estimated_critical_density": params["critical_density"],
+                "estimated_jam_density": params["jam_density"],
+                "vehicle_count_buffer_size": len(
+                    self.desra.vehicle_counts.get(det, [])
+                ),
+                "occupancy_buffer_size": len(self.desra.occupancies.get(det, [])),
+                "flow_rate_buffer_size": len(self.desra.flow_rates.get(det, [])),
+                "density_buffer_size": len(self.desra.densities.get(det, [])),
+            }
+        return stats
+
+    def print_desra_summary(self):
+        """Print a summary of DESRA parameter estimates."""
+        print("\n=== DESRA Parameter Summary ===")
+        print(
+            f"Mode: {'Global Parameters' if self.desra_use_global_params else 'Detector-Specific Parameters'}"
+        )
+
+        if self.desra_use_global_params:
+            print(f"Global Saturation Flow: {self.desra_global_saturation_flow}")
+            print(f"Global Critical Density: {self.desra_global_critical_density}")
+            print(f"Global Jam Density: {self.desra_global_jam_density}")
+        else:
+            stats = self.get_desra_statistics()
+            print(f"Number of detectors: {len(stats)}")
+
+            if stats:
+                # Calculate averages
+                avg_saturation_flow = np.mean(
+                    [s["estimated_saturation_flow"] for s in stats.values()]
+                )
+                avg_critical_density = np.mean(
+                    [s["estimated_critical_density"] for s in stats.values()]
+                )
+                avg_jam_density = np.mean(
+                    [s["estimated_jam_density"] for s in stats.values()]
+                )
+                avg_buffer_size = np.mean(
+                    [s["vehicle_count_buffer_size"] for s in stats.values()]
+                )
+
+                print(f"Average Saturation Flow: {avg_saturation_flow:.3f} veh/s")
+                print(f"Average Critical Density: {avg_critical_density:.3f} veh/m")
+                print(f"Average Jam Density: {avg_jam_density:.3f} veh/m")
+                print(f"Average Buffer Size: {avg_buffer_size:.1f} measurements")
+        print("==============================\n")
+
+    def print_desra_usage_summary(self):
+        """Print summary of DESRA vs DQN action selection usage"""
+        if not self.use_desra_guidance:
+            print("DESRA guidance disabled - using pure DQN")
+            return
+            
+        if self.testing_mode:
+            print("TESTING MODE: DESRA disabled - using pure DQN")
+            return
+            
+        print("\n=== DESRA-DQN Hybrid Usage Summary ===")
+        total_desra = sum(self.desra_action_count.values())
+        total_dqn = sum(self.dqn_action_count.values())
+        total_actions = total_desra + total_dqn
+        
+        if total_actions > 0:
+            desra_percent = (total_desra / total_actions) * 100
+            dqn_percent = (total_dqn / total_actions) * 100
+            
+            print(f"Overall Action Selection:")
+            print(f"  DESRA guidance: {total_desra} actions ({desra_percent:.1f}%)")
+            print(f"  DQN decisions:  {total_dqn} actions ({dqn_percent:.1f}%)")
+            print(f"  Total actions:  {total_actions}")
+            
+            print(f"\nPer Traffic Light:")
+            for tl_id in self.traffic_lights:
+                tl_id_str = tl_id["id"]
+                desra_count = self.desra_action_count.get(tl_id_str, 0)
+                dqn_count = self.dqn_action_count.get(tl_id_str, 0)
+                tl_total = desra_count + dqn_count
+                if tl_total > 0:
+                    tl_desra_percent = (desra_count / tl_total) * 100
+                    print(f"  {tl_id_str}: {desra_count}/{tl_total} DESRA ({tl_desra_percent:.1f}%)")
+        else:
+            print("No actions recorded yet")
+        
+        print("==========================================\n")
+
+    def reset_desra_tracking(self):
+        """Reset DESRA usage tracking for next episode"""
+        for tl_id in self.desra_action_count:
+            self.desra_action_count[tl_id] = 0
+            self.dqn_action_count[tl_id] = 0

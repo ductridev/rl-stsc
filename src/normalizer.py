@@ -9,6 +9,5 @@ class Normalizer:
 
         if self.max_val == self.min_val:
             return 0.0  # avoid divide by zero
-        
-        norm = (val - self.min_val) / (self.max_val - self.min_val)  # Scale to range 0 to 1
-        return norm * 2 - 1
+
+        return (val - self.min_val) / (self.max_val - self.min_val)

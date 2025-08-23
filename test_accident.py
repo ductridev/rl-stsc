@@ -10,7 +10,6 @@ from src.memory import ReplayMemory
 from src.accident_manager import AccidentManager
 
 config = import_train_configuration("config/training_westDragonBridge_cfg.yaml")
-green_duration_deltas = config["agent"]["green_duration_deltas"]
 min_epsilon = config["agent"]["min_epsilon"]
 decay_rate = config["agent"]["decay_rate"]
 start_step = config["start_step"]

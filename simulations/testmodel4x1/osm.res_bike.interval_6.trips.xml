@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-02 13:30:25.142213 by randomTrips.py UNKNOWN
+<configuration>
+    <net-file value="osm.net.xml.gz"/>
+    <weights-prefix value="random_edge_priority_interval_6"/>
+    <output-trip-file value="osm.res_bike.interval_6.trips.xml"/>
+    <prefix value="res_bike_int6"/>
+    <trip-attributes value="departLane='best'"/>
+    <fringe-start-attributes value="departSpeed='max'"/>
+    <vehicle-class value="bicycle"/>
+    <vclass value="bicycle"/>
+    <remove-loops value="True"/>
+    <validate value="True"/>
+    <begin value="2166.0"/>
+    <end value="2526.0"/>
+    <insertion-rate value="280.0"/>
+</configuration>
+-->
+
+<!-- generated on 2025-08-02 13:30:25 by Eclipse SUMO duarouter Version 1.22.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_bike.interval_6.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_bike.interval_6.trips.xml.tmp"/>
+        <alternatives-output value="NUL"/>
+        <write-trips value="true"/>
+    </output>
+
+    <processing>
+        <remove-loops value="true"/>
+    </processing>
+
+    <time>
+        <begin value="2166.0"/>
+        <end value="2526.0"/>
+    </time>
+
+    <report>
+        <no-warnings value="true"/>
+        <ignore-errors value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_bike_int6_bicycle" vClass="bicycle"/>
+    <trip id="res_bike_int60" type="res_bike_int6_bicycle" depart="2166.00" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int61" type="res_bike_int6_bicycle" depart="2178.86" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int62" type="res_bike_int6_bicycle" depart="2191.71" departLane="best" departSpeed="max" from="E30" to="E30.558"/>
+    <trip id="res_bike_int63" type="res_bike_int6_bicycle" depart="2204.57" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int64" type="res_bike_int6_bicycle" depart="2217.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int66" type="res_bike_int6_bicycle" depart="2243.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int67" type="res_bike_int6_bicycle" depart="2256.00" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int69" type="res_bike_int6_bicycle" depart="2281.71" departLane="best" departSpeed="max" from="E31" to="E18.410"/>
+    <trip id="res_bike_int610" type="res_bike_int6_bicycle" depart="2294.57" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int611" type="res_bike_int6_bicycle" depart="2307.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int613" type="res_bike_int6_bicycle" depart="2333.14" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int614" type="res_bike_int6_bicycle" depart="2346.00" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int615" type="res_bike_int6_bicycle" depart="2358.86" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int617" type="res_bike_int6_bicycle" depart="2384.57" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+    <trip id="res_bike_int618" type="res_bike_int6_bicycle" depart="2397.43" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int619" type="res_bike_int6_bicycle" depart="2410.29" departLane="best" departSpeed="max" from="E31" to="E30.558"/>
+    <trip id="res_bike_int621" type="res_bike_int6_bicycle" depart="2436.00" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_bike_int622" type="res_bike_int6_bicycle" depart="2448.86" departLane="best" departSpeed="max" from="E18" to="E18.410"/>
+    <trip id="res_bike_int623" type="res_bike_int6_bicycle" depart="2461.71" departLane="best" departSpeed="max" from="E18" to="E22.488"/>
+    <trip id="res_bike_int624" type="res_bike_int6_bicycle" depart="2474.57" departLane="best" departSpeed="max" from="E22" to="E22.488"/>
+    <trip id="res_bike_int625" type="res_bike_int6_bicycle" depart="2487.43" departLane="best" departSpeed="max" from="E22" to="E18.410"/>
+    <trip id="res_bike_int626" type="res_bike_int6_bicycle" depart="2500.29" departLane="best" departSpeed="max" from="E18" to="E31.622"/>
+    <trip id="res_bike_int627" type="res_bike_int6_bicycle" depart="2513.14" departLane="best" departSpeed="max" from="E22" to="E30.558"/>
+</routes>

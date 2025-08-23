@@ -1,4 +1,4 @@
-import traci
+import libsumo as traci
 
 class SUMO:
     def get_vehicles_in_phase(self, traffic_light, phase_str):

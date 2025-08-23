@@ -5,8 +5,21 @@ import numpy as np
 from torchinfo import summary
 from typing import Optional
 from src.SENet_module import SENet
+
+
 class DQN(nn.Module):
-    def __init__(self, num_layers, batch_size, learning_rate = 0.0001, input_dim = 4, output_dims = [15, 15, 15], gamma = 0.99, attn_heads=4 , device = 'cpu'):
+    def __init__(
+        self,
+        num_layers,
+        batch_size,
+        learning_rate=0.0001,
+        input_dim=4,
+        output_dims=[15, 15, 15],
+        gamma=0.99,
+        loss_type="qr",
+        device="cpu",
+        max_phases=10,
+    ):
         """
         Initialize the DQN model.
 
@@ -19,16 +32,19 @@ class DQN(nn.Module):
             attn_heads (int): Number of attention heads.
         """
         super(DQN, self).__init__()
+        self.loss_type = loss_type
         self.num_layers = num_layers
         self._batch_size = batch_size
         self.learning_rate = learning_rate
-        self._input_dim = input_dim
+        self._input_dim = (
+            max_phases * input_dim + 2 + 1
+        )  # 2 for DESRA and 1 for current phase
         self._output_dims = list(dict.fromkeys(output_dims))
         self.gamma = gamma
         self.device = device
-        self.attn_heads = attn_heads
-
-        # Build model parts: backbone + attention + heads
+        self.num_quantiles = 100
+        self.num_atoms = 51  # For C51 distributional DQN
+        self.v_min, self.v_max = -10.0, 10.0
         self.backbone, self.attn, self.heads = self.__build_model()
 
         self.summary()
@@ -52,11 +68,17 @@ class DQN(nn.Module):
         attn = SENet(channel=256)  # Replace multihead attention
 
         heads = nn.ModuleDict()
+
         for dim in self._output_dims:
-            heads[str(dim)] = nn.Linear(256, dim)
+            if hasattr(self, "loss_type") and self.loss_type in ("qr", "wasserstein"):
+                heads[str(dim)] = nn.Linear(256, dim * self.num_quantiles)
+            elif hasattr(self, "loss_type") and self.loss_type == "c51":
+                heads[str(dim)] = nn.Linear(256, dim * self.num_atoms)
+            else:
+                heads[str(dim)] = nn.Linear(256, dim)
 
         return backbone, attn, heads
-    
+
     def summary(self):
         """
         Print a summary of the model.
@@ -69,7 +91,7 @@ class DQN(nn.Module):
             print(f"\nHead summary for output_dim={dim}:")
             summary(self.heads[str(dim)], input_size=(self.batch_size, 256))
 
-    def forward(self, x, output_dim = 15):
+    def forward(self, x, output_dim=15):
         """
         Forward pass through the network.
 
@@ -84,16 +106,22 @@ class DQN(nn.Module):
         assert isinstance(output_dim, int), "output_dim must be an integer"
         assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
 
-        assert output_dim is not None, "output_dim must be specified"
-        assert isinstance(output_dim, int), "output_dim must be an integer"
-        assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
-
         features = self.backbone(x)  # [B, 256]
         attn_out = self.attn(features)  # Apply SENet, input shape [B, 256]
-        head = self.heads[str(output_dim)]
-        return head(attn_out)
-    
-    def predict_one(self, x, output_dim = 15):
+
+        q_head = self.heads[str(output_dim)]
+
+        q_out = q_head(attn_out)  # Q-values or distributions
+
+        if self.loss_type in ("qr", "wasserstein"):
+            q_out = q_out.view(-1, output_dim, self.num_quantiles)
+
+        elif self.loss_type == "c51":
+            q_out = q_out.view(-1, output_dim, self.num_atoms)
+
+        return q_out
+
+    def predict_one(self, x, output_dim=15):
         """
         Predict the Q-values for the given input.
 
@@ -115,7 +143,7 @@ class DQN(nn.Module):
             x = torch.reshape(x, [1, self.input_dim])
         return self.forward(x, output_dim)
 
-    def predict_batch(self, x, output_dim = 15):
+    def predict_batch(self, x, output_dim=15):
         """
         Predict the Q-values for the given batch of inputs.
 
@@ -133,61 +161,150 @@ class DQN(nn.Module):
         if not isinstance(x, torch.Tensor):
             x = torch.tensor(x, dtype=torch.float32).to(self.device)
         return self.forward(x, output_dim)
-    
-    def train_batch(self, states, actions, rewards, next_states, output_dim=15, done=False, target_net:Optional["DQN"]=None):
+
+    def train_batch(
+        self,
+        states,
+        actions,
+        rewards,
+        next_states,
+        output_dim=15,
+        done=False,
+        target_net: Optional["DQN"] = None,
+        alpha: float = 0.8,
+    ):
         """
         Train the model on a batch of experiences.
 
         Args:
             states (ndarray): Batch of states.
-            actions (ndarray): Batch of actions.
+            actions (ndarray): Batch of actions (phase indices).
             rewards (ndarray): Batch of rewards.
             next_states (ndarray): Batch of next states.
-            output_dim (int): Output dimension (action space size).
+            output_dim (int): Output dimension (number of valid phases).
+            done (bool or np.ndarray): Whether episode terminated.
+            target_net (DQN): Optional target network for DDQN.
+            alpha (float): Alpha value for soft target network update.
 
         Returns:
             dict: Batch training metrics (avg loss, avg q_value, etc.)
         """
         # Convert to tensors
         states = torch.tensor(np.array(states), dtype=torch.float32).to(self.device)
+        next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(
+            self.device
+        )
         actions = torch.tensor(np.array(actions), dtype=torch.int64).to(self.device)
         rewards = torch.tensor(np.array(rewards), dtype=torch.float32).to(self.device)
-        next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(self.device)
         done = torch.tensor(done, dtype=torch.float32).to(self.device)
+
+        loss_type = self.loss_type
+        online = self
+
         # Forward pass
         # Compute target Q-value using DDQN logic
+        q_values = self.predict_batch(states, output_dim)  # [B, A, K] and [B, A]
         next_q_values = (
             target_net.predict_batch(next_states, output_dim)
-            if target_net is not None else self.predict_batch(next_states, output_dim)
+            if target_net is not None
+            else self.predict_batch(next_states, output_dim)
         )
-        next_actions = torch.argmax(self.predict_batch(next_states, output_dim), dim=1)
-        target_q_value = rewards + (1 - done) * self.gamma * next_q_values.gather(1, next_actions.unsqueeze(1)).squeeze(1)
 
-        # Current Q-value
-        q_values = self.predict_batch(states, output_dim)
-        q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+        if loss_type in ("mse", "huber", "weighted"):
+            q_value_all = q_values  # [B, A]
+            next_q_all = next_q_values  # [B, A]
 
-        # Weighted loss: if Q < target => weight = 1, else weight = target / Q (clipped at min δ)
-        delta = 0.85
-        weights = torch.where(q_value < target_q_value, 
-                            torch.ones_like(q_value),
-                            torch.clamp(target_q_value / (q_value + 1e-6), min=delta))
+            next_actions = torch.argmax(
+                self.predict_batch(next_states, output_dim)[0], dim=1
+            )
+            target_q_value = rewards + (1 - done) * self.gamma * next_q_all.gather(
+                1, next_actions.unsqueeze(1)
+            ).squeeze(1)
+            q_value = q_value_all.gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        loss = (weights * (q_value - target_q_value.detach()) ** 2).mean()
+            # === Loss computation ===
+            if loss_type == "mse":
+                q_loss = F.mse_loss(q_value, target_q_value.detach())
+
+            elif loss_type == "huber":
+                q_loss = F.smooth_l1_loss(q_value, target_q_value.detach(), beta=1.0)
+
+            elif loss_type == "weighted":
+                delta = 0.85
+                weights = torch.where(
+                    q_value < target_q_value,
+                    torch.ones_like(q_value),
+                    torch.clamp(target_q_value / (q_value + 1e-6), min=delta),
+                )
+                q_loss = (weights * (q_value - target_q_value.detach()) ** 2).mean()
+        elif loss_type == "qr":
+            K = self.num_quantiles
+
+            q_dist = q_values.view(
+                -1, output_dim, K
+            )  # [batch, num_actions, num_quantiles]
+            next_q_dist = next_q_values.view(-1, output_dim, K)
+
+            # Get the best next action by averaging quantiles, then taking argmax
+            next_actions = torch.argmax(next_q_dist.mean(2), dim=1)
+
+            # Compute target quantile values: rewards + gamma * next_q_values
+            tgt_dist = (
+                rewards.unsqueeze(1)
+                + (1 - done.unsqueeze(1))
+                * self.gamma
+                * next_q_dist[torch.arange(next_q_dist.size(0)), next_actions]
+            )
+
+            # Get predicted quantiles for actions actually taken
+            pred_dist = q_dist[torch.arange(q_dist.size(0)), actions]
+
+            # Quantile Huber loss
+            # Compute pairwise differences between target and predicted quantiles
+            u = tgt_dist.unsqueeze(2) - pred_dist.unsqueeze(1)  # [B, K, K]
+
+            huber = F.smooth_l1_loss(
+                pred_dist.unsqueeze(1).expand_as(u),
+                tgt_dist.unsqueeze(2).expand_as(u),
+                beta=1.0,
+                reduction="none",
+            )
+
+            # Compute quantile fractions taus = (0.5 + i) / K for i in 0..K-1
+            taus = (torch.arange(K, device=self.device).float() + 0.5) / K
+
+            # Quantile weight: |τ - 𝟙{u < 0}|
+            # Encourages over-estimation and under-estimation sensitivity
+            weight = torch.abs(taus.unsqueeze(0) - (u.detach() < 0).float())
+            # Final loss: average over batch, quantiles
+            q_loss = (weight * huber).mean()
+
+            # Mean Q-values for logging
+            target_q_value = tgt_dist.mean(1)
+            q_value = pred_dist.mean(1)
+
+        else:
+            raise ValueError(f"Unknown loss_type '{loss_type}'")
+
         # Backpropagation
         self.optimizer.zero_grad()
-        loss.backward()
+        q_loss.backward()
         self.optimizer.step()
-         
+
+        # Soft update target network if provided
+        # if target_net is not None:
+        #     self.soft_update_target_network(target_net, alpha)
+
         max_next_q_value = next_q_values.max(dim=1)[0]
 
         return {
-            "loss": loss.item(),
+            "q_loss": q_loss.item(),
+            "total_loss": q_loss.item(),
             "avg_q_value": q_value.mean().item(),
             "avg_max_next_q_value": max_next_q_value.mean().item(),
-            "avg_target": target_q_value.mean().item()
+            "avg_target": target_q_value.detach().mean().item(),
         }
-    
+
     def save(self, path):
         """
         Save the model to the specified path.
@@ -197,20 +314,102 @@ class DQN(nn.Module):
         """
         torch.save(self.state_dict(), path)
 
+    def save_checkpoint(self, path, episode=None, epsilon=None):
+        """
+        Save the complete model checkpoint including optimizer state for continuing training.
+
+        Args:
+            path (str): Path to save the checkpoint.
+            episode (int, optional): Current episode number.
+            epsilon (float, optional): Current epsilon value.
+        """
+        checkpoint = {
+            "model_state_dict": self.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "episode": episode,
+            "epsilon": epsilon,
+            "model_config": {
+                "num_layers": self.num_layers,
+                "batch_size": self._batch_size,
+                "learning_rate": self.learning_rate,
+                "input_dim": self._input_dim,
+                "output_dims": self._output_dims,
+                "gamma": self.gamma,
+                "loss_type": self.loss_type,
+                "num_quantiles": self.num_quantiles,
+                "num_atoms": getattr(self, 'num_atoms', 51),  # Safe access with default
+                "v_min": self.v_min,
+                "v_max": self.v_max,
+            },
+        }
+        torch.save(checkpoint, path)
+
+    def soft_update_target_network(self, target_net, alpha):
+        """
+        Soft update target network parameters using exponential moving average.
+        
+        Args:
+            target_net (DQN): Target network to update.
+            alpha (float): Soft update coefficient (0 < alpha < 1).
+                          Higher values update target network faster.
+                          
+        Formula: θ_target = α * θ_online + (1 - α) * θ_target
+        """
+        with torch.no_grad():
+            for target_param, online_param in zip(target_net.parameters(), self.parameters()):
+                target_param.data.copy_(
+                    alpha * online_param.data + (1 - alpha) * target_param.data
+                )
+
+    def load(self, path, for_training=False):
+        """
+        Load the model from the specified path.
+
+        Args:
+            path (str): Path to load the model from.
+            for_training (bool): If True, keep model in training mode. If False, set to eval mode.
+        """
+        self.load_state_dict(torch.load(path, map_location=self.device))
+        if for_training:
+            self.train()  # Set to training mode for continued training
+        else:
+            self.eval()  # Set to evaluation mode for inference
+
+    def load_checkpoint(self, path):
+        """
+        Load the complete model checkpoint including optimizer state for continuing training.
+
+        Args:
+            path (str): Path to load the checkpoint from.
+
+        Returns:
+            dict: Dictionary containing episode and epsilon if available.
+        """
+        checkpoint = torch.load(path, map_location=self.device)
+        self.load_state_dict(checkpoint["model_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.train()  # Set to training mode
+
+        # Return training metadata
+        return {
+            "episode": checkpoint.get("episode", 0),
+            "epsilon": checkpoint.get("epsilon", 1.0),
+        }
+
     @property
     def input_dim(self):
         """
         Get the input dimension of the model.
         """
         return self._input_dim
-    
+
     @property
     def output_dim(self):
         """
         Get the output dimension of the model.
         """
         return self._output_dim
-    
+
     @property
     def batch_size(self):
         """

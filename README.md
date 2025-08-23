@@ -35,7 +35,7 @@ This shared backbone enables all intersections to benefit from global learning p
 - The output dimension is determined by:
 
   ```python
-  output_dims = list(dict.fromkeys([len(phases) * len(time_deltas) for intersection in scenario]))
+  output_dims = list(dict.fromkeys([len(phases) for intersection in scenario]))
   ```
 
   which ensures unique heads for unique action sizes.
@@ -44,18 +44,44 @@ This shared backbone enables all intersections to benefit from global learning p
 
 #### Example
 
-If intersection A has 3 phases and 5 time deltas → `action_dim = 15`
-If intersection B has 5 phases and 5 time deltas → `action_dim = 25`
-Then heads = `{ '15': Linear(128 → 15), '25': Linear(128 → 25) }`
+If intersection A has 3 phases → `action_dim = 3`
+If intersection B has 5 phases → `action_dim = 5`
+Then heads = `{ '3': Linear(128 → 3), '5': Linear(128 → 5) }`
 
 ### Forward Pass Logic
 
 ```python
-def forward(self, x, action_dim):
-    features = self.backbone(x)
-    attn_out = self.attn(features)
-    head = self.heads[str(action_dim)]
-    return head(attn_out)
+def forward(self, x, output_dim=15):
+  """
+  Forward pass through the network.
+
+  Args:
+      x (torch.Tensor): Input tensor.
+      output_dim (int): Dimension of the output.
+
+  Returns:
+      torch.Tensor: Output tensor after passing through the network.
+  """
+  assert output_dim is not None, "output_dim must be specified"
+  assert isinstance(output_dim, int), "output_dim must be an integer"
+  assert output_dim in self._output_dims, f"Invalid output_dim: {output_dim}"
+
+  features = self.backbone(x)  # [B, 256]
+  attn_out = self.attn(features)  # Apply SENet, input shape [B, 256]
+
+  q_head = self.heads[str(output_dim)]
+  green_head = self.green_heads[str(output_dim)]
+
+  q_out = q_head(attn_out)  # Q-values or distributions
+  green_out = green_head(attn_out)  # Green time predictions
+
+  if self.loss_type in ("qr", "wasserstein"):
+      q_out = q_out.view(-1, output_dim, self.num_quantiles)
+
+  elif self.loss_type == "c51":
+      q_out = q_out.view(-1, output_dim, self.num_atoms)
+
+  return q_out, green_out
 ```
 
 Each agent (intersection) will:
@@ -79,8 +105,11 @@ We integrate **DESRA** (DEcentralized Spillback Resistant Acyclic) as a rule-bas
 The input to the DQN model becomes:
 
 ```python
-[free_capacity, density, waiting_time, queue_length, desra_phase_id, desra_green_time]
-
+[...per-phase states..., desra_phase_idx]
+```
+Where per-phase states will be
+```python
+[waiting_time, num_vehicles, highest_queue_length]
 ```
 
 - This maintains compatibility with the existing architecture while improving spillback awareness and decision robustness.
@@ -92,7 +121,9 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 
 #### Accident Format
 
+```python
 [start_step, duration, junction_id_list, edge_id_list]
+```
 
 #### Accident Impact
 
@@ -109,12 +140,21 @@ a vehicle inside a junction or edge for a period of time and remove it after the
 - Supports scalable learning as city-size grows (many intersections).
 - Allows the system to evaluate the robustness of traffic signal control under unexpected disruptions like accident.
 
+
 ### Training Logic
+See [TRAINING.md](TRAINING.md) for details on batch training, target network, and experience replay. After each training run, a snapshot of the configuration used is automatically saved as `config_snapshot.yaml` (YAML format) in the results folder for reproducibility.
 
-Check [TRAINING.md](TRAINING.md)
+### Testing and Evaluation
+After each testing run, a snapshot of the configuration is also saved as `config_snapshot.yaml` (YAML format) in the results folder.
 
-### Project Methodlogy Summary
-Check [SUMMARY.md](SUMMARY.md)
+### Modularization & SKRL Integration
+The codebase is now fully modularized, with SKRL-based agent management, factory patterns for environment/model creation, and clean separation of concerns. See [MODULARIZATION_STATUS.md](MODULARIZATION_STATUS.md) for details.
+
+### Model Saving/Loading
+Models are saved per traffic light with the convention: `skrl_model_{traffic_light_id}_episode_{episode}.pt` and config snapshots are saved alongside results.
+
+### Project Methodology Summary
+See [SUMMARY.md](SUMMARY.md) for a high-level overview.
 
 ## License
 

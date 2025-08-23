@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-08-19 22:58:43 by Eclipse SUMO duarouter Version 1.24.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_truck.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_truck.rou.xml"/>
+    </output>
+
+    <report>
+        <ignore-errors value="true"/>
+    </report>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_truck_int0_truck" vClass="truck"/>
+    <vehicle id="res_truck_int01" type="res_truck_int0_truck" depart="48.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int02" type="res_truck_int0_truck" depart="96.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int04" type="res_truck_int0_truck" depart="192.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int05" type="res_truck_int0_truck" depart="240.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int06" type="res_truck_int0_truck" depart="288.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int07" type="res_truck_int0_truck" depart="336.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int08" type="res_truck_int0_truck" depart="384.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int010" type="res_truck_int0_truck" depart="480.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int011" type="res_truck_int0_truck" depart="528.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int012" type="res_truck_int0_truck" depart="576.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int013" type="res_truck_int0_truck" depart="624.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int014" type="res_truck_int0_truck" depart="672.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int015" type="res_truck_int0_truck" depart="720.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int016" type="res_truck_int0_truck" depart="768.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int017" type="res_truck_int0_truck" depart="816.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int018" type="res_truck_int0_truck" depart="864.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int019" type="res_truck_int0_truck" depart="912.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int021" type="res_truck_int0_truck" depart="1008.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int022" type="res_truck_int0_truck" depart="1056.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int023" type="res_truck_int0_truck" depart="1104.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int024" type="res_truck_int0_truck" depart="1152.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int025" type="res_truck_int0_truck" depart="1200.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int027" type="res_truck_int0_truck" depart="1296.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int028" type="res_truck_int0_truck" depart="1344.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int029" type="res_truck_int0_truck" depart="1392.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int030" type="res_truck_int0_truck" depart="1440.00" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int031" type="res_truck_int0_truck" depart="1488.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int032" type="res_truck_int0_truck" depart="1536.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int033" type="res_truck_int0_truck" depart="1584.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int034" type="res_truck_int0_truck" depart="1632.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int036" type="res_truck_int0_truck" depart="1728.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int037" type="res_truck_int0_truck" depart="1776.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int038" type="res_truck_int0_truck" depart="1824.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int039" type="res_truck_int0_truck" depart="1872.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int040" type="res_truck_int0_truck" depart="1920.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int041" type="res_truck_int0_truck" depart="1968.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int042" type="res_truck_int0_truck" depart="2016.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int043" type="res_truck_int0_truck" depart="2064.00" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int044" type="res_truck_int0_truck" depart="2112.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int045" type="res_truck_int0_truck" depart="2160.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int046" type="res_truck_int0_truck" depart="2208.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int047" type="res_truck_int0_truck" depart="2256.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int048" type="res_truck_int0_truck" depart="2304.00" departLane="best" departSpeed="max">
+        <route edges="E31 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int049" type="res_truck_int0_truck" depart="2352.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int051" type="res_truck_int0_truck" depart="2448.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int052" type="res_truck_int0_truck" depart="2496.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int053" type="res_truck_int0_truck" depart="2544.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int055" type="res_truck_int0_truck" depart="2640.00" departLane="best" departSpeed="max">
+        <route edges="E30 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int057" type="res_truck_int0_truck" depart="2736.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int058" type="res_truck_int0_truck" depart="2784.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int060" type="res_truck_int0_truck" depart="2880.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int061" type="res_truck_int0_truck" depart="2928.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int062" type="res_truck_int0_truck" depart="2976.00" departLane="best" departSpeed="max">
+        <route edges="E18 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int063" type="res_truck_int0_truck" depart="3024.00" departLane="best" departSpeed="max">
+        <route edges="E18 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int064" type="res_truck_int0_truck" depart="3072.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int065" type="res_truck_int0_truck" depart="3120.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int066" type="res_truck_int0_truck" depart="3168.00" departLane="best" departSpeed="max">
+        <route edges="E30 E31.622"/>
+    </vehicle>
+    <vehicle id="res_truck_int067" type="res_truck_int0_truck" depart="3216.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+    <vehicle id="res_truck_int070" type="res_truck_int0_truck" depart="3360.00" departLane="best" departSpeed="max">
+        <route edges="E22 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int072" type="res_truck_int0_truck" depart="3456.00" departLane="best" departSpeed="max">
+        <route edges="E22 E18.410"/>
+    </vehicle>
+    <vehicle id="res_truck_int073" type="res_truck_int0_truck" depart="3504.00" departLane="best" departSpeed="max">
+        <route edges="E30 E30.558"/>
+    </vehicle>
+    <vehicle id="res_truck_int074" type="res_truck_int0_truck" depart="3552.00" departLane="best" departSpeed="max">
+        <route edges="E22 E22.488"/>
+    </vehicle>
+</routes>

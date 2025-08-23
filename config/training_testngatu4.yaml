@@ -1,0 +1,306 @@
+simulation:
+  gui: False
+  total_episodes: 1000
+  max_steps: 3600
+  interphase_duration: 3
+
+memory:
+  memory_size_min: 32
+  memory_size_max: 1000
+
+model:
+  training_epochs: 10000
+  save_model_name: "dqn_testngatu_model" # Name for saving the model
+  load_model_name: null # Set to model name to load existing model, null to start fresh
+  load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
+  save_interval: 2 # Save model every N episodes
+  training_steps: 300
+  updating_target_network_steps: 1200
+
+agent:
+  rbf_components: 100   
+  rbf_gamma: 0.5 
+  gamma: 0.8
+  num_states: 3 # waiting_time, queue_length, num_vehicles. 
+  model:
+    num_layers: 16
+    batch_size: 256
+    learning_rate: 0.001
+    decay_rate: 0.99
+    epsilon: 1.0
+    min_epsilon: 0.05
+    loss_type:
+      - qr
+  weight:
+    queue_length: -0.25
+    outflow_rate: 1
+    delay: -0.25
+    travel_time: -1
+    waiting_time: -0.25
+    switch_phase: -5
+
+vehicle_counts:
+  low:
+    motorcycle: 1750
+    passenger: 1250
+    bicycle: 75
+    truck: 250
+    pedestrian: 100
+  medium:
+    motorcycle: 4000
+    passenger: 1500
+    truck: 150
+    bicycle: 500
+    pedestrian: 200
+  high:
+    motorcycle: 8000
+    passenger: 3000
+    truck: 300
+    bicycle: 1000
+    pedestrian: 400
+
+edge_groups:
+  W:
+    - E22
+  S:
+    - E30
+  E:
+    - E31
+  N:
+    - E18
+
+dir:
+  models_path_name: "models/"
+  sumocfg_file_name: "simulations/testmodel4x1/osm.sumocfg"
+
+traffic_lights:
+  # - traffic_light_1:
+  #   id: "Ngatu"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_4"
+  #       street: "1"
+  #     - id: "e2_5"
+  #       street: "1"
+  #     - id: "e2_10"
+  #       street: "2"
+  #     - id: "e2_11"
+  #       street: "2"
+  #     - id: "e2_14"
+  #       street: "3"
+  #     - id: "e2_15"
+  #       street: "3"
+  #     - id: "e2_0"
+  #       street: "4"
+  #     - id: "e2_1"
+  #       street: "4"
+  # - traffic_light_2:
+  #   id: "NgatuNorth"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_20"
+  #       street: "1"
+  #     - id: "e2_21"
+  #       street: "1"
+  #     - id: "e2_19"
+  #       street: "2"
+  #     - id: "e2_18"
+  #       street: "2"
+  #     - id: "e2_16"
+  #       street: "3"
+  #     - id: "e2_17"
+  #       street: "3"
+  #     - id: "e2_22"
+  #       street: "4"
+  #     - id: "e2_23"
+  #       street: "4"
+  # - traffic_light_3:
+  #   id: "NgatuEast"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_30"
+  #       street: "1"
+  #     - id: "e2_31"
+  #       street: "1"
+  #     - id: "e2_27"
+  #       street: "2"
+  #     - id: "e2_26"
+  #       street: "2"
+  #     - id: "e2_25"
+  #       street: "3"
+  #     - id: "e2_24"
+  #       street: "3"
+  #     - id: "e2_28"
+  #       street: "4"
+  #     - id: "e2_29"
+  #       street: "4"
+  # - traffic_light_4:
+  #   id: "NgatuSouth"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_32"
+  #       street: "1"
+  #     - id: "e2_33"
+  #       street: "1"
+  #     - id: "e2_34"
+  #       street: "2"
+  #     - id: "e2_35"
+  #       street: "2"
+  #     - id: "e2_36"
+  #       street: "3"
+  #     - id: "e2_37"
+  #       street: "3"
+  #     - id: "e2_38"
+  #       street: "4"
+  #     - id: "e2_39"
+  #       street: "4"
+  # - traffic_light_5:
+  #   id: "NgatuWest"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_2"
+  #       street: "1"
+  #     - id: "e2_3"
+  #       street: "1"
+  #     - id: "e2_6"
+  #       street: "2"
+  #     - id: "e2_7"
+  #       street: "2"
+  #     - id: "e2_8"
+  #       street: "3"
+  #     - id: "e2_9"
+  #       street: "3"
+  #     - id: "e2_12"
+  #       street: "4"
+  #     - id: "e2_13"
+  #       street: "4"
+  - traffic_light_6:
+    id: "NgatuNorthEast"
+    phase:
+      - GGGGGrrrGrrrGrrr
+      - GrrrGGGGGrrrGrrr
+      - GrrrGrrrGGGGGrrr
+      - GrrrGrrrGrrrGGGG
+
+    detectors:
+      - id: "e2_50"
+        street: "1"
+      - id: "e2_51"
+        street: "1"
+      - id: "e2_0"
+        street: "2"
+      - id: "e2_1"
+        street: "2"
+      - id: "e2_52"
+        street: "3"
+      - id: "e2_53"
+        street: "3"
+      - id: "e2_54"
+        street: "4"
+      - id: "e2_55"
+        street: "4"
+  # - traffic_light_7:
+  #   id: "NgatuSouthEast"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_44"
+  #       street: "1"
+  #     - id: "e2_45"
+  #       street: "1"
+  #     - id: "e2_42"
+  #       street: "2"
+  #     - id: "e2_43"
+  #       street: "2"
+  #     - id: "e2_40"
+  #       street: "3"
+  #     - id: "e2_41"
+  #       street: "3"
+  #     - id: "e2_46"
+  #       street: "4"
+  #     - id: "e2_47"
+  #       street: "4"
+  # - traffic_light_8:
+  #   id: "NgatuSouthWest"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_66"
+  #       street: "1"
+  #     - id: "e2_67"
+  #       street: "1"
+  #     - id: "e2_64"
+  #       street: "2"
+  #     - id: "e2_65"
+  #       street: "2"
+  #     - id: "e2_68"
+  #       street: "3"
+  #     - id: "e2_69"
+  #       street: "3"
+  #     - id: "e2_70"
+  #       street: "4"
+  #     - id: "e2_71"
+  #       street: "4"
+  # - traffic_light_9:
+  #   id: "NgatuNorthWest"
+  #   phase:
+  #     - GGGGGrrrGrrrGrrr
+  #     - GrrrGGGGGrrrGrrr
+  #     - GrrrGrrrGGGGGrrr
+  #     - GrrrGrrrGrrrGGGG
+
+  #   detectors:
+  #     - id: "e2_56"
+  #       street: "1"
+  #     - id: "e2_57"
+  #       street: "1"
+  #     - id: "e2_58"
+  #       street: "2"
+  #     - id: "e2_59"
+  #       street: "2"
+  #     - id: "e2_60"
+  #       street: "3"
+  #     - id: "e2_61"
+  #       street: "3"
+  #     - id: "e2_62"
+  #       street: "4"
+  #     - id: "e2_63"
+  #       street: "4"
+accident:
+  start_step: 400
+  duration: 100
+  junction:
+    - id: "NgatuNorthEast"

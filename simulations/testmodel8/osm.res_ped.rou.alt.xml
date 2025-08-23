@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-07-17 16:02:46 by Eclipse SUMO duarouter Version 1.22.0
+<duarouterConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml.gz"/>
+        <route-files value="osm.res_ped.trips.xml"/>
+    </input>
+
+    <output>
+        <output-file value="osm.res_ped.rou.xml"/>
+    </output>
+
+</duarouterConfiguration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="res_ped_pedestrian" vClass="pedestrian"/>
+    <vehicle id="res_ped12" type="res_ped_pedestrian" depart="432.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="174.63" probability="1.00000000" edges="E9 E15"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped13" type="res_ped_pedestrian" depart="468.00" departLane="best">
+        <routeDistribution last="0">
+            <route cost="81.51" probability="1.00000000" edges="E1"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped21" type="res_ped_pedestrian" depart="756.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="196.49" probability="1.00000000" edges="E12 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped29" type="res_ped_pedestrian" depart="1044.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="183.49" probability="1.00000000" edges="E11 E17"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped42" type="res_ped_pedestrian" depart="1512.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="188.15" probability="1.00000000" edges="E19 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped72" type="res_ped_pedestrian" depart="2592.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="188.15" probability="1.00000000" edges="E19 E13"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped74" type="res_ped_pedestrian" depart="2664.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="196.49" probability="1.00000000" edges="E12 E14"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="res_ped95" type="res_ped_pedestrian" depart="3420.00" departLane="best" departSpeed="max">
+        <routeDistribution last="0">
+            <route cost="183.60" probability="1.00000000" edges="E19 E14"/>
+        </routeDistribution>
+    </vehicle>
+</routes>
