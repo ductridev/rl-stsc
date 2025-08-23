@@ -169,16 +169,16 @@ class AccidentManager:
                 return True
         
         # Check collisions
-        for col in traci.simulation.getCollisions():
-            col_lane = col.lane
+        # for col in traci.simulation.getCollisions():
+        #     col_lane = col.lane
 
-            # Match collision lane to a controlled link index
-            for link_idx, link_entries in enumerate(controlled_links):
-                for (from_edge, _, via_lane) in link_entries:
-                    if col_lane in (from_edge, via_lane):
-                        # If this link is GREEN in the phase → blocked
-                        if link_idx < len(phase_state) and phase_state[link_idx] in ("G", "g"):
-                            return True
+        #     # Match collision lane to a controlled link index
+        #     for link_idx, link_entries in enumerate(controlled_links):
+        #         for (from_edge, _, via_lane) in link_entries:
+        #             if col_lane in (from_edge, via_lane):
+        #                 # If this link is GREEN in the phase → blocked
+        #                 if link_idx < len(phase_state) and phase_state[link_idx] in ("G", "g"):
+        #                     return True
 
         return False
 
