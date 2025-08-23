@@ -1,5 +1,5 @@
 import os
-import json
+import yaml
 def save_config_snapshot(config, save_path):
     """
     Save config snapshot to the results folder as config_snapshot.json
@@ -7,10 +7,10 @@ def save_config_snapshot(config, save_path):
         config: Configuration dictionary
         save_path: Path to save the config snapshot
     """
-    config_snapshot_file = os.path.join(save_path, "config_snapshot.json")
+    config_snapshot_file = os.path.join(save_path, "config_snapshot.yaml")
     try:
         with open(config_snapshot_file, "w") as f:
-            json.dump(config, f, indent=2, default=str)
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
         print(f"Config snapshot saved to: {config_snapshot_file}")
     except Exception as e:
         print(f"Failed to save config snapshot: {e}")
@@ -21,7 +21,6 @@ import glob
 import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
-import torch
 import argparse
 import time
 from src.memory import ReplayMemory
