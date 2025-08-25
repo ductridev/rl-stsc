@@ -12,7 +12,7 @@ memory:
 model:
   training_epochs: 500
   save_model_name: "dqn_testngatu_model" # Name for saving the model
-  load_model_name: "G:/python_learn/AIP/models/model_152/skrl_model_NgatuNorthEast_episode_1.pt" # Set to model path to load existing model, null to start fresh
+  load_model_name: "G:/python_learn/AIP/models/model_190/skrl_model_NgatuNorthEast_episode_1.pt" # Set to model path to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
   save_interval: 10 # Save model every N episodes
   training_steps: 10  # DECISION interval between batch training cycles (increased responsiveness while maintaining stability)
@@ -65,12 +65,12 @@ agent:
     initial_epsilon: 1
     min_epsilon: 0.0
   weight:
-    queue_length: -1
-    outflow_rate: 1
+    queue_length: -0.3
+    outflow_rate: 0.2
     delay: -0.25
     travel_time: -1
-    waiting_time: -0.5
-    switch_phase: -5
+    waiting_time: -0.7
+    switch_phase: -0.3
 
 vehicle_counts:
   low:
