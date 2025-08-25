@@ -515,8 +515,10 @@ class Simulation(SUMO):
         self.travel_time[tl_id] = st["travel_time_sum"]
         self.waiting_time[tl_id] = st["waiting_time"]
 
+        st["outflow"] = 0  # Reset outflow for next phase
+
         # Calculate reward
-        reward = self.get_reward(tl_id, st["phase"])
+        reward = self.get_reward(tl_id, st["phase"], st["old_phase"])
 
         # Always record reward when phase ends (not just every 60 steps)
         st["step_reward_sum"] += reward
@@ -733,7 +735,7 @@ class Simulation(SUMO):
 
         return best_idx
 
-    def get_reward(self, tl_id: str, phase: str) -> float:
+    def get_reward(self, tl_id: str, phase: str, old_phase: str) -> float:
         """Reward = decrease in LOCAL waiting time and queue length for this specific traffic light.
         Uses the difference in waiting time and queue length before and after the action to provide
         proper credit assignment for multi-agent learning."""
@@ -753,7 +755,7 @@ class Simulation(SUMO):
             return 0.0
             
         current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
-        # current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
+        current_local_queue = TrafficMetrics.get_mean_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):
@@ -769,8 +771,10 @@ class Simulation(SUMO):
         # waiting_reduction = current_local_wait
         # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
 
-        # waiting_norm = self.waiting_time_normalizer.normalize(current_local_wait)
-        # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
+        waiting_norm = self.waiting_time_normalizer.normalize(current_local_wait)
+        queue_norm = self.queue_length_normalizer.normalize(current_local_queue)
+        outflow_norm = self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
+        switch_phase = int(phase != old_phase)
         
         # Scale rewards based on magnitude to improve learning signal
         # Use square root to reduce impact of extreme values
@@ -788,8 +792,7 @@ class Simulation(SUMO):
         
         # Combined reward: waiting time has higher weight than queue length
         # reward = waiting_reward + queue_reward
-        reward = -current_local_wait
-        
+        reward = weight["waiting_time"] * waiting_norm + weight["queue_length"] * queue_norm + weight["outflow_rate"] * outflow_norm + weight["switch_phase"] * switch_phase
         # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait
         # self.prev_local_queue[tl_id] = current_local_queue
