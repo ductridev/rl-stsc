@@ -133,6 +133,20 @@ class TrafficMetrics:
             else:
                 queue_lengths.append(length)
         return np.sum(queue_lengths) if queue_lengths else 0.0
+    
+    @staticmethod
+    def get_mean_queue_length(tl: Dict) -> float:
+        """Get mean queue length for a traffic light"""
+        total_queue_length = 0.0
+        total_lanes = 0
+
+        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
+            length = traci.lane.getLastStepLength(lane)
+            if length > 0:
+                total_queue_length += length
+                total_lanes += 1
+
+        return total_queue_length / total_lanes if total_lanes > 0 else 0.0
 
     @staticmethod
     def get_sum_waiting_time(tl: Dict) -> float:
