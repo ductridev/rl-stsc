@@ -1,4 +1,9 @@
+
 ## 🧠 Training Logic
+
+**New Feature:** After each training run, a snapshot of the configuration used is automatically saved as `config_snapshot.yaml` (YAML format) in the results folder. This ensures reproducibility and easy experiment tracking.
+
+**Modularization & SKRL Integration:** The training logic is now fully modularized, with SKRL agent management and factory patterns for environment/model creation. See [MODULARIZATION_STATUS.md](MODULARIZATION_STATUS.md) for details.
 
 This section describes the core training logic behind the Deep Q-Network (DQN) implementation used in this project, focusing on batch training with a target network for stability.
 

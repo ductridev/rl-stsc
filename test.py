@@ -1,3 +1,19 @@
+import os
+import yaml
+def save_config_snapshot(config, save_path):
+    """
+    Save config snapshot to the results folder as config_snapshot.json
+    Args:
+        config: Configuration dictionary
+        save_path: Path to save the config snapshot
+    """
+    config_snapshot_file = os.path.join(save_path, "config_snapshot.yaml")
+    try:
+        with open(config_snapshot_file, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        print(f"Config snapshot saved to: {config_snapshot_file}")
+    except Exception as e:
+        print(f"Failed to save config snapshot: {e}")
 """
 Multi-simulation testing script for traffic signal control.
 Supports testing with Base (SUMO default), Actuated (queue-based), and DQN simulations.
@@ -1329,6 +1345,9 @@ def main():
     print("="*50)
     print(f"Total testing time: {overall_time:.2f}s")
     print(f"Results saved to: {path}")
+
+    # Save config snapshot after testing
+    save_config_snapshot(config, path)
     
     # Clean up
     try:

@@ -27,12 +27,10 @@ agent:
   
   # Reward weights (for DQN simulation)
   weight:
-    queue_length: -1
-    outflow_rate: 1
-    delay: -0.25
-    travel_time: -1
-    waiting_time: -0.5
-    switch_phase: -5
+    queue_length: 0.15
+    outflow_rate: 0.15
+    waiting_time: 0.6
+    switch_phase: 0.1
 
 vehicle_counts:
   low:
@@ -68,7 +66,7 @@ dir:
   models_path_name: "models/"
   sumocfg_file_name: "simulations/testmodel6x1-4/osm.sumocfg"
   sumocfg_path: "simulations/testmodel6x1-4"
-  model_folder: "model_152/"
+  model_folder: "model_198/"
 
 traffic_lights:
   # - traffic_light_1:

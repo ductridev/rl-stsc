@@ -192,11 +192,11 @@ class DQN(Agent):
 
         self.tensors_names = ["states", "actions", "rewards", "next_states", "terminated", "truncated"]
 
-    def act(self, states: torch.Tensor, timestep: int, timesteps: int, desra_phase_idx: int) -> torch.Tensor:
+    def act(self, raw_states: torch.Tensor, timestep: int, timesteps: int, desra_phase_idx: int) -> torch.Tensor:
         """Process the environment's states to make a decision (actions) using the main policy
 
-        :param states: Environment's states
-        :type states: torch.Tensor
+        :param raw_states: Environment's states
+        :type raw_states: torch.Tensor
         :param timestep: Current timestep
         :type timestep: int
         :param timesteps: Number of timesteps
@@ -207,7 +207,7 @@ class DQN(Agent):
         :return: Actions
         :rtype: torch.Tensor
         """
-        states = self._state_preprocessor(states)
+        states = self._state_preprocessor(raw_states)
 
         if not self._exploration_timesteps:
             q_values, log, adds = self.q_network.act({"states": states}, role="q_network")
@@ -246,10 +246,10 @@ class DQN(Agent):
                 q_values, log, adds = self.q_network.act({"states": states[exploit_indexes]}, role="q_network")
 
                 predicted_actions = torch.argmax(q_values, dim=1, keepdim=True)
-                actions[exploit_indexes] = predicted_actions
-                
                 print(f"Timestep: {timestep}, Epsilon: {epsilon:.4f}")
                 print(f"Predicted actions: {predicted_actions} - Actions: {actions} - Q-values {q_values} - States: {states}")
+                
+                actions[exploit_indexes] = predicted_actions
 
         # record epsilon
         self.track_data("Exploration / Exploration epsilon", epsilon)

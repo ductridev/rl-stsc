@@ -1,6 +1,6 @@
 simulation:
   gui: False
-  total_episodes: 100
+  total_episodes: 200
   max_steps: 3600
   interphase_duration: 3
 
@@ -12,7 +12,7 @@ memory:
 model:
   training_epochs: 500
   save_model_name: "dqn_testngatu_model" # Name for saving the model
-  load_model_name: null # Set to model path to load existing model, null to start fresh
+  load_model_name: "G:/python_learn/AIP/models/model_190/skrl_model_NgatuNorthEast_episode_1.pt" # Set to model path to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
   save_interval: 10 # Save model every N episodes
   training_steps: 10  # DECISION interval between batch training cycles (increased responsiveness while maintaining stability)
@@ -63,14 +63,12 @@ agent:
     # Epsilon settings
     decay_episode: 100 # epsilon will be min at episode 100
     initial_epsilon: 1
-    min_epsilon: 0.01
+    min_epsilon: 0.0
   weight:
-    queue_length: -1
-    outflow_rate: 1
-    delay: -0.25
-    travel_time: -1
-    waiting_time: -0.5
-    switch_phase: -5
+    queue_length: 0.15
+    outflow_rate: 0.15
+    waiting_time: 0.6
+    switch_phase: 0.1
 
 vehicle_counts:
   low:
@@ -346,3 +344,16 @@ accident:
   duration: 100
   junction:
     - id: "NgatuNorthEast"
+  detectors:
+    - id: "e2_50"
+    - id: "e2_51"
+    - id: "e2_4"
+    - id: "e2_1"
+    - id: "e2_0"
+    - id: "e2_5"
+    - id: "e2_53"
+    - id: "e2_52"
+    - id: "e2_2"
+    - id: "e2_54"
+    - id: "e2_55"
+    - id: "e2_3"

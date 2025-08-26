@@ -75,6 +75,7 @@ class ActuatedSimulation(SUMO):
         # Add normalizers for reward calculation (same as SKRL simulation)
         self.outflow_rate_normalizer = Normalizer()
         self.queue_length_normalizer = Normalizer()
+        self.num_vehicles_normalizer = Normalizer()
         self.travel_time_normalizer = Normalizer()
         self.travel_delay_normalizer = Normalizer()
         self.waiting_time_normalizer = Normalizer()
@@ -449,6 +450,7 @@ class ActuatedSimulation(SUMO):
                 st["in_all_red"] = False
                 new_phase_str = tl["phase"][st["current_phase_index"]]
                 traci.trafficlight.setRedYellowGreenState(tl_id, new_phase_str)
+                st["old_phase"] = st["phase"]  # Store old phase before updating
                 st["phase"] = new_phase_str
                 st["green_time_remaining"] = self.min_green_time
                 st["waiting_for_extension"] = False
@@ -580,8 +582,10 @@ class ActuatedSimulation(SUMO):
         self.travel_time[tl_id] = st["travel_time_sum"]
         self.waiting_time[tl_id] = st["waiting_time"]
 
+        st["outflow"] = 0  # Reset outflow for next phase
+
         # Calculate reward
-        reward = self.get_reward(tl_id, st["phase"])
+        reward = self.get_reward(tl_id, st["phase"], st["old_phase"])
         self.history["reward"][tl_id].append(reward)
 
         # Reset phase metrics
@@ -595,7 +599,13 @@ class ActuatedSimulation(SUMO):
 
         # Calculate metrics
         new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-        outflow = abs(len(new_ids) - len(st["old_vehicle_ids"]))
+        
+        # Calculate true outflow: vehicles that left the detection zone
+        # Outflow = vehicles that were detected before but are not detected now
+        old_ids_set = set(st["old_vehicle_ids"])
+        new_ids_set = set(new_ids)
+        outflow = len(old_ids_set - new_ids_set)  # Vehicles that left
+        
         st["old_vehicle_ids"] = new_ids
 
         sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
@@ -908,7 +918,7 @@ class ActuatedSimulation(SUMO):
             total_waiting_time += traci.lane.getWaitingTime(lane)
         return total_waiting_time
 
-    def get_reward(self, tl_id: str, phase: str) -> float:
+    def get_reward(self, tl_id: str, phase: str, old_phase: str) -> float:
         """Reward = decrease in LOCAL waiting time and queue length for this specific traffic light.
         Uses the difference in waiting time and queue length before and after the action to provide
         proper credit assignment for multi-agent learning."""
@@ -928,7 +938,7 @@ class ActuatedSimulation(SUMO):
             return 0.0
             
         current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
-        # current_local_queue = TrafficMetrics.get_sum_queue_length(tl_data)
+        current_local_queue = TrafficMetrics.get_mean_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):
@@ -937,34 +947,35 @@ class ActuatedSimulation(SUMO):
         #     self.prev_local_queue = {}
         
         # First calculation for this TL returns 0 (no baseline)
-        if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
-            reward = 0.0
-        else:
-            # Reward = reduction in waiting time and queue length (positive if decreased)
-            waiting_reduction = self.prev_local_wait[tl_id] - current_local_wait
-            # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
+        # if (tl_id not in self.prev_local_wait or self.prev_local_wait[tl_id] is None):
+        #     reward = 0.0
+        # else:
+        # Reward = reduction in waiting time and queue length (positive if decreased)
+        # waiting_reduction = current_local_wait
+        # queue_reduction = self.prev_local_queue[tl_id] - current_local_queue
 
-            # waiting_norm = self.waiting_time_normalizer.normalize(waiting_reduction)
-            # queue_norm = self.queue_length_normalizer.normalize(queue_reduction)
-            
-            # Scale rewards based on magnitude to improve learning signal
-            # Use square root to reduce impact of extreme values
-            # waiting_reward = 0.0
-            # if waiting_reduction > 0:
-            #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
-            # elif waiting_reduction < 0:
-            #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
-            
-            # queue_reward = 0.0
-            # if queue_reduction > 0:
-            #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
-            # elif queue_reduction < 0:
-            #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
-            
-            # Combined reward: waiting time has higher weight than queue length
-            # reward = waiting_reward + queue_reward
-            reward = -current_local_wait
+        waiting_norm = self.waiting_time_normalizer.normalize(current_local_wait)
+        queue_norm = self.queue_length_normalizer.normalize(current_local_queue)
+        outflow_norm = self.outflow_rate_normalizer.normalize(self.outflow_rate[tl_id])
+        switch_phase = int(phase != old_phase)
         
+        # Scale rewards based on magnitude to improve learning signal
+        # Use square root to reduce impact of extreme values
+        # waiting_reward = 0.0
+        # if waiting_reduction > 0:
+        #     waiting_reward = -waiting_reduction * weight["waiting_time"]  # Positive reward for improvement
+        # elif waiting_reduction < 0:
+        #     waiting_reward = waiting_reduction * weight["waiting_time"]  # Negative reward for worsening
+        
+        # queue_reward = 0.0
+        # if queue_reduction > 0:
+        #     queue_reward = -queue_norm * weight["queue_length"]  # Positive reward for queue reduction (weighted less than waiting time)
+        # elif queue_reduction < 0:
+        #     queue_reward = queue_norm * weight["queue_length"]  # Negative reward for queue increase
+        
+        # Combined reward: waiting time has higher weight than queue length
+        # reward = waiting_reward + queue_reward
+        reward = weight["waiting_time"] * waiting_norm + weight["queue_length"] * queue_norm + weight["outflow_rate"] * outflow_norm + weight["switch_phase"] * switch_phase
         # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait
         # self.prev_local_queue[tl_id] = current_local_queue

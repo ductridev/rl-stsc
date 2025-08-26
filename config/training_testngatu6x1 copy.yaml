@@ -1,32 +1,32 @@
 simulation:
   gui: False
-  total_episodes: 100
+  total_episodes: 200
   max_steps: 3600
   interphase_duration: 3
 
 memory:
   memory_size_min: 300
-  memory_size_max: 1000
+  memory_size_max: 50000
   sample_size: 300
 
 model:
-  training_epochs: 20
+  training_epochs: 500
   save_model_name: "dqn_testngatu_model" # Name for saving the model
   load_model_name: null # Set to model path to load existing model, null to start fresh
   load_q_table_name: null # Set to Q-table filename to load existing Q-table, null to start fresh
   save_interval: 10 # Save model every N episodes
   training_steps: 10  # DECISION interval between batch training cycles (increased responsiveness while maintaining stability)
-  updating_target_network_steps: 300  # Target network sync interval in decisions (reduced for better stability during learning)
+  updating_target_network_steps: 10  # Target network sync interval in decisions (reduced for better stability during learning)
 
 agent:
   rbf_components: 100
   rbf_gamma: 0.5
-  gamma: 0.95
-  num_states: 22 # Per-phase features (max 10 phases × 2 feature waiting_time, queue length) + current_phase + DESRA_phase
+  gamma: 0.9
+  num_states: 16 # Per-phase features (max 4 phases × 4 feature waiting_time, queue length, num vehicles, desra)
   batch_updates: 2  # Number of gradient update cycles per training interval (reduced for more frequent training)
   
   # DESRA-DQN Hybrid Configuration
-  use_desra_guidance: true          # Enable DESRA expert guidance
+  use_desra_guidance: false          # Enable DESRA expert guidance
   desra_min_probability: 0.05       # Minimum 5% DESRA usage (traffic responsiveness)
   desra_epsilon_multiplier: 0.6     # Scale DESRA usage with exploration rate
 
@@ -35,14 +35,14 @@ agent:
     type: "qnetwork" # Options: "qnetwork", "dueling", "noisy"
 
     # Basic architecture (from original model)
-    num_layers: 9
-    hidden_size: 1000
-    batch_size: 256
-    learning_rate: 0.001
+    num_layers: 8
+    hidden_size: 128
+    batch_size: 64
+    learning_rate: 0.0001
 
     # Advanced features from your original model
     use_attention: true # Enable SENet attention mechanism
-    loss_type: "qr" # Options: "mse", "huber", "weighted", "qr", "wasserstein"
+    loss_type: "huber" # Options: "mse", "huber", "weighted", "qr", "wasserstein"
 
     # Quantile regression settings (for loss_type: "qr" or "wasserstein")
     num_quantiles: 100
@@ -61,15 +61,15 @@ agent:
     noisy_layers_only: true # Only make final layers noisy (vs all layers)
 
     # Epsilon settings
-    decay_episode: 90 # epsilon will be min at episode 90
-    initial_epsilon: 0.95
-    min_epsilon: 0.01
+    decay_episode: 100 # epsilon will be min at episode 100
+    initial_epsilon: 1
+    min_epsilon: 0.0
   weight:
     queue_length: -1
     outflow_rate: 1
     delay: -0.25
     travel_time: -1
-    waiting_time: -0.75
+    waiting_time: -0.5
     switch_phase: -5
 
 vehicle_counts:
@@ -104,8 +104,8 @@ edge_groups:
 
 dir:
   models_path_name: "models/"
-  sumocfg_file_name: "simulations/testmodel6x1 - Copy/osm.sumocfg"
-  sumocfg_path: "simulations/testmodel6x1 - Copy"
+  sumocfg_file_name: "simulations/testmodel6x1/osm.sumocfg"
+  sumocfg_path: "simulations/testmodel6x1"
 
 traffic_lights:
   # - traffic_light_1:
@@ -236,10 +236,10 @@ traffic_lights:
   - traffic_light_6:
     id: "NgatuNorthEast"
     phase:
-      - GGGGGGrrrrGrrrrGrrrr
-      - GrrrrGGGGGGrrrrGrrrr
-      - GrrrrGrrrrGGGGGGrrrr
-      - GrrrrGrrrrGrrrrGGGGG
+      - GGGGGrrrrrrrrrrrrrrr
+      - rrrrrGGGGGrrrrrrrrrr
+      - rrrrrrrrrrGGGGGrrrrr
+      - rrrrrrrrrrrrrrrGGGGG
 
     detectors:
       - id: "e2_50"
@@ -346,3 +346,16 @@ accident:
   duration: 100
   junction:
     - id: "NgatuNorthEast"
+  detectors:
+    - id: "e2_50"
+    - id: "e2_51"
+    - id: "e2_4"
+    - id: "e2_1"
+    - id: "e2_0"
+    - id: "e2_5"
+    - id: "e2_53"
+    - id: "e2_52"
+    - id: "e2_2"
+    - id: "e2_54"
+    - id: "e2_55"
+    - id: "e2_3"

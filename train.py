@@ -1,3 +1,19 @@
+import os
+import yaml
+def save_config_snapshot(config, save_path):
+    """
+    Save config snapshot to the results folder as config_snapshot.json
+    Args:
+        config: Configuration dictionary
+        save_path: Path to save the config snapshot
+    """
+    config_snapshot_file = os.path.join(save_path, "config_snapshot.yaml")
+    try:
+        with open(config_snapshot_file, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        print(f"Config snapshot saved to: {config_snapshot_file}")
+    except Exception as e:
+        print(f"Failed to save config snapshot: {e}")
 import libsumo as traci
 import torch
 import os
@@ -5,7 +21,6 @@ import glob
 import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
-import torch
 import argparse
 import time
 from src.memory import ReplayMemory
@@ -1704,6 +1719,9 @@ def main():
         torch.save(final_checkpoint_data, final_checkpoint_path)
         print(f"Final training checkpoint saved: {os.path.basename(final_checkpoint_path)}")
     
+    # Save config snapshot for the first config (can be extended for all configs)
+    if shared_path and 'first_config' in locals() and first_config:
+        save_config_snapshot(first_config, shared_path)
     print(f"\nAll results saved to: {shared_path}")
     print("=" * 85)
 
