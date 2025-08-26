@@ -534,7 +534,11 @@ class Simulation(SUMO):
 
                 # Calculate metrics
                 new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
-                outflow = abs(len(new_ids) - len(st["old_vehicle_ids"]))
+                # Calculate true outflow: vehicles that left the detection zone
+                # Outflow = vehicles that were detected before but are not detected now
+                old_ids_set = set(st["old_vehicle_ids"])
+                new_ids_set = set(new_ids)
+                outflow = len(old_ids_set - new_ids_set)  # Vehicles that left
                 st["old_vehicle_ids"] = new_ids
 
                 sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
