@@ -975,7 +975,7 @@ class ActuatedSimulation(SUMO):
         
         # Combined reward: waiting time has higher weight than queue length
         # reward = waiting_reward + queue_reward
-        reward = weight["waiting_time"] * waiting_norm + weight["queue_length"] * queue_norm + weight["outflow_rate"] * outflow_norm + weight["switch_phase"] * switch_phase
+        reward = -weight["waiting_time"] * waiting_norm - weight["queue_length"] * queue_norm + weight["outflow_rate"] * outflow_norm - weight["switch_phase"] * switch_phase
         # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait
         # self.prev_local_queue[tl_id] = current_local_queue
