@@ -1,5 +1,6 @@
 import time
-import libsumo as traci
+# import libsumo as traci
+import traci
 import numpy as np
 import pandas as pd
 import sys

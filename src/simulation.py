@@ -6,7 +6,8 @@ Refactored to use separate modules for better organization.
 import numpy as np
 import torch
 import time
-import libsumo as traci
+# import libsumo as traci
+import traci
 from collections import defaultdict, deque
 from typing import Dict, List, Any, Tuple
 import sys

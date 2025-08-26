@@ -1,4 +1,5 @@
-import libsumo as traci
+# import libsumo as traci
+import traci
 import random
 from shapely.geometry import Point, Polygon
 

@@ -2,7 +2,8 @@
 Multi-simulation testing script for traffic signal control.
 Supports testing with Base (SUMO default), Actuated (queue-based), and DQN simulations.
 """
-import libsumo as traci
+# import libsumo as traci
+import traci
 import argparse
 import time
 import os
