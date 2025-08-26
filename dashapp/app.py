@@ -22,8 +22,6 @@ METRICS = [
     "outflow_avg",
     "queue_length_avg",
     "waiting_time_avg",
-    "junction_arrival_avg",
-    "stopped_vehicles_avg",
     "travel_delay_avg",
 ]
 
@@ -42,7 +40,7 @@ COLORS = {
 }
 
 # -------------------- Run simulations --------------------
-def run_all(config_path, sims=("base", "actuated", "dqn")):
+def run_all(config_path, sims=("base", "actuated", "skrl_dqn")):
     config = import_test_configuration(config_path)
     path = set_test_path(config["models_path_name"])
 
@@ -52,7 +50,7 @@ def run_all(config_path, sims=("base", "actuated", "dqn")):
             result = test_base_simulation(config, path)
         elif sim == "actuated":
             result = test_actuated_simulation(config, path)
-        elif sim == "dqn":
+        elif sim == "skrl_dqn":
             result = test_dqn_simulation(config, path)
         else:
             continue
@@ -68,13 +66,13 @@ def build_comparison_plots(path, episode=0, metrics=None, names=None):
     if metrics is None:
         metrics = METRICS
     if names is None:
-        names = ["base", "actuated", "dqn"]
+        names = ["base", "actuated", "skrl_dqn"]
 
     # Color mapping for different simulations
     color_map = {
         "base": COLORS['primary'],
         "actuated": COLORS['accent'],
-        "dqn": COLORS['success']
+        "skrl_dqn": COLORS['success']
     }
 
     figures = []

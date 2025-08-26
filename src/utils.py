@@ -13,8 +13,8 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
     """
     import os
     import sys
-    import libsumo as traci
-
+    # import libsumo as traci
+    import traci
     # Add SUMO tools to Python path
     sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 
