@@ -1,11 +1,20 @@
 import math
 
 class Normalizer:
-    def __init__(self):
+    def __init__(self, scaling_factor=10.0):
+        """
+        Initialize the Normalizer with running statistics for z-score normalization.
+        
+        Args:
+            scaling_factor (float): Multiplier applied to the z-score. 
+                                  Default is 10.0 for amplified sensitivity.
+                                  Use 1.0 for standard z-score normalization.
+        """
         self.count = 0
         self.mean = 0.0
         self.sum_squares = 0.0
         self.std = 1.0  # Initialize to 1.0 to avoid division by zero initially
+        self.scaling_factor = scaling_factor
 
     def normalize(self, val):
         # Update running statistics
@@ -22,8 +31,8 @@ class Normalizer:
         else:
             self.std = 1.0  # Default to 1.0 for single observation
         
-        # Return z-score normalized value
+        # Return z-score normalized value with scaling factor
         if self.std == 0.0:
             return 0.0  # avoid divide by zero when all values are identical
         
-        return 10 * (val - self.mean) / self.std
+        return self.scaling_factor * (val - self.mean) / self.std
