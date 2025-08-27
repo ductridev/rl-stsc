@@ -65,12 +65,10 @@ agent:
     initial_epsilon: 1
     min_epsilon: 0.0
   weight:
-    queue_length: -0.3
-    outflow_rate: 0.2
-    delay: -0.25
-    travel_time: -1
-    waiting_time: -0.7
-    switch_phase: -0.3
+    queue_length: 0.15
+    outflow_rate: 0.15
+    waiting_time: 0.6
+    switch_phase: 0.1
 
 vehicle_counts:
   low:

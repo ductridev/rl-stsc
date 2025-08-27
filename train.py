@@ -14,7 +14,7 @@ def save_config_snapshot(config, save_path):
         print(f"Config snapshot saved to: {config_snapshot_file}")
     except Exception as e:
         print(f"Failed to save config snapshot: {e}")
-import libsumo as traci
+import traci
 import torch
 import os
 import glob
@@ -89,99 +89,6 @@ def find_latest_trained_model(shared_path):
     else:
         print("No model files found in shared path")
         return None
-
-
-def test_dqn_simulation_standalone(config, path, model_file_path):
-    """
-    Standalone DQN simulation test function.
-    
-    Args:
-        config: Test configuration dictionary
-        path: Path for saving test results
-        model_file_path: Path to the model file to test
-        
-    Returns:
-        dict: Test results and metrics
-    """
-    print(f"Testing DQN simulation with model: {os.path.basename(model_file_path)}")
-    
-    # Initialize visualization
-    visualization = Visualization(path=path, dpi=100)
-    
-    # Initialize accident manager if accident configuration exists
-    accident_manager = None
-    if 'accident' in config:
-        accident_manager = AccidentManager(
-            start_step=config['accident']['start_step'],
-            duration=config['accident']['duration'],
-            junction_id_list=[junction["id"] for junction in config['accident']['junction']],
-            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
-        )
-    
-    # Initialize DQN simulation in testing mode
-    dqn_simulation = Simulation(
-        visualization=visualization,
-        agent_cfg=config["agent"],
-        max_steps=config["max_steps"],
-        traffic_lights=config["traffic_lights"],
-        accident_manager=accident_manager,
-        interphase_duration=config["interphase_duration"],
-        path=path,
-        model_file_path=model_file_path
-    )
-    
-    # Set up SUMO (disable GUI for automated testing)
-    set_sumo(False, config["sumo_cfg_file"], config["max_steps"])
-    
-    # Run simulation
-    start_time = time.time()
-    dqn_simulation.run(episode=1)
-    total_time = time.time() - start_time
-    
-    print(f"DQN simulation completed in {total_time:.2f}s")
-    
-    # Collect results
-    completion_data = None
-    if hasattr(dqn_simulation, 'completion_tracker'):
-        completion_data = {
-            'completed_count': dqn_simulation.completion_tracker.get_completed_count(),
-            'avg_travel_time': dqn_simulation.completion_tracker.get_average_total_travel_time(),
-            'total_travel_time': dqn_simulation.completion_tracker.get_total_travel_time()
-        }
-    
-    # Collect metrics data
-    metrics_data = {}
-    if hasattr(dqn_simulation, 'history'):
-        for metric_name, metric_data in dqn_simulation.history.items():
-            if metric_data:
-                # Calculate average across all traffic lights
-                all_values = []
-                for tl_values in metric_data.values():
-                    all_values.extend(tl_values)
-                if all_values:
-                    metrics_data[f'avg_{metric_name}'] = sum(all_values) / len(all_values)
-                    metrics_data[f'total_{metric_name}'] = sum(all_values)
-    
-    # Save metrics and plots
-    print("Saving test simulation metrics and plots...")
-    dqn_simulation.save_plot(episode=1)
-    dqn_simulation.save_metrics_to_dataframe(episode=1)
-    
-    # Reset for cleanup
-    dqn_simulation.reset_history()
-    if hasattr(dqn_simulation, 'completion_tracker'):
-        dqn_simulation.completion_tracker.reset()
-    
-    # Combine results
-    result = {
-        'simulation_time': total_time,
-        'completion_data': completion_data,
-        'metrics_data': metrics_data,
-        'model_file': os.path.basename(model_file_path)
-    }
-    
-    return result
-
 
 def save_test_results_summary(test_results, test_results_path):
     """
@@ -702,102 +609,6 @@ def extract_simulation_metrics(simulation, label):
         'total_departed': stats['total_departed']
     }
 
-
-def run_baseline_simulations(config_files, shared_path, shared_visualization, phase="before_training"):
-    """
-    Run baseline simulations (SimulationBase and ActuatedSimulation) for all configurations.
-    
-    Args:
-        config_files: List of configuration file paths
-        shared_path: Path for saving results
-        shared_visualization: Visualization object
-        phase: Phase of training ("before_training" or "after_training")
-        
-    Returns:
-        dict: Dictionary containing baseline results for all configurations
-    """
-    print(f"\nRUNNING BASELINE SIMULATIONS {phase.upper().replace('_', ' ')}")
-    print("=" * 80)
-    
-    baseline_results = {}
-    
-    for config_idx, config_file in enumerate(config_files):
-        print(f"\n--- Baseline for Config {config_idx + 1}: {config_file} ---")
-        config = import_train_configuration(config_file)
-        
-        # Initialize baseline components
-        baseline_path = set_train_path(config["models_path_name"]) if config_idx == 0 and shared_path is None else shared_path
-        baseline_visualization = shared_visualization if shared_visualization else Visualization(path=baseline_path, dpi=100)
-        
-        accident_manager = AccidentManager(
-            start_step=config['accident']['start_step'],
-            duration=config['accident']['duration'],
-            junction_id_list=[junction["id"] for junction in config['accident']['junction']],
-            detection_id_list= [detector["id"] for detector in config['accident']['detectors']]
-        )
-        
-        # Initialize SimulationBase
-        simulation_base = SimulationBase(
-            agent_cfg=config["agent"],
-            max_steps=config["max_steps"],
-            traffic_lights=config["traffic_lights"],
-            accident_manager=accident_manager,
-            visualization=baseline_visualization,
-            epoch=config["training_epochs"],
-            path=baseline_path,
-            save_interval=10,
-        )
-        
-        # Initialize ActuatedSimulation
-        simulation_actuated = ActuatedSimulation(
-            agent_cfg=config["agent"],
-            max_steps=config["max_steps"],
-            traffic_lights=config["traffic_lights"],
-            accident_manager=accident_manager,
-            visualization=baseline_visualization,
-            epoch=config["training_epochs"],
-            path=baseline_path,
-            save_interval=10,
-        )
-        
-        # Run SimulationBase
-        print("Running SimulationBase (static baseline)...")
-        set_sumo(False, config["sumo_cfg_file"], config["max_steps"])
-        simulation_time_base = simulation_base.run(1)
-        base_metrics = extract_simulation_metrics(simulation_base, "Base")
-        base_metrics['simulation_time'] = simulation_time_base
-        
-        # Reset base simulation
-        simulation_base.vehicle_tracker.reset()
-        simulation_base.reset_history()
-        
-        # Run ActuatedSimulation
-        print("Running ActuatedSimulation (queue-based baseline)...")
-        set_sumo(False, config["sumo_cfg_file"], config["max_steps"])
-        simulation_time_actuated = simulation_actuated.run(1)
-        actuated_metrics = extract_simulation_metrics(simulation_actuated, "Actuated")
-        actuated_metrics['simulation_time'] = simulation_time_actuated
-        
-        # Reset actuated simulation
-        simulation_actuated.vehicle_tracker.reset()
-        simulation_actuated.reset_history()
-        
-        # Store baseline results for this configuration
-        config_name = config_file.split('/')[-1].replace('.yaml', '')
-        baseline_results[config_name] = {
-            'config_file': config_file,
-            'base': base_metrics,
-            'actuated': actuated_metrics
-        }
-        
-        print(f"Baseline results stored for {config_name}")
-    
-    print(f"\nBASELINE SIMULATIONS COMPLETED - Results stored for comparison")
-    print("=" * 80)
-    
-    return baseline_results
-
-
 def load_checkpoint_from_config(simulation_skrl, config):
     """
     Load checkpoint or model specified in configuration file.
@@ -899,7 +710,7 @@ def load_checkpoint_from_config(simulation_skrl, config):
 
 
 def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, shared_visualization, 
-                             config_idx):
+                             config_idx, port):
     """
     Initialize or update DQN simulation components.
     
@@ -909,7 +720,8 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
         shared_path: Shared path for saving results
         shared_visualization: Shared visualization object
         config_idx: Configuration index
-        
+        port: Port for SUMO
+
     Returns:
         tuple: (simulation_skrl, shared_path, shared_visualization)
     """
@@ -924,6 +736,7 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
         
         # Initialize accident manager for this config
         accident_manager = AccidentManager(
+            port=port,
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
             junction_id_list=[junction["id"] for junction in config['accident']['junction']],
@@ -945,13 +758,15 @@ def initialize_dqn_simulation(config, shared_simulation_skrl, shared_path, share
             training_steps=config["training_steps"],
             updating_target_network_steps=config["updating_target_network_steps"],
             save_interval=save_interval,
-            memory_size=(config['memory_size_min'], config['memory_size_max'])
+            memory_size=(config['memory_size_min'], config['memory_size_max']),
+            port=port,
         )
         
         print(f"Shared DQN model initialized with first config")
     else:
         # Update existing simulation with new config parameters
         accident_manager = AccidentManager(
+            port=port,
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
             junction_id_list=[junction["id"] for junction in config['accident']['junction']],
@@ -990,11 +805,6 @@ def train_dqn_episode(simulation_skrl, global_episode, config_episode, config_fi
     print(f"\n----- Config Episode {config_episode} of {config['total_episodes']} (Global: {global_episode}) -----")
     
     print("Running SKRL DQN Simulation...")
-    # Enable GUI once every 100 episodes for visual monitoring
-    gui_enabled = (global_episode % 100 == 0 and global_episode > 0)
-    set_sumo(gui_enabled, config["sumo_cfg_file"], config["max_steps"])
-    if gui_enabled:
-        print(f"GUI enabled for config episode {config_episode} (global {global_episode}) - Visual monitoring")
     
     simulation_time_skrl, training_time_skrl = simulation_skrl.run(global_episode)
     print(f"Simulation (SKRL DQN) time: {simulation_time_skrl}, Training time: {training_time_skrl}")
@@ -1447,10 +1257,8 @@ def main():
     print(f"   Pattern: Episode 1→Config 1, Episode 2→Config 2, Episode 3→Config 3, Episode 4→Config 1, etc.")
     print(f"   Each config gets equal training opportunities distributed across episodes")
     print("=" * 80)
-    
-    # Run initial baseline simulations
-    # baseline_results_before = run_baseline_simulations(config_files, shared_path, shared_visualization, "before_training")
-    # baseline_results = {'before_training': baseline_results_before}
+
+    port = set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
     
     # Initialize tracking for each configuration
     config_trackers = {}
@@ -1480,7 +1288,7 @@ def main():
     # Initialize DQN simulation with first config
     first_config_file, first_config = configs[0]
     shared_simulation_skrl, shared_path, shared_visualization = initialize_dqn_simulation(
-        first_config, shared_simulation_skrl, shared_path, shared_visualization, 0
+        first_config, shared_simulation_skrl, shared_path, shared_visualization, 0, port
     )
     
     # Handle checkpoint/model loading - Priority order:
@@ -1601,12 +1409,14 @@ def main():
         
         # Update simulation with current configuration parameters
         shared_simulation_skrl, shared_path, shared_visualization = initialize_dqn_simulation(
-            config, shared_simulation_skrl, shared_path, shared_visualization, config_idx
+            config, shared_simulation_skrl, shared_path, shared_visualization, config_idx, port
         )
 
         for demand in ['medium']:
             # Generate routes if needed
             generate_routes_if_needed(current_tracker['config_file'], current_tracker['config'], demand, global_episode)
+
+            port = set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"], port)
 
             # Train one episode with current configuration
             performance_metrics = train_dqn_episode(

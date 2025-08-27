@@ -1,4 +1,12 @@
-def set_sumo(gui, sumo_cfg_file, max_steps):
+import random
+import socket
+
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))  # Bind to a free port provided by the host.
+        return s.getsockname()[1]  # Return the port number assigned.
+
+def set_sumo(gui, sumo_cfg_file, max_steps, port: int = None):
     """
     Set up the SUMO environment for the simulation.
 
@@ -6,25 +14,32 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
         gui (bool): Whether to use the GUI.
         sumo_cfg_file (str): Path to the SUMO configuration file.
         max_steps (int): Maximum number of steps for the simulation.
-        sumo_port (int): Port number for SUMO.
+        port (int, optional): Port number for the SUMO connection. If None, a free port will be assigned.
 
     Returns:
         None
     """
     import os
     import sys
-    import libsumo as traci
-
+    # import traci
+    import traci
     # Add SUMO tools to Python path
     sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 
     print("Starting SUMO...")
 
+    if port is None:
+        port = get_free_port()
+
+    print(f"Using port: {port}")
+
     # Start SUMO with GUI or without GUI
     if gui:
-        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label="master")
+        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label=f"master-{port}", port=port)
     else:
-        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label="master")
+        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label=f"master-{port}", port=port)
+
+    return port
 
 def set_train_path(model_name):
     """

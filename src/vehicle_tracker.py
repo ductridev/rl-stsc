@@ -3,7 +3,8 @@ Vehicle Tracker for SUMO Traffic Simulation
 Tracks vehicle statistics by type (bike, car, truck) during simulation.
 """
 
-import libsumo as traci
+# import libsumo as traci
+import traci
 import numpy as np
 from collections import defaultdict
 import json
@@ -16,7 +17,7 @@ import pandas as pd
 class VehicleTracker:
     """Track vehicle statistics by type (bike, car, truck) during simulation."""
 
-    def __init__(self, path, output_dir="logs"):
+    def __init__(self, path, port: int, output_dir="logs"):
         """
         Initialize VehicleTracker with path for saving logs.
 
@@ -27,6 +28,11 @@ class VehicleTracker:
         self.path = path
         self.output_dir = os.path.join(path, output_dir) if path else output_dir
         os.makedirs(self.output_dir, exist_ok=True)
+
+        if 'LIBSUMO_AS_TRACI' not in os.environ and 'LIBTRACI_AS_TRACI' not in os.environ:
+            self.simulation_conn = traci.getConnection(f"master-{port}")
+        else:
+            self.simulation_conn = traci
 
         # Vehicle type mapping based on SUMO vehicle types
         self.vehicle_types = {
@@ -60,7 +66,7 @@ class VehicleTracker:
     def get_vehicle_type(self, vehicle_id):
         """Determine vehicle type from SUMO vehicle ID or type."""
         try:
-            veh_type = traci.vehicle.getTypeID(vehicle_id).lower()
+            veh_type = self.simulation_conn.vehicle.getTypeID(vehicle_id).lower()
         except:
             # If vehicle not found, try to infer from ID
             veh_type = vehicle_id.lower()
@@ -77,9 +83,9 @@ class VehicleTracker:
         """Update vehicle statistics for current simulation step."""
         try:
             # Get current vehicle lists
-            departed_ids = traci.simulation.getDepartedIDList()
-            arrived_ids = traci.simulation.getArrivedIDList()
-            running_ids = traci.vehicle.getIDList()
+            departed_ids = self.simulation_conn.simulation.getDepartedIDList()
+            arrived_ids = self.simulation_conn.simulation.getArrivedIDList()
+            running_ids = self.simulation_conn.vehicle.getIDList()
 
             # Process departed vehicles
             for veh_id in departed_ids:

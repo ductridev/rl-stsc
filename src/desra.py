@@ -1,13 +1,17 @@
 from src.sumo import SUMO
 
-import libsumo as traci
+# import libsumo as traci
+import traci
 import numpy as np
 from collections import defaultdict, deque
 import math
 
 
 class DESRA(SUMO):
-    def __init__(self, interphase_duration=3, buffer_size=1000000):
+    def __init__(self, port: int, interphase_duration=3, buffer_size=1000000):
+        # Initialize parent class
+        super().__init__(port)
+
         self.interphase_duration = interphase_duration
         self.buffer_size = buffer_size
 
@@ -68,7 +72,7 @@ class DESRA(SUMO):
             #    i.e. the most restrictive downstream capacity over all movements.
             xd = float("inf")
             for det in movements:
-                lane_len = traci.lanearea.getLength(det)
+                lane_len = self.simulation_conn.lanearea.getLength(det)
                 free_down = self.get_downstream_queue_length(det)  # in meters
                 xd = min(xd, free_down)
 
@@ -78,7 +82,7 @@ class DESRA(SUMO):
             for det in movements:
                 x0 = self.get_queue_length(det)  # upstream queue (m)
                 q_arr = q_arrivals.get(det, 0.0)  # veh/s
-                lane_len = traci.lanearea.getLength(det)  # Δ_j
+                lane_len = self.simulation_conn.lanearea.getLength(det)  # Δ_j
                 
                 # Get parameters for this detector
                 if use_global_params and all(p is not None for p in [global_saturation_flow, global_critical_density, global_jam_density]):
@@ -155,9 +159,9 @@ class DESRA(SUMO):
         """
         try:
             # Get current measurements
-            vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)
-            occupancy_pct = traci.lanearea.getLastStepOccupancy(detector_id)
-            detector_length = traci.lanearea.getLength(detector_id)
+            vehicle_count = self.simulation_conn.lanearea.getLastStepVehicleNumber(detector_id)
+            occupancy_pct = self.simulation_conn.lanearea.getLastStepOccupancy(detector_id)
+            detector_length = self.simulation_conn.lanearea.getLength(detector_id)
             
             # Store measurements
             self.vehicle_counts[detector_id].append(vehicle_count)
@@ -447,9 +451,9 @@ class DESRA(SUMO):
 
     def get_queue_length(self, detector_id):
         return (
-            traci.lanearea.getLastStepOccupancy(detector_id)
+            self.simulation_conn.lanearea.getLastStepOccupancy(detector_id)
             / 100
-            * traci.lanearea.getLength(detector_id)
+            * self.simulation_conn.lanearea.getLength(detector_id)
         )
 
     def get_downstream_queue_length(self, detector_id):
@@ -457,15 +461,15 @@ class DESRA(SUMO):
         Returns the available storage (free space in meters) of the downstream link(s)
         for the given area‑detector. Uses the minimum over all downstream lanes.
         """
-        lane_id = traci.lanearea.getLaneID(detector_id)
-        links = traci.lane.getLinks(lane_id)  # list of (toLane, viaEdge, ...)
+        lane_id = self.simulation_conn.lanearea.getLaneID(detector_id)
+        links = self.simulation_conn.lane.getLinks(lane_id)  # list of (toLane, viaEdge, ...)
         free_spaces = []
 
         for link in links:
             downstream_lane = link[0]
-            # length = traci.lane.getLength(downstream_lane)
+            # length = self.simulation_conn.lane.getLength(downstream_lane)
             length = 100
-            occupancy_pct = traci.lane.getLastStepOccupancy(downstream_lane)
+            occupancy_pct = self.simulation_conn.lane.getLastStepOccupancy(downstream_lane)
             # occupancy_pct is 0–100%, so queue_length_m = length * (occupancy_pct/100)
             queue_m = length * (occupancy_pct / 100.0)
             free_spaces.append(max(0.0, length - queue_m))
@@ -474,7 +478,7 @@ class DESRA(SUMO):
             return min(free_spaces)
         else:
             # no downstream links → assume full storage available
-            return traci.lanearea.getLength(detector_id)
+            return self.simulation_conn.lanearea.getLength(detector_id)
 
     def clear_buffers(self):
         """Clear all DESRA buffers to prevent memory accumulation between episodes"""

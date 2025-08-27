@@ -1,5 +1,4 @@
 import time
-import libsumo as traci
 import numpy as np
 import pandas as pd
 import sys
@@ -25,10 +24,14 @@ class SimulationBase(SUMO):
         traffic_lights,
         accident_manager: AccidentManager,
         visualization: Visualization,
+        port: int,
         epoch=1000,
         path=None,
         save_interval=10,
     ):
+        # Initialize parent class
+        super().__init__(port)
+
         self.max_steps = max_steps
         self.agent_cfg = agent_cfg
         self.traffic_lights = traffic_lights
@@ -39,13 +42,13 @@ class SimulationBase(SUMO):
         self.save_interval = save_interval
 
         # Initialize VehicleTracker for logging vehicle statistics
-        self.vehicle_tracker = VehicleTracker(path=self.path)
+        self.vehicle_tracker = VehicleTracker(path=self.path, port=port)
 
         # Initialize completion tracker for episode-end travel time analysis
-        self.completion_tracker = VehicleCompletionTracker()
+        self.completion_tracker = VehicleCompletionTracker(port=port)
 
         # Junction vehicle tracking for throughput analysis
-        self.junction_tracker = JunctionVehicleTracker()
+        self.junction_tracker = JunctionVehicleTracker(port=port)
 
         # Testing mode flag to disable training operations
         self.testing_mode = False
@@ -135,10 +138,10 @@ class SimulationBase(SUMO):
         st = self.tl_states[tl_id]
 
         # 1) Detect outflow: vehicles that left since last step
-        current_phase = traci.trafficlight.getRedYellowGreenState(tl_id)
+        current_phase = self.simulation_conn.trafficlight.getRedYellowGreenState(tl_id)
         if current_phase != st["phase"]:
             # Phase change detected, reset old vehicle IDs and update phase tracking
-            st["old_vehicle_ids"] = TrafficMetrics.get_vehicles_in_phase(
+            st["old_vehicle_ids"] = self.traffic_metrics.get_vehicles_in_phase(
                 tl, current_phase
             )
             # Update phase tracking for reward calculation
@@ -159,7 +162,7 @@ class SimulationBase(SUMO):
             self.history["reward"][tl_id].append(reward)
 
         # Calculate metrics
-        new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+        new_ids = self.traffic_metrics.get_vehicles_in_phase(tl, current_phase)
         
         # Calculate true outflow: vehicles that left the detection zone
         # Outflow = vehicles that were detected before but are not detected now
@@ -169,12 +172,12 @@ class SimulationBase(SUMO):
         
         st["old_vehicle_ids"] = new_ids
 
-        sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
-        sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
-        sum_density = TrafficMetrics.get_sum_density(tl)
-        sum_queue_length = TrafficMetrics.get_sum_queue_length(tl)
-        mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
-        stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
+        sum_travel_delay = self.traffic_metrics.get_sum_travel_delay(tl)
+        sum_travel_time = self.traffic_metrics.get_sum_travel_time(tl)
+        sum_density = self.traffic_metrics.get_sum_density(tl)
+        sum_queue_length = self.traffic_metrics.get_sum_queue_length(tl)
+        mean_waiting_time = self.traffic_metrics.get_mean_waiting_time(tl)
+        stopped_vehicles_count = self.traffic_metrics.count_stopped_vehicles_for_traffic_light(tl)
         
         # 2) Accumulate into both TL‐level and step‐level metrics
         st["step"]["outflow"] += outflow
@@ -232,16 +235,16 @@ class SimulationBase(SUMO):
 
         # Warm up 50 steps
         for _ in range(50):
-            traci.simulationStep()
+            self.simulation_conn.simulationStep()
 
         # 2) Main loop (one traci.simulationStep per iteration)
         while self.step < self.max_steps:
             # 2a) Step simulator
             if self.accident_manager:
                 self.accident_manager.create_accident(current_step=self.step)
-            traci.simulationStep()
-            num_vehicles += traci.simulation.getDepartedNumber()
-            num_vehicles_out += traci.simulation.getArrivedNumber()
+            self.simulation_conn.simulationStep()
+            num_vehicles += self.simulation_conn.simulation.getDepartedNumber()
+            num_vehicles_out += self.simulation_conn.simulation.getArrivedNumber()
             self.step += 1
 
             # Update vehicle tracking statistics
@@ -277,7 +280,7 @@ class SimulationBase(SUMO):
                 self._record_base_step_metrics(tl)
 
         # 3) Tear down
-        traci.close()
+        self.simulation_conn.close()
         print(
             f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} through."
         )
@@ -394,14 +397,14 @@ class SimulationBase(SUMO):
         return df
 
     def set_green_phase(self, tlsId, duration, new_phase):
-        traci.trafficlight.setPhaseDuration(tlsId, duration)
-        traci.trafficlight.setRedYellowGreenState(tlsId, new_phase)
+        self.simulation_conn.trafficlight.setPhaseDuration(tlsId, duration)
+        self.simulation_conn.trafficlight.setRedYellowGreenState(tlsId, new_phase)
 
     def get_queue_length(self, detector_id):
         """
         Get the queue length of a lane.
         """
-        return traci.lanearea.getLastStepHaltingNumber(detector_id)
+        return self.simulation_conn.lanearea.getLastStepHaltingNumber(detector_id)
 
     def get_sum_travel_delay(self, traffic_light) -> float:
         """
@@ -418,9 +421,9 @@ class SimulationBase(SUMO):
         """
         delay_sum = 0.0
 
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            speed_limit = traci.lane.getMaxSpeed(lane)
-            mean_speed = traci.lane.getLastStepMeanSpeed(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(traffic_light["id"]):
+            speed_limit = self.simulation_conn.lane.getMaxSpeed(lane)
+            mean_speed = self.simulation_conn.lane.getLastStepMeanSpeed(lane)
 
             if speed_limit > 0:
                 delay = 1.0 - (mean_speed / speed_limit)
@@ -433,13 +436,13 @@ class SimulationBase(SUMO):
         total_travel_time = 0.0
         vehicle_count = 0
         
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            vehicle_ids = traci.lane.getLastStepVehicleIDs(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(traffic_light["id"]):
+            vehicle_ids = self.simulation_conn.lane.getLastStepVehicleIDs(lane)
             for vehicle_id in vehicle_ids:
                 try:
                     # Get actual travel time for each vehicle
-                    departure_time = traci.vehicle.getDeparture(vehicle_id)
-                    current_time = traci.simulation.getTime()
+                    departure_time = self.simulation_conn.vehicle.getDeparture(vehicle_id)
+                    current_time = self.simulation_conn.simulation.getTime()
                     travel_time = current_time - departure_time
                     total_travel_time += travel_time
                     vehicle_count += 1
@@ -457,10 +460,10 @@ class SimulationBase(SUMO):
         total_veh = 0
         total_length = 0.0
 
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(traffic_light["id"]):
             try:
-                count = traci.lane.getLastStepVehicleNumber(lane)
-                lane_len = traci.lane.getLength(lane)
+                count = self.simulation_conn.lane.getLastStepVehicleNumber(lane)
+                lane_len = self.simulation_conn.lane.getLength(lane)
                 total_veh += count
                 total_length += lane_len
             except Exception:
@@ -498,8 +501,8 @@ class SimulationBase(SUMO):
     def get_sum_queue_length(self, traffic_light):
         """Get sum of queue lengths for a traffic light"""
         queue_lengths = []
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            length = traci.lane.getLastStepHaltingNumber(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(traffic_light["id"]):
+            length = self.simulation_conn.lane.getLastStepHaltingNumber(lane)
             if length <= 0:
                 queue_lengths.append(0.0)
             else:
@@ -511,8 +514,8 @@ class SimulationBase(SUMO):
         Estimate waiting time by summing waiting times of all vehicles in the lane.
         """
         total_waiting_time = 0.0
-        for lane in traci.trafficlight.getControlledLanes(traffic_light["id"]):
-            total_waiting_time += traci.lane.getWaitingTime(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(traffic_light["id"]):
+            total_waiting_time += self.simulation_conn.lane.getWaitingTime(lane)
 
         return total_waiting_time
 
@@ -535,8 +538,8 @@ class SimulationBase(SUMO):
         if tl_data is None:
             return 0.0
             
-        current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
-        current_local_queue = TrafficMetrics.get_mean_queue_length(tl_data)
+        current_local_wait = self.traffic_metrics.get_mean_waiting_time(tl_data)
+        current_local_queue = self.traffic_metrics.get_mean_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):
@@ -573,7 +576,7 @@ class SimulationBase(SUMO):
         
         # Combined reward: waiting time has higher weight than queue length
         # reward = waiting_reward + queue_reward
-        reward = weight["waiting_time"] * waiting_norm + weight["queue_length"] * queue_norm + weight["outflow_rate"] * outflow_norm + weight["switch_phase"] * switch_phase
+        reward = -weight["waiting_time"] * waiting_norm - weight["queue_length"] * queue_norm + weight["outflow_rate"] * outflow_norm - weight["switch_phase"] * switch_phase
         # Update snapshots for this traffic light
         self.prev_local_wait[tl_id] = current_local_wait
         # self.prev_local_queue[tl_id] = current_local_queue
@@ -588,4 +591,4 @@ class SimulationBase(SUMO):
         self.junction_tracker.reset_all()
         
         # Reset vehicle stop tracking for next episode
-        TrafficMetrics.reset_vehicle_stop_tracker()
+        self.traffic_metrics.reset_vehicle_stop_tracker()

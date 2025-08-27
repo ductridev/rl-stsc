@@ -1,9 +1,11 @@
-import libsumo as traci
+# import libsumo as traci
+import os
+import traci
 import random
 from shapely.geometry import Point, Polygon
 
 class AccidentManager:
-    def __init__(self,  start_step, duration=1000, junction_id_list = [], edge_id_list = [], detection_id_list = []):
+    def __init__(self, start_step, port: int, duration=1000, junction_id_list = [], edge_id_list = [], detection_id_list = []):
         """
         Initialize the AccidentManager class.
 
@@ -23,6 +25,11 @@ class AccidentManager:
         self.stopped_vehicle = None
         self.accident_created_step = 0
 
+        if 'LIBSUMO_AS_TRACI' not in os.environ and 'LIBTRACI_AS_TRACI' not in os.environ:
+            self.simulation_conn = traci.getConnection(f"master-{port}")
+        else:
+            self.simulation_conn = traci
+
     def count_vehicles_on_junction(self):
         """
         Counts the number of vehicles on a specific junction.
@@ -37,11 +44,11 @@ class AccidentManager:
         vehicle_ids_in_junction = []
         total_vehicles_count = 0
         for junction_id in self.junction_id_list:
-            junction_shape = Polygon(traci.junction.getShape(junction_id))
-            vehicle_ids = traci.vehicle.getIDList()
+            junction_shape = Polygon(self.simulation_conn.junction.getShape(junction_id))
+            vehicle_ids = self.simulation_conn.vehicle.getIDList()
 
             for vehicle_id in vehicle_ids:
-                vehicle_position = traci.vehicle.getPosition(vehicle_id)
+                vehicle_position = self.simulation_conn.vehicle.getPosition(vehicle_id)
                 vehicle_point = Point(vehicle_position)
                 if junction_shape.contains(vehicle_point):
                     total_vehicles_count += 1
@@ -66,9 +73,9 @@ class AccidentManager:
         vehicle_ids_in_edge_list = []
         total_vehicle_count = 0
         for edge_id in self.edge_id_list:
-            vehicle_count = traci.edge.getLastStepVehicleNumber(edge_id)
+            vehicle_count = self.simulation_conn.edge.getLastStepVehicleNumber(edge_id)
             total_vehicle_count += vehicle_count
-            vehicle_ids_in_edge = traci.edge.getLastStepVehicleIDs(edge_id)
+            vehicle_ids_in_edge = self.simulation_conn.edge.getLastStepVehicleIDs(edge_id)
             vehicle_ids_in_edge_list.extend(vehicle_ids_in_edge)
         # print(vehicle_ids_in_edge_list)
         # print(f"Type of vehicle_ids_in_edge_list: {type(vehicle_ids_in_edge_list)}")
@@ -93,11 +100,11 @@ class AccidentManager:
         for detector_id in self.detection_id_list:
             try:
                 # Get vehicles in the detector area
-                vehicle_count = traci.lanearea.getLastStepVehicleNumber(detector_id)
+                vehicle_count = self.simulation_conn.lanearea.getLastStepVehicleNumber(detector_id)
                 total_vehicle_count += vehicle_count
-                vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
+                vehicle_ids = self.simulation_conn.lanearea.getLastStepVehicleIDs(detector_id)
                 vehicle_ids_in_detectors.extend(vehicle_ids)
-            except traci.TraCIException:
+            except self.simulation_conn.TraCIException:
                 print(f"Warning: Detector {detector_id} not found or inaccessible.")
                 continue
 
@@ -114,11 +121,11 @@ class AccidentManager:
             str: ID of the stopped vehicle.
         """
         vehicle_id_stop = random.choice(vehicle_ids)
-        if traci.vehicletype.getVehicleClass(traci.vehicle.getTypeID(vehicle_id_stop)) == "pedestrian":
-            traci.vehicle.setParameter(vehicle_id_stop, "impatience",  0)
+        if self.simulation_conn.vehicletype.getVehicleClass(self.simulation_conn.vehicle.getTypeID(vehicle_id_stop)) == "pedestrian":
+            self.simulation_conn.vehicle.setParameter(vehicle_id_stop, "impatience",  0)
         else:
-            traci.vehicle.setSpeed(vehicle_id_stop, 0)
-            traci.vehicle.setLaneChangeMode(vehicle_id_stop, 0)
+            self.simulation_conn.vehicle.setSpeed(vehicle_id_stop, 0)
+            self.simulation_conn.vehicle.setLaneChangeMode(vehicle_id_stop, 0)
 
         print(f"🚦 Vehicle {vehicle_id_stop} stopped.")
         return vehicle_id_stop
@@ -129,9 +136,9 @@ class AccidentManager:
         """
         if self.stopped_vehicle is not None:
             try:
-                traci.vehicle.remove(self.stopped_vehicle)
+                self.simulation_conn.vehicle.remove(self.stopped_vehicle)
                 print(f"Vehicle {self.stopped_vehicle} removed after stopping.")
-            except traci.TraCIException:
+            except self.simulation_conn.TraCIException:
                 print(f"Vehicle {self.stopped_vehicle} could not be removed (not found).")
 
     def is_phase_blocked_by_vehicle(self, tl_id: str, phase_state: str, movements: list[str]) -> bool:
@@ -147,14 +154,14 @@ class AccidentManager:
         if self.stopped_vehicle is None:
             return False  # No stopped vehicle to block the phase
 
-        if self.stopped_vehicle not in traci.vehicle.getIDList():
+        if self.stopped_vehicle not in self.simulation_conn.vehicle.getIDList():
             return False  # Vehicle not present
 
-        road_id = traci.vehicle.getRoadID(self.stopped_vehicle)
-        lane_id = traci.vehicle.getLaneID(self.stopped_vehicle)
+        road_id = self.simulation_conn.vehicle.getRoadID(self.stopped_vehicle)
+        lane_id = self.simulation_conn.vehicle.getLaneID(self.stopped_vehicle)
 
         # Get controlled links (list of lists of (fromEdge, toEdge, viaLane))
-        controlled_links = traci.trafficlight.getControlledLinks(tl_id)
+        controlled_links = self.simulation_conn.trafficlight.getControlledLinks(tl_id)
 
         # Match vehicle’s current road/lane with a controlled link index
         for link_idx, link_entries in enumerate(controlled_links):
@@ -165,11 +172,11 @@ class AccidentManager:
                         return True
 
         for det in movements:
-            if traci.vehicle.getLaneID(self.stopped_vehicle) == traci.lanearea.getLaneID(det):
+            if self.simulation_conn.vehicle.getLaneID(self.stopped_vehicle) == self.simulation_conn.lanearea.getLaneID(det):
                 return True
         
         # Check collisions
-        # for col in traci.simulation.getCollisions():
+        # for col in self.simulation_conn.simulation.getCollisions():
         #     col_lane = col.lane
 
         #     # Match collision lane to a controlled link index

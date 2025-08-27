@@ -22,8 +22,6 @@ METRICS = [
     "outflow_avg",
     "queue_length_avg",
     "waiting_time_avg",
-    "junction_arrival_avg",
-    "stopped_vehicles_avg",
     "travel_delay_avg",
 ]
 
@@ -42,7 +40,7 @@ COLORS = {
 }
 
 # -------------------- Run simulations --------------------
-def run_all(config_path, sims=("base", "actuated", "dqn")):
+def run_all(config_path, sims=("base", "actuated", "skrl_dqn")):
     config = import_test_configuration(config_path)
     path = set_test_path(config["models_path_name"])
 
@@ -52,7 +50,7 @@ def run_all(config_path, sims=("base", "actuated", "dqn")):
             result = test_base_simulation(config, path)
         elif sim == "actuated":
             result = test_actuated_simulation(config, path)
-        elif sim == "dqn":
+        elif sim == "skrl_dqn":
             result = test_dqn_simulation(config, path)
         else:
             continue
@@ -68,13 +66,13 @@ def build_comparison_plots(path, episode=0, metrics=None, names=None):
     if metrics is None:
         metrics = METRICS
     if names is None:
-        names = ["base", "actuated", "dqn"]
+        names = ["base", "actuated", "skrl_dqn"]
 
     # Color mapping for different simulations
     color_map = {
         "base": COLORS['primary'],
         "actuated": COLORS['accent'],
-        "dqn": COLORS['success']
+        "skrl_dqn": COLORS['success']
     }
 
     figures = []
@@ -239,7 +237,6 @@ app.layout = html.Div([
                 'border': f'1px solid {COLORS["light"]}'
             })
         ], style={'marginBottom': '30px'}),
-
         # Configuration Info
         html.Div(id="config-info", style={'marginBottom': '30px'}),
 
@@ -252,7 +249,20 @@ app.layout = html.Div([
                 'fontWeight': '600'
             }),
             html.Div(id="plots-container", children=[])
-        ])
+        ]),
+        # 🌀 Loading Wrapper
+        dcc.Loading(
+            id="loading-sim",
+            type="circle",
+            fullscreen=True,
+            style={
+                'opacity': 0.3,
+            },
+            children=[
+                html.Div(id="config-info", style={'marginBottom': '30px'}),
+                html.Div(id="plots-container", children=[]),
+            ]
+        )
     ], style={
         'maxWidth': '1200px',
         'margin': '0 auto',
@@ -300,7 +310,7 @@ def run_and_update(n_clicks, config_path):
     try:
         results, config, path = run_all(config_path)
 
-        # Configuration info with enhanced styling
+        # Configuration info
         config_info = html.Div([
             html.Div([
                 html.H4("Configuration Details", style={
@@ -332,7 +342,6 @@ def run_and_update(n_clicks, config_path):
             })
         ])
 
-        # Generate plots with enhanced styling
         figures = build_comparison_plots(path, episode=1, metrics=METRICS, names=list(results.keys()))
         plots = [
             html.Div([
@@ -383,4 +392,6 @@ def run_and_update(n_clicks, config_path):
         return error_info, []
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    if 'LIBSUMO_AS_TRACI' in os.environ or 'LIBTRACI_AS_TRACI' in os.environ:
+        raise EnvironmentError("Incompatible SUMO/TraCI environment variables set.")
+    app.run(debug=False)

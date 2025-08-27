@@ -1,6 +1,16 @@
-import libsumo as traci
+# import libsumo as traci
+import os
+import traci
 
+from sim_utils.traffic_metrics import TrafficMetrics
 class SUMO:
+    def __init__(self, port):
+        if 'LIBSUMO_AS_TRACI' not in os.environ and 'LIBTRACI_AS_TRACI' not in os.environ:
+            self.simulation_conn = traci.getConnection(f"master-{port}")
+        else:
+            self.simulation_conn = traci
+        self.traffic_metrics = TrafficMetrics(port)
+
     def get_vehicles_in_phase(self, traffic_light, phase_str):
         """
         Returns the vehicle IDs on lanes with a green signal in the specified phase.
@@ -23,7 +33,7 @@ class SUMO:
         vehicle_ids = []
         for lane in green_lanes:
             try:
-                vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(lane))
+                vehicle_ids.extend(self.simulation_conn.lanearea.getLastStepVehicleIDs(lane))
             except:
                 pass  # Skip any invalid or unavailable lanes
 
