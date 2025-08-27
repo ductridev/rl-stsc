@@ -14,7 +14,7 @@ def save_config_snapshot(config, save_path):
         print(f"Config snapshot saved to: {config_snapshot_file}")
     except Exception as e:
         print(f"Failed to save config snapshot: {e}")
-import libsumo as traci
+import traci
 import torch
 import os
 import glob
