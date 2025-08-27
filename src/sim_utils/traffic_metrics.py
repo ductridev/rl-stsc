@@ -42,8 +42,6 @@ class VehicleCompletionTracker:
                 
                 # Remove from tracking dictionary to save memory
                 del self.vehicle_departure_times[vehicle_id]
-            else:
-                print(f"DEBUG: Vehicle {vehicle_id} arrived but departure time not tracked")
     
     def get_average_total_travel_time(self) -> float:
         """Get average total travel time of all completed vehicles"""
