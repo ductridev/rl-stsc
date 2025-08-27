@@ -7,7 +7,6 @@ import math
 import numpy as np
 import torch
 import time
-import libsumo as traci
 from collections import defaultdict, deque
 from typing import Dict, List, Any, Tuple
 import sys
@@ -42,13 +41,14 @@ class Simulation(SUMO):
         traffic_lights: List[Dict],
         accident_manager: AccidentManager,
         model_file_path: str,
+        port: int,
         interphase_duration: int = 3,
         path: str = None,
         use_skrl: bool = False,
         evaluation_mode: bool = True,
     ):
         # Initialize parent class
-        super().__init__()
+        super().__init__(port)
 
         # Core configuration
         self.visualization = visualization
@@ -72,13 +72,13 @@ class Simulation(SUMO):
         self.waiting_time_normalizer = Normalizer()
 
         # Vehicle tracking
-        self.vehicle_tracker = VehicleTracker(path=self.path)
+        self.vehicle_tracker = VehicleTracker(path=self.path, port=port)
 
         # Vehicle completion tracking for episode-end travel time analysis
-        self.completion_tracker = VehicleCompletionTracker()
+        self.completion_tracker = VehicleCompletionTracker(port=port)
 
         # Junction vehicle tracking for throughput analysis
-        self.junction_tracker = JunctionVehicleTracker()
+        self.junction_tracker = JunctionVehicleTracker(port=port)
 
         # Simulation state
         self.step = 0
@@ -129,7 +129,7 @@ class Simulation(SUMO):
         print(f"Using device: {self.device}")
 
         # DESRA setup
-        self.desra = DESRA(interphase_duration=self.interphase_duration)
+        self.desra = DESRA(port=port, interphase_duration=self.interphase_duration)
 
         # DESRA configuration (default to detector-specific parameters)
         self.desra_use_global_params = False
@@ -261,7 +261,7 @@ class Simulation(SUMO):
 
         # Initialize DESRA timing
         for det in self.all_detectors:
-            self.last_desra_time[det] = traci.simulation.getTime()
+            self.last_desra_time[det] = self.simulation_conn.simulation.getTime()
 
         start_time = time.time()
 
@@ -300,7 +300,7 @@ class Simulation(SUMO):
 
         # Warm up 50 steps
         for _ in range(50):
-            traci.simulationStep()
+            self.simulation_conn.simulationStep()
 
         while self.step < self.max_steps:
             # Action selection for each traffic light
@@ -352,7 +352,7 @@ class Simulation(SUMO):
                         "phase": new_phase,
                         "old_phase": state["phase"],
                         "green_time": green_time,
-                        "old_vehicle_ids": TrafficMetrics.get_vehicles_in_phase(
+                        "old_vehicle_ids": self.traffic_metrics.get_vehicles_in_phase(
                             tl, new_phase
                         ),
                         "green_time_remaining": green_time,
@@ -367,9 +367,9 @@ class Simulation(SUMO):
             if self.accident_manager:
                 self.accident_manager.create_accident(current_step=self.step)
             try:
-                traci.simulationStep()
-                num_vehicles += traci.simulation.getDepartedNumber()
-                num_vehicles_out += traci.simulation.getArrivedNumber()
+                self.simulation_conn.simulationStep()
+                num_vehicles += self.simulation_conn.simulation.getDepartedNumber()
+                num_vehicles_out += self.simulation_conn.simulation.getArrivedNumber()
             except Exception as e:
                 print(f"SUMO simulation error at step {self.step}: {e}")
                 # Try to handle common SUMO errors
@@ -378,23 +378,23 @@ class Simulation(SUMO):
                     # Remove problematic vehicles and continue
                     try:
                         # Get list of vehicles and remove any with route issues
-                        vehicle_ids = traci.vehicle.getIDList()
+                        vehicle_ids = self.simulation_conn.vehicle.getIDList()
                         for vid in vehicle_ids:
                             try:
-                                route = traci.vehicle.getRoute(vid)
+                                route = self.simulation_conn.vehicle.getRoute(vid)
                                 if not route or len(route) == 0:
                                     print(f"Removing vehicle {vid} with invalid route")
-                                    traci.vehicle.remove(vid)
+                                    self.simulation_conn.vehicle.remove(vid)
                             except:
                                 print(f"Removing problematic vehicle {vid}")
                                 try:
-                                    traci.vehicle.remove(vid)
+                                    self.simulation_conn.vehicle.remove(vid)
                                 except:
                                     pass  # Vehicle might already be removed
                         # Try simulation step again
-                        traci.simulationStep()
-                        num_vehicles += traci.simulation.getDepartedNumber()
-                        num_vehicles_out += traci.simulation.getArrivedNumber()
+                        self.simulation_conn.simulationStep()
+                        num_vehicles += self.simulation_conn.simulation.getDepartedNumber()
+                        num_vehicles_out += self.simulation_conn.simulation.getArrivedNumber()
                     except Exception as e2:
                         print(f"Failed to recover from SUMO error: {e2}")
                         print("Ending episode early due to simulation error")
@@ -428,7 +428,7 @@ class Simulation(SUMO):
             # Update DESRA traffic parameters for real-time adaptation
             # Only update every 100 steps to reduce computational overhead
             if self.step % 100 == 0:
-                current_time = traci.simulation.getTime()
+                current_time = self.simulation_conn.simulation.getTime()
                 for det in self.all_detectors:
                     self.desra.update_traffic_parameters(det, current_time)
 
@@ -450,7 +450,7 @@ class Simulation(SUMO):
                 current_phase = st["phase"]
 
                 # Calculate metrics
-                new_ids = TrafficMetrics.get_vehicles_in_phase(tl, current_phase)
+                new_ids = self.traffic_metrics.get_vehicles_in_phase(tl, current_phase)
                 # Calculate true outflow: vehicles that left the detection zone
                 # Outflow = vehicles that were detected before but are not detected now
                 old_ids_set = set(st["old_vehicle_ids"])
@@ -458,13 +458,13 @@ class Simulation(SUMO):
                 outflow = len(old_ids_set - new_ids_set)  # Vehicles that left
                 st["old_vehicle_ids"] = new_ids
 
-                sum_travel_delay = TrafficMetrics.get_sum_travel_delay(tl)
-                sum_travel_time = TrafficMetrics.get_sum_travel_time(tl)
-                sum_density = TrafficMetrics.get_sum_density(tl)
-                sum_queue_length = TrafficMetrics.get_sum_queue_length(tl)
-                sum_waiting_time = TrafficMetrics.get_sum_waiting_time(tl)
-                mean_waiting_time = TrafficMetrics.get_mean_waiting_time(tl)
-                stopped_vehicles_count = TrafficMetrics.count_stopped_vehicles_for_traffic_light(tl)
+                sum_travel_delay = self.traffic_metrics.get_sum_travel_delay(tl)
+                sum_travel_time = self.traffic_metrics.get_sum_travel_time(tl)
+                sum_density = self.traffic_metrics.get_sum_density(tl)
+                sum_queue_length = self.traffic_metrics.get_sum_queue_length(tl)
+                sum_waiting_time = self.traffic_metrics.get_sum_waiting_time(tl)
+                mean_waiting_time = self.traffic_metrics.get_mean_waiting_time(tl)
+                stopped_vehicles_count = self.traffic_metrics.count_stopped_vehicles_for_traffic_light(tl)
 
                 # Update metrics
                 st["step_outflow_sum"] += outflow
@@ -495,7 +495,7 @@ class Simulation(SUMO):
 
                 # FIX: Removed redundant step-based training to avoid double training
 
-        traci.close()
+        self.simulation_conn.close()
         sim_time = time.time() - start_time
         print(
             f"Simulation ended — {num_vehicles} departed, {num_vehicles_out} arrived."
@@ -539,18 +539,18 @@ class Simulation(SUMO):
 
     def _record_arrivals(self):
         """Record vehicle arrivals for DESRA"""
-        t = traci.simulation.getTime()
+        t = self.simulation_conn.simulation.getTime()
         for tl in self.traffic_lights:
             for phase_str in tl["phase"]:
                 for det in self.get_movements_from_phase(tl, phase_str):
-                    lane_id = traci.lanearea.getLaneID(det)
+                    lane_id = self.simulation_conn.lanearea.getLaneID(det)
                     incoming = [
                         link[0]
-                        for link in traci.lane.getLinks(lane_id)
+                        for link in self.simulation_conn.lane.getLinks(lane_id)
                         if link[0] != lane_id
                     ]
                     raw_count = sum(
-                        traci.lane.getLastStepVehicleNumber(l) for l in incoming
+                        self.simulation_conn.lane.getLastStepVehicleNumber(l) for l in incoming
                     )
                     self.arrival_buffers[det].append((t, raw_count))
 
@@ -624,7 +624,7 @@ class Simulation(SUMO):
         self.junction_tracker.reset_all()
 
         # Reset vehicle stop tracking for next episode
-        TrafficMetrics.reset_vehicle_stop_tracker()
+        self.traffic_metrics.reset_vehicle_stop_tracker()
 
         return 0.0  # Return dummy training time
 
@@ -652,13 +652,13 @@ class Simulation(SUMO):
 
             lane_waiting_time = 0.0
             for det in movements:
-                for veh in traci.lanearea.getLastStepVehicleIDs(det):
+                for veh in self.simulation_conn.lanearea.getLastStepVehicleIDs(det):
                     # Get cumulative waiting time for all vehicles in lane
-                    lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
+                    lane_waiting_time += self.simulation_conn.vehicle.getAccumulatedWaitingTime(veh)
                 # Get number of vehicles currently in lane
-                num_vehicles += traci.lanearea.getLastStepVehicleNumber(det)
+                num_vehicles += self.simulation_conn.lanearea.getLastStepVehicleNumber(det)
 
-                queue_length = TrafficMetrics.get_queue_length(det)
+                queue_length = self.traffic_metrics.get_queue_length(det)
                 highest_queue_length = queue_length if queue_length > highest_queue_length else highest_queue_length
 
             # Fill per-phase features
@@ -669,7 +669,7 @@ class Simulation(SUMO):
             ])
 
         q_arr_dict = self._compute_arrival_flows()
-        current_time = traci.simulation.getTime()
+        current_time = self.simulation_conn.simulation.getTime()
 
         (
             use_global_params,
@@ -758,8 +758,8 @@ class Simulation(SUMO):
         if tl_data is None:
             return 0.0
             
-        current_local_wait = TrafficMetrics.get_mean_waiting_time(tl_data)
-        current_local_queue = TrafficMetrics.get_mean_queue_length(tl_data)
+        current_local_wait = self.traffic_metrics.get_mean_waiting_time(tl_data)
+        current_local_queue = self.traffic_metrics.get_mean_queue_length(tl_data)
         
         # Initialize per-TL waiting time and queue length tracking if not exists
         if not hasattr(self, 'prev_local_wait'):
@@ -804,7 +804,7 @@ class Simulation(SUMO):
 
     def get_movements_from_phase(self, tl: Dict, phase_str: str) -> List[str]:
         """Get movement detectors from a phase"""
-        return TrafficMetrics.get_movements_from_phase(tl, phase_str)
+        return self.traffic_metrics.get_movements_from_phase(tl, phase_str)
 
     def get_yellow_phase(self, green_phase: str) -> str:
         """Convert green phase to yellow phase"""
@@ -813,18 +813,18 @@ class Simulation(SUMO):
     def set_yellow_phase(self, tl_id: str, green_phase: str):
         """Set yellow phase for a traffic light"""
         yellow_phase = self.get_yellow_phase(green_phase)
-        traci.trafficlight.setPhaseDuration(tl_id, 3)
-        traci.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
+        self.simulation_conn.trafficlight.setPhaseDuration(tl_id, 3)
+        self.simulation_conn.trafficlight.setRedYellowGreenState(tl_id, yellow_phase)
 
     def set_green_phase(self, tl_id: str, green_time: int, phase: str):
         """Set green phase for a traffic light"""
-        traci.trafficlight.setPhaseDuration(tl_id, green_time)
-        traci.trafficlight.setRedYellowGreenState(tl_id, phase)
+        self.simulation_conn.trafficlight.setPhaseDuration(tl_id, green_time)
+        self.simulation_conn.trafficlight.setRedYellowGreenState(tl_id, phase)
 
     def _compute_arrival_flows(self):
         """Turn each detector's deque of (t,count) into a veh/s over
         the exact interval since the last DESRA call."""
-        now = traci.simulation.getTime()
+        now = self.simulation_conn.simulation.getTime()
         q_arrivals = {}
         for det, buf in self.arrival_buffers.items():
             t0 = self.last_desra_time[det]

@@ -2,6 +2,7 @@
 Traffic metrics calculation utilities.
 """
 
+import os
 import numpy as np
 # import libsumo as traci
 import traci
@@ -11,27 +12,31 @@ from typing import Dict, List
 class VehicleCompletionTracker:
     """Tracks completed vehicles and their total travel times for episode-end analysis"""
     
-    def __init__(self):
+    def __init__(self, port):
         self.completed_vehicles = []
         self.total_travel_times = []
         self.vehicle_departure_times = {}  # Store departure times of active vehicles
-        
+        if 'LIBSUMO_AS_TRACI' not in os.environ and 'LIBTRACI_AS_TRACI' not in os.environ:
+            self.simulation_conn = traci.getConnection(f"master-{port}")
+        else:
+            self.simulation_conn = traci
+
     def update_completed_vehicles(self):
         """Call each simulation step to track newly arrived vehicles"""
         # First, track departure times of all current vehicles
-        current_vehicles = traci.simulation.getDepartedIDList()
+        current_vehicles = self.simulation_conn.simulation.getDepartedIDList()
         for vehicle_id in current_vehicles:
             if vehicle_id not in self.vehicle_departure_times:
                 try:
-                    departure_time = traci.vehicle.getDeparture(vehicle_id)
+                    departure_time = self.simulation_conn.vehicle.getDeparture(vehicle_id)
                     self.vehicle_departure_times[vehicle_id] = departure_time
                 except:
                     # Fallback to current simulation time if getDeparture fails
-                    self.vehicle_departure_times[vehicle_id] = traci.simulation.getTime()
+                    self.vehicle_departure_times[vehicle_id] = self.simulation_conn.simulation.getTime()
         
         # Track vehicles that have arrived at their destination
-        arrived_vehicles = traci.simulation.getArrivedIDList()
-        current_time = traci.simulation.getTime()
+        arrived_vehicles = self.simulation_conn.simulation.getArrivedIDList()
+        current_time = self.simulation_conn.simulation.getTime()
         for vehicle_id in arrived_vehicles:
             if vehicle_id in self.vehicle_departure_times:
                 departure_time = self.vehicle_departure_times[vehicle_id]
@@ -63,15 +68,19 @@ class VehicleCompletionTracker:
 
 class TrafficMetrics:
     """Utility class for calculating traffic metrics"""
+    def __init__(self, port):
+        if 'LIBSUMO_AS_TRACI' not in os.environ and 'LIBTRACI_AS_TRACI' not in os.environ:
+            self.simulation_conn = traci.getConnection(f"master-{port}")
+        else:
+            self.simulation_conn = traci
 
-    @staticmethod
-    def get_sum_travel_delay(tl: Dict) -> float:
+    def get_sum_travel_delay(self, tl: Dict) -> float:
         """Get sum of travel delays for a traffic light"""
         delay_sum = 0.0
 
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            speed_limit = traci.lane.getMaxSpeed(lane)
-            mean_speed = traci.lane.getLastStepMeanSpeed(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
+            speed_limit = self.simulation_conn.lane.getMaxSpeed(lane)
+            mean_speed = self.simulation_conn.lane.getLastStepMeanSpeed(lane)
 
             if speed_limit > 0:
                 delay = 1.0 - (mean_speed / speed_limit)
@@ -79,19 +88,18 @@ class TrafficMetrics:
 
         return delay_sum
 
-    @staticmethod
-    def get_sum_travel_time(tl: Dict) -> float:
+    def get_sum_travel_time(self, tl: Dict) -> float:
         """Calculate average actual travel time of vehicles in the intersection area"""
         total_travel_time = 0.0
         vehicle_count = 0
         
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            vehicle_ids = traci.lane.getLastStepVehicleIDs(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
+            vehicle_ids = self.simulation_conn.lane.getLastStepVehicleIDs(lane)
             for vehicle_id in vehicle_ids:
                 try:
                     # Get actual travel time for each vehicle
-                    departure_time = traci.vehicle.getDeparture(vehicle_id)
-                    current_time = traci.simulation.getTime()
+                    departure_time = self.simulation_conn.vehicle.getDeparture(vehicle_id)
+                    current_time = self.simulation_conn.simulation.getTime()
                     travel_time = current_time - departure_time
                     total_travel_time += travel_time
                     vehicle_count += 1
@@ -101,16 +109,15 @@ class TrafficMetrics:
         # Return average travel time per vehicle (or 0 if no vehicles)
         return total_travel_time / vehicle_count if vehicle_count > 0 else 0.0
 
-    @staticmethod
-    def get_sum_density(tl: Dict) -> float:
+    def get_sum_density(self, tl: Dict) -> float:
         """Get sum of densities for a traffic light"""
         total_veh = 0
         total_length = 0.0
 
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
             try:
-                count = traci.lane.getLastStepVehicleNumber(lane)
-                lane_len = traci.lane.getLength(lane)
+                count = self.simulation_conn.lane.getLastStepVehicleNumber(lane)
+                lane_len = self.simulation_conn.lane.getLength(lane)
                 total_veh += count
                 total_length += lane_len
             except Exception:
@@ -121,58 +128,54 @@ class TrafficMetrics:
         else:
             return 0.0
 
-    @staticmethod
-    def get_sum_queue_length(tl: Dict) -> float:
+    def get_sum_queue_length(self, tl: Dict) -> float:
         """Get sum of queue lengths for a traffic light"""
         queue_lengths = []
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            length = traci.lane.getLastStepLength(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
+            length = self.simulation_conn.lane.getLastStepLength(lane)
             if length <= 0:
                 queue_lengths.append(0.0)
             else:
                 queue_lengths.append(length)
         return np.sum(queue_lengths) if queue_lengths else 0.0
-    
-    @staticmethod
-    def get_mean_queue_length(tl: Dict) -> float:
+
+    def get_mean_queue_length(self, tl: Dict) -> float:
         """Get mean queue length for a traffic light"""
         total_queue_length = 0.0
         total_lanes = 0
 
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            length = traci.lane.getLastStepLength(lane)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
+            length = self.simulation_conn.lane.getLastStepLength(lane)
             if length > 0:
                 total_queue_length += length
                 total_lanes += 1
 
         return total_queue_length / total_lanes if total_lanes > 0 else 0.0
 
-    @staticmethod
-    def get_sum_waiting_time(tl: Dict) -> float:
+    def get_sum_waiting_time(self, tl: Dict) -> float:
         """Get sum of waiting times for a traffic light"""
         total_waiting_time = 0.0
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
-            for veh in traci.lane.getLastStepVehicleIDs(lane):
-                total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
+            for veh in self.simulation_conn.lane.getLastStepVehicleIDs(lane):
+                total_waiting_time += self.simulation_conn.vehicle.getAccumulatedWaitingTime(veh)
         return total_waiting_time
 
-    @staticmethod
-    def get_mean_waiting_time(tl: Dict) -> float:
+    def get_mean_waiting_time(self, tl: Dict) -> float:
         """Get mean waiting time per vehicle for a traffic light"""
         total_waiting_time = 0.0
         total_vehicles = 0
         non_stop_vehicles = 0
 
-        for lane in traci.trafficlight.getControlledLanes(tl["id"]):
+        for lane in self.simulation_conn.trafficlight.getControlledLanes(tl["id"]):
             lane_waiting_time = 0.0
-            for veh in traci.lane.getLastStepVehicleIDs(lane):
+            for veh in self.simulation_conn.lane.getLastStepVehicleIDs(lane):
                 # Get cumulative waiting time for all vehicles in lane
-                lane_waiting_time += traci.vehicle.getAccumulatedWaitingTime(veh)
-                if traci.vehicle.getAccumulatedWaitingTime(veh) == 0:
+                lane_waiting_time += self.simulation_conn.vehicle.getAccumulatedWaitingTime(veh)
+                if self.simulation_conn.vehicle.getAccumulatedWaitingTime(veh) == 0:
                     non_stop_vehicles += 1
                 
             # Get number of vehicles currently in lane
-            vehicle_count = traci.lane.getLastStepVehicleNumber(lane)
+            vehicle_count = self.simulation_conn.lane.getLastStepVehicleNumber(lane)
 
             total_waiting_time += lane_waiting_time
             total_vehicles += vehicle_count
@@ -180,10 +183,9 @@ class TrafficMetrics:
         # Return mean waiting time per vehicle
         return total_waiting_time / (total_vehicles - non_stop_vehicles) if total_vehicles - non_stop_vehicles > 0 else 0.0
 
-    @staticmethod
-    def get_completed_vehicles_travel_time() -> float:
+    def get_completed_vehicles_travel_time(self) -> float:
         """Get average travel time of vehicles that arrived in the current simulation step"""
-        arrived_vehicles = traci.simulation.getArrivedIDList()
+        arrived_vehicles = self.simulation_conn.simulation.getArrivedIDList()
         if not arrived_vehicles:
             return 0.0
         
@@ -192,8 +194,8 @@ class TrafficMetrics:
         
         for vehicle_id in arrived_vehicles:
             try:
-                departure_time = traci.vehicle.getDeparture(vehicle_id)
-                arrival_time = traci.vehicle.getArrival(vehicle_id)
+                departure_time = self.simulation_conn.vehicle.getDeparture(vehicle_id)
+                arrival_time = self.simulation_conn.vehicle.getArrival(vehicle_id)
                 travel_time = arrival_time - departure_time
                 total_travel_time += travel_time
                 valid_vehicles += 1
@@ -202,51 +204,45 @@ class TrafficMetrics:
         
         return total_travel_time / valid_vehicles if valid_vehicles > 0 else 0.0
 
-    @staticmethod
-    def get_queue_length(detector_id: str) -> float:
+    def get_queue_length(self, detector_id: str) -> float:
         """Get the queue length of a lane"""
-        length = traci.lanearea.getLastStepHaltingNumber(detector_id)
+        length = self.simulation_conn.lanearea.getLastStepHaltingNumber(detector_id)
         if length <= 0:
             return 0.0
         return length
 
-    @staticmethod
-    def get_waiting_time(detector_id: str) -> float:
+    def get_waiting_time(self, detector_id: str) -> float:
         """Estimate waiting time by summing waiting times of all vehicles in the lane"""
-        vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
+        vehicle_ids = self.simulation_conn.lanearea.getLastStepVehicleIDs(detector_id)
         total_waiting_time = 0.0
         for vid in vehicle_ids:
-            total_waiting_time += traci.vehicle.getAccumulatedWaitingTime(vid)
+            total_waiting_time += self.simulation_conn.vehicle.getAccumulatedWaitingTime(vid)
         return total_waiting_time
 
-    @staticmethod
-    def get_num_vehicles(detector_id: str) -> int:
+    def get_num_vehicles(self, detector_id: str) -> int:
         """Get number of vehicles in detector"""
-        return traci.lanearea.getLastStepVehicleNumber(detector_id)
+        return self.simulation_conn.lanearea.getLastStepVehicleNumber(detector_id)
     
-    @staticmethod
-    def get_speed(detector_id: str) -> float:
+    def get_speed(self, detector_id: str) -> float:
         """Get average speed of vehicles in detector"""
-        vehicle_ids = traci.lanearea.getLastStepVehicleIDs(detector_id)
+        vehicle_ids = self.simulation_conn.lanearea.getLastStepVehicleIDs(detector_id)
         total_speed = 0.0
         for vid in vehicle_ids:
-            total_speed += traci.vehicle.getSpeed(vid)
+            total_speed += self.simulation_conn.vehicle.getSpeed(vid)
         return total_speed
     
-    @staticmethod
-    def get_occupance(detector_id: str) -> float:
+    def get_occupance(self, detector_id: str) -> float:
         """Get occupancy of a lane"""
-        return traci.lanearea.getLastStepOccupancy(detector_id)
+        return self.simulation_conn.lanearea.getLastStepOccupancy(detector_id)
 
-    @staticmethod
-    def get_vehicles_in_phase(tl: Dict, phase_str: str) -> List[str]:
+    def get_vehicles_in_phase(self, tl: Dict, phase_str: str) -> List[str]:
         """Get vehicle IDs in a phase"""
         lane_idxs = [detector["id"] for detector in tl["detectors"]]
 
         vehicle_ids = []
         for lane in lane_idxs:
             try:
-                vehicle_ids.extend(traci.lanearea.getLastStepVehicleIDs(lane))
+                vehicle_ids.extend(self.simulation_conn.lanearea.getLastStepVehicleIDs(lane))
             except:
                 pass  # Skip any invalid or unavailable lanes
 
@@ -267,8 +263,7 @@ class TrafficMetrics:
 
         return active_detectors
 
-    @staticmethod
-    def count_vehicles_in_junction(junction_id: str) -> tuple:
+    def count_vehicles_in_junction(self, junction_id: str) -> tuple:
         """
         Count the number of vehicles currently in a specific junction using geometric containment.
         Uses the same logic as AccidentManager.count_vehicles_on_junction().
@@ -289,14 +284,14 @@ class TrafficMetrics:
         
         try:
             # Get junction shape as polygon
-            junction_shape = Polygon(traci.junction.getShape(junction_id))
-            vehicle_ids = traci.vehicle.getIDList()
+            junction_shape = Polygon(self.simulation_conn.junction.getShape(junction_id))
+            vehicle_ids = self.simulation_conn.vehicle.getIDList()
             
             vehicle_ids_in_junction = []
             
             for vehicle_id in vehicle_ids:
                 try:
-                    vehicle_position = traci.vehicle.getPosition(vehicle_id)
+                    vehicle_position = self.simulation_conn.vehicle.getPosition(vehicle_id)
                     vehicle_point = Point(vehicle_position)
                     
                     if junction_shape.contains(vehicle_point):
@@ -311,8 +306,7 @@ class TrafficMetrics:
             print(f"Error counting vehicles in junction {junction_id}: {e}")
             return 0, []
 
-    @staticmethod
-    def count_vehicles_in_multiple_junctions(junction_id_list: List[str]) -> tuple:
+    def count_vehicles_in_multiple_junctions(self, junction_id_list: List[str]) -> tuple:
         """
         Count the number of vehicles in multiple junctions.
         Uses the same logic as AccidentManager.count_vehicles_on_junction() for multiple junctions.
@@ -340,12 +334,12 @@ class TrafficMetrics:
         
         for junction_id in junction_id_list:
             try:
-                junction_shape = Polygon(traci.junction.getShape(junction_id))
-                vehicle_ids = traci.vehicle.getIDList()
+                junction_shape = Polygon(self.simulation_conn.junction.getShape(junction_id))
+                vehicle_ids = self.simulation_conn.vehicle.getIDList()
 
                 for vehicle_id in vehicle_ids:
                     try:
-                        vehicle_position = traci.vehicle.getPosition(vehicle_id)
+                        vehicle_position = self.simulation_conn.vehicle.getPosition(vehicle_id)
                         vehicle_point = Point(vehicle_position)
                         
                         if junction_shape.contains(vehicle_point):
@@ -363,8 +357,7 @@ class TrafficMetrics:
 
         return total_vehicles_count, vehicle_ids_in_all_junctions
     
-    @staticmethod
-    def count_vehicles_entering_junction(junction_id: str, previous_vehicles_in_junction: set = None) -> tuple:
+    def count_vehicles_entering_junction(self, junction_id: str, previous_vehicles_in_junction: set = None) -> tuple:
         """
         Count the number of vehicles that ENTERED the junction since the last call.
         This avoids counting stuck vehicles multiple times.
@@ -390,14 +383,14 @@ class TrafficMetrics:
         
         try:
             # Get junction shape as polygon
-            junction_shape = Polygon(traci.junction.getShape(junction_id))
-            vehicle_ids = traci.vehicle.getIDList()
+            junction_shape = Polygon(self.simulation_conn.junction.getShape(junction_id))
+            vehicle_ids = self.simulation_conn.vehicle.getIDList()
             
             current_vehicles_in_junction = set()
             
             for vehicle_id in vehicle_ids:
                 try:
-                    vehicle_position = traci.vehicle.getPosition(vehicle_id)
+                    vehicle_position = self.simulation_conn.vehicle.getPosition(vehicle_id)
                     vehicle_point = Point(vehicle_position)
                     
                     if junction_shape.contains(vehicle_point):
@@ -415,8 +408,7 @@ class TrafficMetrics:
             print(f"Error counting vehicles entering junction {junction_id}: {e}")
             return 0, [], set()
 
-    @staticmethod
-    def count_stopped_vehicles_for_traffic_light(tl: Dict) -> int:
+    def count_stopped_vehicles_for_traffic_light(self, tl: Dict) -> int:
         """
         Count the average number of stop events per vehicle for a traffic light.
         A stop event is when a vehicle's speed drops below threshold after being above it.
@@ -429,37 +421,37 @@ class TrafficMetrics:
         """
         # Access the global vehicle stop tracker
         if not hasattr(TrafficMetrics, '_vehicle_stop_tracker'):
-            TrafficMetrics._vehicle_stop_tracker = {}
+            self._vehicle_stop_tracker = {}
         
-        stop_tracker = TrafficMetrics._vehicle_stop_tracker
+        stop_tracker = self._vehicle_stop_tracker
         speed_threshold = 0.1  # m/s - below this is considered stopped
         total_stop_events = 0
         vehicle_count = 0
         
         try:
             # Get all lanes controlled by this traffic light
-            controlled_lanes = traci.trafficlight.getControlledLanes(tl["id"])
+            controlled_lanes = self.simulation_conn.trafficlight.getControlledLanes(tl["id"])
             
             for lane in controlled_lanes:
                 try:
                     # Get all vehicle IDs on this lane
-                    vehicle_ids = traci.lane.getLastStepVehicleIDs(lane)
+                    vehicle_ids = self.simulation_conn.lane.getLastStepVehicleIDs(lane)
                     
                     for vehicle_id in vehicle_ids:
                         try:
                             vehicle_count += 1
-                            current_speed = traci.vehicle.getSpeed(vehicle_id)
+                            current_speed = self.simulation_conn.vehicle.getSpeed(vehicle_id)
                             
                             # Initialize tracking for new vehicles
                             if vehicle_id not in stop_tracker:
                                 stop_tracker[vehicle_id] = {
                                     'stop_count': 0,
                                     'was_moving': current_speed >= speed_threshold,
-                                    'last_seen_step': traci.simulation.getTime()
+                                    'last_seen_step': self.simulation_conn.simulation.getTime()
                                 }
                             
                             vehicle_data = stop_tracker[vehicle_id]
-                            current_time = traci.simulation.getTime()
+                            current_time = self.simulation_conn.simulation.getTime()
                             
                             # Check for stop event: was moving, now stopped
                             is_currently_stopped = current_speed < speed_threshold
@@ -490,7 +482,7 @@ class TrafficMetrics:
             pass
         
         # Clean up old vehicles (not seen for more than 60 seconds)
-        current_time = traci.simulation.getTime()
+        current_time = self.simulation_conn.simulation.getTime()
         vehicles_to_remove = []
         for vehicle_id, data in stop_tracker.items():
             if current_time - data['last_seen_step'] > 60:
@@ -505,24 +497,29 @@ class TrafficMetrics:
         else:
             return 0
 
-    @staticmethod
-    def reset_vehicle_stop_tracker():
+    def reset_vehicle_stop_tracker(self):
         """
         Reset the vehicle stop tracking data. Should be called at the start of each episode.
         """
-        if hasattr(TrafficMetrics, '_vehicle_stop_tracker'):
-            TrafficMetrics._vehicle_stop_tracker.clear()
+        if hasattr(self, '_vehicle_stop_tracker'):
+            self._vehicle_stop_tracker.clear()
             print("Vehicle stop tracker reset for new episode")
 
 
 class JunctionVehicleTracker:
     """Helper class to track vehicles entering junctions over time"""
     
-    def __init__(self):
+    def __init__(self, port):
         self.previous_vehicles = {}  # junction_id -> set of vehicle IDs
         self.total_entered = {}     # junction_id -> total count of vehicles entered
         self.entered_this_step = {} # junction_id -> vehicles that entered in current step
-    
+        self.traffic_metrics = TrafficMetrics(port)
+
+        if 'LIBSUMO_AS_TRACI' not in os.environ and 'LIBTRACI_AS_TRACI' not in os.environ:
+            self.simulation_conn = traci.getConnection(f"master-{port}")
+        else:
+            self.simulation_conn = traci
+
     def update_junction(self, junction_id: str) -> tuple:
         """
         Update tracking for a specific junction and return vehicles that entered this step.
@@ -537,7 +534,7 @@ class JunctionVehicleTracker:
         previous_vehicles = self.previous_vehicles.get(junction_id, set())
         
         # Count new vehicles entering
-        new_count, new_vehicles, current_vehicles = TrafficMetrics.count_vehicles_entering_junction(
+        new_count, new_vehicles, current_vehicles = self.traffic_metrics.count_vehicles_entering_junction(
             junction_id, previous_vehicles
         )
         
@@ -572,8 +569,7 @@ class JunctionVehicleTracker:
         self.total_entered.clear()
         self.entered_this_step.clear()
     
-    @staticmethod
-    def count_stopped_vehicles() -> tuple:
+    def count_stopped_vehicles(self) -> tuple:
         """
         Count the total number of stopped vehicles in the simulation at the current step.
         A vehicle is considered stopped if its speed is below a threshold (default 0.1 m/s).
@@ -587,12 +583,12 @@ class JunctionVehicleTracker:
         STOPPED_SPEED_THRESHOLD = 0.1  # m/s - vehicles below this speed are considered stopped
         
         try:
-            vehicle_ids = traci.vehicle.getIDList()
+            vehicle_ids = self.simulation_conn.vehicle.getIDList()
             stopped_vehicles = []
             
             for vehicle_id in vehicle_ids:
                 try:
-                    speed = traci.vehicle.getSpeed(vehicle_id)
+                    speed = self.simulation_conn.vehicle.getSpeed(vehicle_id)
                     if speed <= STOPPED_SPEED_THRESHOLD:
                         stopped_vehicles.append(vehicle_id)
                 except:
@@ -605,8 +601,7 @@ class JunctionVehicleTracker:
             print(f"Error counting stopped vehicles: {e}")
             return 0, [], 0
     
-    @staticmethod
-    def count_stopped_vehicles_in_junction(junction_id: str) -> tuple:
+    def count_stopped_vehicles_in_junction(self, junction_id: str) -> tuple:
         """
         Count the number of stopped vehicles specifically within a junction area.
         
@@ -629,22 +624,22 @@ class JunctionVehicleTracker:
         
         try:
             # Get junction shape as polygon
-            junction_shape = Polygon(traci.junction.getShape(junction_id))
-            vehicle_ids = traci.vehicle.getIDList()
+            junction_shape = Polygon(self.simulation_conn.junction.getShape(junction_id))
+            vehicle_ids = self.simulation_conn.vehicle.getIDList()
             
             vehicles_in_junction = []
             stopped_vehicles_in_junction = []
             
             for vehicle_id in vehicle_ids:
                 try:
-                    vehicle_position = traci.vehicle.getPosition(vehicle_id)
+                    vehicle_position = self.simulation_conn.vehicle.getPosition(vehicle_id)
                     vehicle_point = Point(vehicle_position)
                     
                     if junction_shape.contains(vehicle_point):
                         vehicles_in_junction.append(vehicle_id)
                         
                         # Check if this vehicle is stopped
-                        speed = traci.vehicle.getSpeed(vehicle_id)
+                        speed = self.simulation_conn.vehicle.getSpeed(vehicle_id)
                         if speed <= STOPPED_SPEED_THRESHOLD:
                             stopped_vehicles_in_junction.append(vehicle_id)
                 except:

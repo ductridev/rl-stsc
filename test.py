@@ -258,10 +258,14 @@ def test_base_simulation(config, path):
     
     visualization = Visualization(path=path, dpi=100)
     
+    # Set up SUMO
+    port = set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+
     # Initialize accident manager if accident configuration exists
     accident_manager = None
     if 'accident' in config:
         accident_manager = AccidentManager(
+            port=port,
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
             # junction_id_list=[junction["id"] for junction in config['accident']['junction']],
@@ -276,13 +280,11 @@ def test_base_simulation(config, path):
         accident_manager=accident_manager,
         visualization=visualization,
         path=path,
-        save_interval=1
+        save_interval=1,
+        port=port
     )
 
     base_simulation.testing_mode = True
-    
-    # Set up SUMO
-    set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
     
     # Run simulation
     start_time = time.time()
@@ -385,10 +387,14 @@ def test_actuated_simulation(config, path):
     
     visualization = Visualization(path=path, dpi=100)
     
+    # Set up SUMO
+    port = set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+
     # Initialize accident manager if accident configuration exists
     accident_manager = None
     if 'accident' in config:
         accident_manager = AccidentManager(
+            port=port,
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
             # junction_id_list=[junction["id"] for junction in config['accident']['junction']],
@@ -406,13 +412,11 @@ def test_actuated_simulation(config, path):
         save_interval=1,
         min_green_time=config["agent"].get("min_green_time", 20),
         max_green_time=config["agent"].get("max_green_time", 60),
-        detection_threshold=config["agent"].get("detection_threshold", 2)
+        detection_threshold=config["agent"].get("detection_threshold", 2),
+        port=port
     )
 
     actuated_simulation.testing_mode = True
-    
-    # Set up SUMO
-    set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
     
     # Run simulation
     start_time = time.time()
@@ -586,10 +590,15 @@ def test_dqn_simulation(config, path, specific_model_file=None):
     
     visualization = Visualization(path=path, dpi=100)
     
+    # Set up SUMO
+    # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
+    port = set_sumo(True, config["sumo_cfg_file"], config["max_steps"])
+
     # Initialize accident manager if accident configuration exists
     accident_manager = None
     if 'accident' in config:
         accident_manager = AccidentManager(
+            port=port,
             start_step=config['accident']['start_step'],
             duration=config['accident']['duration'],
             # junction_id_list=[junction["id"] for junction in config['accident']['junction']],
@@ -606,12 +615,9 @@ def test_dqn_simulation(config, path, specific_model_file=None):
         interphase_duration=config["interphase_duration"],
         path=path,
         model_file_path=model_file_path,
-        use_skrl=True
+        use_skrl=True,
+        port=port
     )
-    
-    # Set up SUMO
-    # set_sumo(config["gui"], config["sumo_cfg_file"], config["max_steps"])
-    set_sumo(True, config["sumo_cfg_file"], config["max_steps"])
     
     # Run simulation with episode=1 (pure exploitation mode since model is loaded)
     start_time = time.time()
@@ -1348,12 +1354,6 @@ def main():
 
     # Save config snapshot after testing
     save_config_snapshot(config, path)
-    
-    # Clean up
-    try:
-        traci.close()
-    except:
-        pass
 
 
 if __name__ == "__main__":
