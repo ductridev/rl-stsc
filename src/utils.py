@@ -1,3 +1,11 @@
+import random
+import socket
+
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))  # Bind to a free port provided by the host.
+        return s.getsockname()[1]  # Return the port number assigned.
+
 def set_sumo(gui, sumo_cfg_file, max_steps):
     """
     Set up the SUMO environment for the simulation.
@@ -13,18 +21,22 @@ def set_sumo(gui, sumo_cfg_file, max_steps):
     """
     import os
     import sys
-    # import libsumo as traci
+    # import traci
     import traci
     # Add SUMO tools to Python path
     sys.path.append(os.path.join(os.environ["SUMO_HOME"], "tools"))
 
     print("Starting SUMO...")
 
+    port = get_free_port()
+
+    print(f"Using port: {port}")
+
     # Start SUMO with GUI or without GUI
     if gui:
-        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label="master")
+        traci.start(["sumo-gui", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label=f"master-{port}", port=port)
     else:
-        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label="master")
+        traci.start(["sumo", "-c", os.path.join(os.getcwd(), sumo_cfg_file), "--no-step-log", "true", "--waiting-time-memory", str(max_steps), "-W", "true",  "--duration-log.disable"], label=f"master-{port}", port=port)
 
 def set_train_path(model_name):
     """
