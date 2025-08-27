@@ -237,7 +237,6 @@ app.layout = html.Div([
                 'border': f'1px solid {COLORS["light"]}'
             })
         ], style={'marginBottom': '30px'}),
-
         # Configuration Info
         html.Div(id="config-info", style={'marginBottom': '30px'}),
 
@@ -250,7 +249,20 @@ app.layout = html.Div([
                 'fontWeight': '600'
             }),
             html.Div(id="plots-container", children=[])
-        ])
+        ]),
+        # 🌀 Loading Wrapper
+        dcc.Loading(
+            id="loading-sim",
+            type="circle",
+            fullscreen=True,
+            style={
+                'opacity': 0.3,
+            },
+            children=[
+                html.Div(id="config-info", style={'marginBottom': '30px'}),
+                html.Div(id="plots-container", children=[]),
+            ]
+        )
     ], style={
         'maxWidth': '1200px',
         'margin': '0 auto',
@@ -298,7 +310,7 @@ def run_and_update(n_clicks, config_path):
     try:
         results, config, path = run_all(config_path)
 
-        # Configuration info with enhanced styling
+        # Configuration info
         config_info = html.Div([
             html.Div([
                 html.H4("Configuration Details", style={
@@ -330,7 +342,6 @@ def run_and_update(n_clicks, config_path):
             })
         ])
 
-        # Generate plots with enhanced styling
         figures = build_comparison_plots(path, episode=1, metrics=METRICS, names=list(results.keys()))
         plots = [
             html.Div([
@@ -381,4 +392,4 @@ def run_and_update(n_clicks, config_path):
         return error_info, []
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
