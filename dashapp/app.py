@@ -18,12 +18,12 @@ from src.utils import import_test_configuration, set_test_path
 
 # -------------------- Metrics --------------------
 METRICS = [
-    "density_avg",
-    "travel_time_avg",
-    "outflow_avg",
-    "queue_length_avg",
     "waiting_time_avg",
     "travel_delay_avg",
+    "outflow_avg",
+    "queue_length_avg",
+    "density_avg",
+    "travel_time_avg",
 ]
 
 # -------------------- Color Scheme --------------------
