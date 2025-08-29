@@ -1,3 +1,4 @@
+import traci
 import matplotlib
 matplotlib.use("Agg")  # avoid Tkinter GUI backend
 import dash
@@ -392,6 +393,4 @@ def run_and_update(n_clicks, config_path):
         return error_info, []
 
 if __name__ == "__main__":
-    if 'LIBSUMO_AS_TRACI' in os.environ or 'LIBTRACI_AS_TRACI' in os.environ:
-        raise EnvironmentError("Incompatible SUMO/TraCI environment variables set.")
-    app.run(debug=False)
+    app.run(host='0.0.0.0', port=8050, debug=False)
